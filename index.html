@@ -19,6 +19,7 @@
             --input-bg: #252529;
             --secondary-btn: #4E5561;
             --accent-color: #FFD25C;
+            --success-color: #4EFA87;
         }
 
         body {
@@ -114,6 +115,7 @@
             box-sizing: border-box;
         }
 
+        button:disabled { background-color: #3A3A42 !important; color: #72727A !important; cursor: not-allowed; }
         button.secondary { background-color: var(--secondary-btn); color: white; }
         .switch-link { display: inline-block; margin-top: 15px; color: var(--primary-color); text-decoration: underline; font-size: 14px; cursor: pointer; }
         .room-info { background-color: #252A36; padding: 12px; border-radius: 8px; font-size: 18px; font-weight: 700; color: var(--primary-color); margin-bottom: 20px; border: 1px solid #2D3748; }
@@ -157,6 +159,17 @@
         .role-box { padding: 20px; border-radius: 12px; font-size: 22px; font-weight: bold; margin: 20px 0; border: 2px solid transparent; }
         .role-box.liar { background-color: #3d1d1d; border-color: var(--danger-color); color: #ff8b8b; }
         .role-box.citizen { background-color: #1d3322; border-color: #5cff86; color: #aeffc3; line-height: 1.6; }
+
+        /* 신규 생존 라벨 및 게이지 스타일 */
+        .status-badge { font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: bold; }
+        .status-badge.waiting { background-color: #3A3A42; color: #B3B3B9; }
+        .status-badge.success { background-color: #1D3322; color: var(--success-color); border: 1px solid var(--success-color); }
+
+        .balance-box { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
+        .balance-option-btn { background-color: #252529; color: white; border: 2px solid #3A3A42; padding: 16px; font-size: 16px; border-radius: 12px; transition: all 0.2s; text-align: left; position: relative; overflow: hidden; }
+        .balance-option-btn.selected { border-color: var(--primary-color); background-color: #1B2433; }
+        .balance-gauge { position: absolute; top: 0; left: 0; height: 100%; background-color: rgba(92,159,255,0.15); width: 0%; transition: width 0.5s ease-out; z-index: 1; }
+        .balance-text { position: relative; z-index: 2; display: flex; justify-content: space-between; width: 100%; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -182,11 +195,12 @@
     <div id="lobby-screen" class="screen">
         <div class="room-info">방 코드: <span id="display-room-code">----</span></div>
         <p style="text-align: left; margin: 5px; font-weight: bold; color: var(--primary-color); font-size: 14px;">🎲 다음 게임 선택</p>
-        <div class="game-tabs">
+        <div class="game-tabs" style="grid-template-columns: 1fr 1fr 1fr; font-size: 11px;">
             <button class="tab-btn active" id="tab-liar" onclick="selectGameMode('liar')">🤫 라이어</button>
             <button class="tab-btn" id="tab-draw" onclick="selectGameMode('draw')">📐 도형그리기</button>
             <button class="tab-btn" id="tab-bomb" onclick="selectGameMode('bomb')">💣 폭탄돌리기</button>
             <button class="tab-btn" id="tab-speed" onclick="selectGameMode('speed')">⚡ 초성대결</button>
+            <button class="tab-btn" id="tab-balance" onclick="selectGameMode('balance')" style="grid-column: span 2;">⚖️ 밸런스 게임 (소수결)</button>
         </div>
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
         <ul id="player-list" class="player-list"></ul>
@@ -235,12 +249,47 @@
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 8px; letter-spacing: 1px;">제시된 순수 초성</div>
             <div class="quiz-question" id="speed-chosung-display" style="font-size: 42px; color: #66B2FF; letter-spacing: 5px;">???</div>
         </div>
-        <div id="speed-winner-box" style="background: #151518; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; font-size: 15px;">
-            🥇 현재 1등 선점자: <span id="speed-winner-text" style="color: var(--accent-color);">대기 중...</span>
+        
+        <!-- 초성 대결 실시간 패배 박스 및 명단 인터페이스 -->
+        <div id="speed-explosion-box" class="role-box liar" style="display: none; font-size: 18px; margin-bottom: 15px;"></div>
+        
+        <div class="score-board" style="margin-bottom: 15px;">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">🏃 실시간 탈출 및 생존 현황</div>
+            <div id="speed-live-players"></div>
         </div>
+
         <input type="text" id="speed-answer-input" placeholder="떠오르는 정답 단어를 빠르게 입력!">
         <button id="btn-submit-speed" style="background-color: var(--primary-color); color: #121214;">⚡ 전송하기</button>
         <button id="btn-back-lobby-speed" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 신규 추가: ⚖️ 밸런스 게임 스크린 -->
+    <div id="game-balance-screen" class="screen">
+        <h2>⚖️ 밸런스 게임 (소수결)</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: #1e1e24; margin-bottom: 10px;">
+            <div style="font-size: 12px; color: #8E9AA8; margin-bottom: 4px;">눈치싸움 소수결 미션</div>
+            <div id="balance-question-title" style="font-size: 18px; font-weight: bold; color: var(--accent-color);">질문을 가져오는 중..</div>
+        </div>
+        <div id="balance-status-alert" style="font-size: 14px; font-weight: bold; color: #8E9AA8; margin-bottom: 15px;">원하는 선택지를 터치하세요!</div>
+        
+        <div class="balance-box">
+            <button class="balance-option-btn" id="btn-balance-a" onclick="submitBalanceVote('A')">
+                <div class="balance-gauge" id="gauge-a"></div>
+                <div class="balance-text"><span id="text-option-a">선택지 A</span><span id="count-option-a" style="display:none;">0명</span></div>
+            </button>
+            <button class="balance-option-btn" id="btn-balance-b" onclick="submitBalanceVote('B')">
+                <div class="balance-gauge" id="gauge-b"></div>
+                <div class="balance-text"><span id="text-option-b">선택지 B</span><span id="count-option-b" style="display:none;">0명</span></div>
+            </button>
+        </div>
+
+        <div id="balance-result-box" class="score-board" style="display: none; margin-bottom: 15px;">
+            <div style="font-size: 13px; color: var(--success-color); font-weight: bold; margin-bottom: 6px;">🎉 소수결 생존자 (적게 고른 사람)</div>
+            <div id="balance-winners-list" style="font-weight: bold; font-size: 15px; color: #fff;"></div>
+        </div>
+
+        <button id="btn-reveal-balance" style="background-color: var(--success-color); color:#121214; display:none;">📊 투표 종료 및 결과 공개 (방장용)</button>
+        <button id="btn-back-lobby-balance" class="secondary btn-back-lobby" style="margin-top: 10px;">대기실로 돌아가기</button>
     </div>
 </div>
 
@@ -263,20 +312,16 @@
     // 🤫 라이어 게임 제시어 데이터베이스 총 50개 대확장 유지
     const wordList = {
         "연예/콘텐츠 📺": [
-            "유재석", "아이유", "BTS", "뉴진스", "에스파", "아이브", "르세라핌", "세븐틴", "임영웅", 
-            "침착맨", "피식대학", "흑백요리사", "오징어게임"
+            "유재석", "아이유", "BTS", "뉴진스", "에스파", "아이브", "르세라핌", "세븐틴", "임영웅", "침착맨", "피식대학", "흑백요리사", "오징어게임"
         ],
         "요즘 먹거리 🍗": [
-            "마라탕", "탕후루", "두바이 초콜릿", "삼겹살", "치킨", "피자", "초밥", "햄버거", 
-            "요아정", "크루키", "로제떡볶이", "불닭볶음면", "소금빵"
+            "마라탕", "탕후루", "두바이 초콜릿", "삼겹살", "치킨", "피자", "초밥", "햄버거", "요아정", "크루키", "로제떡볶이", "불닭볶음면", "소금빵"
         ],
         "일상/라이프 🏠": [
-            "스마트폰", "노트북", "텀블러", "제로콜라", "다이슨 에어랩", "당근마켓", "무선 이어폰", 
-            "스타벅스", "유튜브 쇼츠", "인스타그램", "애플워치", "보조배터리"
+            "스마트폰", "노트북", "텀블러", "제로콜라", "다이슨 에어랩", "당근마켓", "무선 이어폰", "스타벅스", "유튜브 쇼츠", "인스타그램", "애플워치", "보조배터리"
         ],
         "핫플레이스 📍": [
-            "성수동", "홍대", "다이소", "올리브영", "인생네컷", "한강공원", "스타필드", "제주도", 
-            "편의점", "코인노래방", "더현대", "팝업스토어"
+            "성수동", "홍대", "다이소", "올리브영", "인생네컷", "한강공원", "스타필드", "제주도", "편의점", "코인노래방", "더현대", "팝업스토어"
         ]
     };
 
@@ -307,8 +352,8 @@
         { chosung: "ㅈㄱ", answers: ["조건", "장갑", "지구", "제과", "전공", "지갑", "중국", "작가", "증권", "직업", "지각", "정국", "주가", "주말", "재고", "장고", "진격", "저격", "제국"] },
         { chosung: "ㅊㅋ", answers: ["치킨", "추천", "창고", "체크", "초코", "치카", "차키", "추카", "초크", "치코", "청킹", "초킹", "체킹", "치클", "초케", "체쿠", "치쿠", "초키", "치킹", "청쿠"] },
         { chosung: "ㅌㅍ", answers: ["투표", "타파", "태풍", "토포", "투포", "타포", "특파", "돌풍", "통풍", "타피", "탈피", "택배", "텐트", "타패", "팀장", "토피", "투피", "특폐", "통패", "태평"] },
-        { chosung: "ㅎㅁ", answers: ["항목", "화면", "학문", "할망", "후미", "허무", "현명", "해물", "해맑", "해묵", "흑막", "효모", "향미", "한문", "항만", "호물", "희망", "황망", "환멸", "항무", "후무"] }, // '할머니' 제거 및 2글자 정답 보완
-        { chosung: "ㄱㄴ", answers: ["그네", "국내", "그냥", "개념", "겨냥", "가나", "강남", "과녁", "귀농", "권능", "기념", "고뇌", "그늘", "건낭", "계낭", "가내", "광년", "기녀", "금년", "가노"] }, // 'ㄱ낭' 오타를 정상 초성 'ㄱㄴ'으로 수정
+        { chosung: "ㅎㅁ", answers: ["항목", "화면", "학문", "할망", "후미", "허무", "현명", "해물", "해맑", "해묵", "흑막", "효모", "향미", "한문", "항만", "호물", "희망", "황망", "환멸", "항무", "후무"] },
+        { chosung: "ㄱㄴ", answers: ["그네", "국내", "그냥", "개념", "겨냥", "가나", "강남", "과녁", "귀농", "권능", "기념", "고뇌", "그늘", "건낭", "계낭", "가내", "광년", "기녀", "금년", "가노"] },
         { chosung: "ㄹㄷ", answers: ["런던", "레드", "로또", "리더", "라단", "레도", "로단", "리두", "로드", "루트", "리본", "라면", "리듬", "레몬", "루머", "로봇"] },
         { chosung: "ㅁㅈ", answers: ["모자", "문장", "매장", "먼지", "명작", "민족", "목적", "무지", "매주", "마술", "만두", "물주", "미로", "마을", "미전", "무전", "무직", "마장", "멸종", "문직"] },
         { chosung: "ㅂㄷ", answers: ["바다", "반도", "배달", "부담", "빌딩", "바둑", "부두", "부디", "밴드", "버퍼", "바닥", "방전", "변동", "비동", "보도", "복도", "백도", "방도", "부도"] },
@@ -321,6 +366,17 @@
         { chosung: "ㅍㄷ", answers: ["포도", "파도", "판다", "푸딩", "폭탄", "풍두", "포두", "패도", "편도", "팔도", "풍도", "폭도", "피도", "포동", "평도", "포데", "파동", "폐단", "풍덕", "포덕"] }
     ];
 
+    // ⚖️ 신규: 밸런스 게임 질문 Pool
+    const balancePool = [
+        { q: "평생 동안 먹어야 한다면?", a: "매일 삼겹살만 먹기", b: "매일 라면만 먹기" },
+        { q: "더 끔찍한 출퇴근 상황은?", a: "왕복 4시간 앉아서 가기", b: "왕복 1시간 지옥철 서서 가기" },
+        { q: "로또 1등 당첨 시 행동은?", a: "주변에 절대 숨기고 조용히 살기", b: "가족과 친한 친구에겐 쏘며 자랑하기" },
+        { q: "다시 태어난다면 내 직업은?", a: "월 300 버는 백수 안 부러운 한량", b: "월 2000 버는 잠 못 자는 대기업 임원" },
+        { q: "연인과 가기 더 싫은 곳은?", a: "내 전 애인과 동행하는 술자리", b: "상대방의 전 애인이 운영하는 가게" },
+        { q: "스마트폰 없이 살기 vs 탄산음료 없이 살기", a: "평생 스마트폰 없이 살기", b: "평생 모든 탄산음료 끊기" },
+        { q: "과거로 갈 수 있다면?", a: "10년 전 과거로 가서 비트코인 사기", b: "50년 후 미래로 가서 기술 훔쳐오기" }
+    ];
+
     let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
     const canvas = document.getElementById('drawing-canvas');
     const ctx = canvas.getContext('2d');
@@ -329,7 +385,6 @@
 
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('join-mode-box').style.display = 'block';
-        document.getElementById('create-mode-box').style.display = 'none';
         clearCanvas();
     });
 
@@ -366,11 +421,6 @@
     };
     document.getElementById('btn-close-modal').addEventListener('click', () => {
         document.getElementById('global-image-modal').style.display = 'none';
-    });
-    document.getElementById('global-image-modal').addEventListener('click', (e) => {
-        if(e.target === document.getElementById('global-image-modal')) {
-            document.getElementById('global-image-modal').style.display = 'none';
-        }
     });
 
     document.getElementById('btn-create-room').addEventListener('click', () => {
@@ -413,15 +463,19 @@
             const players = data.players || {}; const playerIds = Object.keys(players);
             document.getElementById('player-count').innerText = playerIds.length;
 
-            const playerListEl = document.getElementById('player-list'); playerListEl.innerHTML = '';
-            playerIds.forEach(id => {
-                const li = document.createElement('li'); li.innerText = players[id].nickname;
-                if (id === myId) { li.classList.add('me'); li.innerText += " (나)"; }
-                if (players[id].isHost) { li.innerHTML += ` <span class="host-badge">방장</span>`; }
-                playerListEl.appendChild(li);
-            });
-
             if (data.selectedGame) updateTabUI(data.selectedGame);
+
+            // 대기실 유저 목록 동기화
+            const playerListEl = document.getElementById('player-list');
+            if(playerListEl) {
+                playerListEl.innerHTML = '';
+                playerIds.forEach(id => {
+                    const li = document.createElement('li'); li.innerText = players[id].nickname;
+                    if (id === myId) { li.classList.add('me'); li.innerText += " (나)"; }
+                    if (players[id].isHost) { li.innerHTML += ` <span class="host-badge">방장</span>`; }
+                    playerListEl.appendChild(li);
+                });
+            }
 
             if(data.status === 'playing') {
                 if(data.selectedGame === 'liar') {
@@ -436,59 +490,109 @@
                     document.getElementById('target-shape-text').innerText = `목표 도형: ${shapes[currentShapeIndex].name}`;
                     document.getElementById('preview-svg').innerHTML = shapes[currentShapeIndex].svg;
 
-                    const scores = data.drawScores || {};
-                    const images = data.drawImages || {};
-                    const scoreBoardEl = document.getElementById('draw-score-list');
-                    scoreBoardEl.innerHTML = '';
-                    
-                    const sorted = Object.keys(scores).map(id => ({
-                        nickname: players[id]?.nickname || '참가자',
-                        score: scores[id],
-                        img: images[id] || null
-                    })).sort((a,b) => b.score - a.score);
-
-                    if(sorted.length === 0) {
-                        scoreBoardEl.innerHTML = '<div style="color:#8E9AA8;">그림을 그린 후 아래 버튼을 눌러 제출하세요!</div>';
-                    } else {
-                        sorted.forEach(s => {
-                            const row = document.createElement('div'); row.className = 'score-row';
-                            const imgTag = s.img ? `<img src="${s.img}" class="user-drawing-thumbnail" onclick="openImageModal('${s.nickname}', '${s.img}')">` : `<div class="user-drawing-thumbnail"></div>`;
-                            row.innerHTML = `<div class="score-info"><span>👤 ${s.nickname}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`;
-                            scoreBoardEl.appendChild(row);
-                        });
-                    }
+                    const scores = data.drawScores || {}; const images = data.drawImages || {};
+                    const scoreBoardEl = document.getElementById('draw-score-list'); scoreBoardEl.innerHTML = '';
+                    const sorted = Object.keys(scores).map(id => ({ nickname: players[id]?.nickname || '참가자', score: scores[id], img: images[id] || null })).sort((a,b) => b.score - a.score);
+                    if(sorted.length === 0) { scoreBoardEl.innerHTML = '<div style="color:#8E9AA8;">그림을 그린 후 아래 버튼을 눌러 제출하세요!</div>'; } 
+                    else { sorted.forEach(s => {
+                        const row = document.createElement('div'); row.className = 'score-row';
+                        const imgTag = s.img ? `<img src="${s.img}" class="user-drawing-thumbnail" onclick="openImageModal('${s.nickname}', '${s.img}')">` : `<div class="user-drawing-thumbnail"></div>`;
+                        row.innerHTML = `<div class="score-info"><span>👤 ${s.nickname}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`;
+                        scoreBoardEl.appendChild(row);
+                    }); }
                 }
                 else if (data.selectedGame === 'bomb') {
                     showScreen('game-bomb-screen');
                     const holderNick = players[data.bombHolderId]?.nickname || "대기중";
                     const statusTextEl = document.getElementById('bomb-status-text');
                     const bombIcon = document.getElementById('bomb-icon');
-
                     if(data.bombExploded) {
                         bombIcon.innerText = "💥"; statusTextEl.innerHTML = `🚨 [${holderNick}] 폭사!`;
                         document.getElementById('quiz-box').style.display = 'none'; triggerExplosionEffect();
                     } else {
                         bombIcon.innerText = "💣";
-                        if (data.bombHolderId === myId) {
-                            statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`;
-                            document.getElementById('quiz-box').style.display = 'block';
-                            if (!localBombActive) { generateQuiz(); localBombActive = true; }
-                        } else {
-                            statusTextEl.innerHTML = `👤 폭탄 소지자: ${holderNick}`;
-                            document.getElementById('quiz-box').style.display = 'none'; localBombActive = false;
-                        }
+                        if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; if (!localBombActive) { generateQuiz(); localBombActive = true; } } 
+                        else { statusTextEl.innerHTML = `👤 폭탄 소지자: ${holderNick}`; document.getElementById('quiz-box').style.display = 'none'; localBombActive = false; }
                     }
                 }
                 else if (data.selectedGame === 'speed') {
                     showScreen('game-speed-screen');
                     document.getElementById('speed-chosung-display').innerText = data.speedChosung || "???";
-                    if(data.speedWinner) {
-                        document.getElementById('speed-winner-text').innerText = `${data.speedWinner} (${data.speedAnswer})`;
+                    
+                    const speedAnswers = data.speedAnswers || {};
+                    const liveContainer = document.getElementById('speed-live-players');
+                    liveContainer.innerHTML = '';
+
+                    playerIds.forEach(id => {
+                        const row = document.createElement('div');
+                        row.className = 'score-row';
+                        const hasAns = speedAnswers[id];
+                        const badgeClass = hasAns ? 'success' : 'waiting';
+                        const badgeText = hasAns ? `성공! (${speedAnswers[id]}) 🎉` : '입력 중.. 💬';
+                        row.innerHTML = `<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`;
+                        liveContainer.appendChild(row);
+                    });
+
+                    // 탈락자(마지막 생존자) 판정 연출 활성화
+                    const expBox = document.getElementById('speed-explosion-box');
+                    if (data.speedLoserId) {
+                        const loserNick = players[data.speedLoserId]?.nickname || "참가자";
+                        expBox.innerHTML = `💥 초성 대결 탈락 완료! 💥<br><span style="color:var(--accent-color); font-size:22px;">🚨 ${loserNick} 탈락! 벌칙 확정! 🚨</span>`;
+                        expBox.style.display = 'block';
                         document.getElementById('btn-submit-speed').disabled = true;
+                        if(data.speedLoserId === myId) { triggerExplosionEffect(); }
                     } else {
-                        document.getElementById('speed-winner-text').innerText = "아직 없음 (먼저 맞추세요!)";
-                        document.getElementById('btn-submit-speed').disabled = false;
+                        expBox.style.display = 'none';
+                        document.getElementById('btn-submit-speed').disabled = speedAnswers[myId] ? true : false;
                     }
+                }
+                else if (data.selectedGame === 'balance') {
+                    showScreen('game-balance-screen');
+                    const bIdx = data.balanceIndex || 0;
+                    document.getElementById('balance-question-title').innerText = `❓ ${balancePool[bIdx].q}`;
+                    document.getElementById('text-option-a').innerText = `🅰️ ${balancePool[bIdx].a}`;
+                    document.getElementById('text-option-b').innerText = `🅱️ ${balancePool[bIdx].b}`;
+
+                    const votes = data.balanceVotes || {};
+                    document.getElementById('btn-balance-a').className = `balance-option-btn ${votes[myId]==='A'?'selected':''}`;
+                    document.getElementById('btn-balance-b').className = `balance-option-btn ${votes[myId]==='B'?'selected':''}`;
+
+                    if (data.balanceRevealed) {
+                        document.getElementById('btn-balance-a').disabled = true;
+                        document.getElementById('btn-balance-b').disabled = true;
+                        document.getElementById('count-option-a').style.display = 'inline';
+                        document.getElementById('count-option-b').style.display = 'inline';
+                        document.getElementById('balance-result-box').style.display = 'block';
+                        document.getElementById('balance-status-alert').innerText = "📊 소수결 투표가 종료되었습니다!";
+
+                        let countA = 0, countB = 0;
+                        Object.values(votes).forEach(v => { if(v === 'A') countA++; if(v==='B') countB++; });
+                        const total = Object.keys(votes).length || 1;
+                        document.getElementById('gauge-a').style.width = `${(countA/total)*100}%`;
+                        document.getElementById('gauge-b').style.width = `${(countB/total)*100}%`;
+                        document.getElementById('count-option-a').innerText = `${countA}명`;
+                        document.getElementById('count-option-b').innerText = `${countB}명`;
+
+                        let minorSide = '';
+                        if(countA < countB) minorSide = 'A';
+                        else if(countB < countA) minorSide = 'B';
+
+                        const winList = [];
+                        playerIds.forEach(id => {
+                            if(minorSide !== '' && votes[id] === minorSide) { winList.push(`🟢 ${players[id].nickname}`); }
+                        });
+                        document.getElementById('balance-winners-list').innerHTML = winList.length > 0 ? winList.join('<br>') : "동점! 생존자가 없습니다.";
+                    } else {
+                        document.getElementById('btn-balance-a').disabled = false;
+                        document.getElementById('btn-balance-b').disabled = false;
+                        document.getElementById('gauge-a').style.width = '0%';
+                        document.getElementById('gauge-b').style.width = '0%';
+                        document.getElementById('count-option-a').style.display = 'none';
+                        document.getElementById('count-option-b').style.display = 'none';
+                        document.getElementById('balance-result-box').style.display = 'none';
+                        document.getElementById('balance-status-alert').innerText = "원하는 선택지를 눈치껏 터치하세요!";
+                    }
+                    document.getElementById('btn-reveal-balance').style.display = (isHost && !data.balanceRevealed) ? 'block' : 'none';
                 }
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => btn.style.display = isHost ? 'block' : 'none');
             }
@@ -508,9 +612,6 @@
     canvas.addEventListener('mousedown', (e) => startDrawing(getCanvasCoordinates(e)));
     canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); });
     canvas.addEventListener('mouseup', () => isDrawing = false);
-    canvas.addEventListener('touchstart', (e) => { startDrawing(getCanvasCoordinates(e)); e.preventDefault(); });
-    canvas.addEventListener('touchmove', (e) => { if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); e.preventDefault(); });
-    canvas.addEventListener('touchend', () => isDrawing = false);
 
     document.getElementById('btn-submit-score').addEventListener('click', () => {
         if (userDrawingPoints.length < 5) return alert("도형을 그린 뒤 제출해주세요!");
@@ -521,25 +622,17 @@
         for (let i = 0; i < userDrawingPoints.length; i += step) {
             if (!userDrawingPoints[i]) continue;
             const uPt = userDrawingPoints[i]; let minDist = Infinity;
-            target.points.forEach(tPt => {
-                const dist = Math.sqrt((uPt.x - tPt.x)**2 + (uPt.y - tPt.y)**2);
-                if (dist < minDist) minDist = dist;
-            });
+            target.points.forEach(tPt => { const dist = Math.sqrt((uPt.x - tPt.x)**2 + (uPt.y - tPt.y)**2); if (dist < minDist) minDist = dist; });
             totalMinDist += minDist;
         }
         let finalScore = Math.round(Math.max(0, 100 - ((totalMinDist / sampleCount) * 1.5)));
-
         const thumb = document.createElement('canvas'); thumb.width = 60; thumb.height = 60;
-        const tCtx = thumb.getContext('2d'); tCtx.drawImage(canvas, 0, 0, 60, 60);
-        const base64Image = thumb.toDataURL('image/jpeg', 0.5);
+        thumb.getContext('2d').drawImage(canvas, 0, 0, 60, 60);
 
         const updates = {};
         updates[`rooms/${currentRoomCode}/drawScores/${myId}`] = finalScore;
-        updates[`rooms/${currentRoomCode}/drawImages/${myId}`] = base64Image;
-
-        update(ref(db), updates).then(() => {
-            alert(`🎉 제출 성공! 내 점수: ${finalScore}점`);
-        });
+        updates[`rooms/${currentRoomCode}/drawImages/${myId}`] = thumb.toDataURL('image/jpeg', 0.5);
+        update(ref(db), updates).then(() => alert(`🎉 제출 성공! 내 점수: ${finalScore}점`));
     });
 
     document.getElementById('btn-submit-speed').addEventListener('click', () => {
@@ -547,21 +640,39 @@
         if(!userAns) return alert("단어를 입력하세요!");
 
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
-            const rData = snap.val(); if(!rData || rData.speedWinner) return;
+            const rData = snap.val(); if(!rData || rData.speedLoserId) return;
             const targetIdx = rData.speedChosungIndex;
-            const validAnswers = chosungPool[targetIdx].answers;
+            if(!chosungPool[targetIdx].answers.includes(userAns)) return alert("❌ 등록되지 않았거나 틀린 단어입니다!");
 
-            if(validAnswers.includes(userAns)) {
-                const up = {};
-                up[`rooms/${currentRoomCode}/speedWinner`] = myNickname;
-                up[`rooms/${currentRoomCode}/speedAnswer`] = userAns;
-                update(ref(db), up).then(() => {
-                    document.getElementById('speed-answer-input').value = '';
-                });
-            } else {
-                alert("❌ 등록되지 않았거나 유효하지 않은 단어입니다!");
+            const players = rData.players || {}; const pIds = Object.keys(players);
+            const currentAnswers = rData.speedAnswers || {};
+            
+            // 이미 정답을 낸 유저가 또 내는것 방지
+            if (currentAnswers[myId]) return;
+
+            const updates = {};
+            updates[`rooms/${currentRoomCode}/speedAnswers/${myId}`] = userAns;
+
+            const answeredCount = Object.keys(currentAnswers).length + 1;
+            // 꼴찌(마지막 생존 탈락자) 자동 확정 트리거
+            if (answeredCount === pIds.length - 1) {
+                const loserId = pIds.find(id => id !== myId && !currentAnswers[id]);
+                if(loserId) updates[`rooms/${currentRoomCode}/speedLoserId`] = loserId;
             }
+
+            update(ref(db), updates).then(() => { document.getElementById('speed-answer-input').value = ''; });
         });
+    });
+
+    window.submitBalanceVote = function(choice) {
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            if(snap.val()?.balanceRevealed) return;
+            set(ref(db, `rooms/${currentRoomCode}/balanceVotes/${myId}`), choice);
+        });
+    }
+
+    document.getElementById('btn-reveal-balance').addEventListener('click', () => {
+        update(ref(db, `rooms/${currentRoomCode}`), { balanceRevealed: true });
     });
 
     function generateQuiz() {
@@ -574,8 +685,7 @@
 
         const opts = new Set([a]);
         while(opts.size < 4){
-            const offsets = [-10, -5, -2, -1, 1, 2, 5, 10];
-            const f = a + offsets[Math.floor(Math.random()*offsets.length)];
+            const offsets = [-10, -5, -2, -1, 1, 2, 5, 10]; const f = a + offsets[Math.floor(Math.random()*offsets.length)];
             if(f !== a && f > 0) opts.add(f);
         }
         const arr = Array.from(opts).sort(() => Math.random() - 0.5);
@@ -589,7 +699,7 @@
                         const d = snap.val(); if(!d || d.bombExploded) return;
                         const pIds = Object.keys(d.players || {});
                         const nIdx = (pIds.indexOf(myId) + 1) % pIds.length;
-                        update(ref(db, `rooms/${currentRoomCode}`), { bombHolderId: pIds[nIdx] }).then(() => localBombActive = false);
+                        update(ref(db, `rooms/${currentRoomCode}/`), { bombHolderId: pIds[nIdx] }).then(() => localBombActive = false);
                     });
                 } else {
                     isPenaltyActive = true; b.classList.add('wrong-animation');
@@ -606,12 +716,11 @@
         document.getElementById('main-container').style.boxShadow = '0 0 50px #FF6B6B';
         const overlay = document.getElementById('explosion-overlay'); overlay.innerHTML = '';
         for (let i = 0; i < 25; i++) {
-            const p = document.createElement('div'); p.className = 'particle';
-            p.style.left = '50%'; p.style.top = '50%'; overlay.appendChild(p);
+            const p = document.createElement('div'); p.className = 'particle'; p.style.left = '50%'; p.style.top = '50%'; overlay.appendChild(p);
             const ang = Math.random() * Math.PI * 2, dist = Math.floor(Math.random() * 180) + 40;
             p.animate([{ opacity: 1 }, { transform: `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px) scale(0)`, opacity: 0 }], { duration: 700, fill: 'forwards' });
         }
-        setTimeout(() => document.body.classList.remove('explode-shake'), 500);
+        setTimeout(() => { document.body.classList.remove('explode-shake'); document.getElementById('main-container').style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.3)'; }, 600);
     }
 
     document.getElementById('btn-start-game').addEventListener('click', () => {
@@ -631,14 +740,21 @@
                 });
             } else if (selectedGame === 'speed') {
                 const randIdx = Math.floor(Math.random() * chosungPool.length);
-                update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung.split(' ').pop(), speedWinner: null, speedAnswer: null });
+                update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedAnswers: null, speedLoserId: null });
+            } else if (selectedGame === 'balance') {
+                const randB = Math.floor(Math.random() * balancePool.length);
+                update(rRef, { status: 'playing', balanceIndex: randB, balanceVotes: null, balanceRevealed: false });
             }
         });
     });
 
     document.querySelectorAll('.btn-back-lobby').forEach(btn => {
         btn.addEventListener('click', () => {
-            update(ref(db, `rooms/${currentRoomCode}`), { status: 'waiting', word: '', category: '', liarId: '', targetShapeIndex: '', drawScores: null, drawImages: null, bombHolderId: '', bombExploded: false, speedChosungIndex: '', speedChosung: '', speedWinner: null, speedAnswer: null });
+            update(ref(db, `rooms/${currentRoomCode}`), { 
+                status: 'waiting', word: '', category: '', liarId: '', targetShapeIndex: '', drawScores: null, drawImages: null, 
+                bombHolderId: '', bombExploded: false, speedChosungIndex: '', speedChosung: '', speedAnswers: null, speedLoserId: null,
+                balanceIndex: '', balanceVotes: null, balanceRevealed: false
+            });
         });
     });
 </script>
