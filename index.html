@@ -194,12 +194,13 @@
     <div id="lobby-screen" class="screen">
         <div class="room-info">방 코드: <span id="display-room-code">----</span></div>
         <p style="text-align: left; margin: 5px; font-weight: bold; color: var(--primary-color); font-size: 14px;">🎲 다음 게임 선택</p>
-        <div class="game-tabs" style="grid-template-columns: 1fr 1fr 1fr; font-size: 11px;">
+        <div class="game-tabs" style="grid-template-columns: 1fr 1fr 1fr; font-size: 11px; margin-bottom: 15px;">
             <button class="tab-btn active" id="tab-liar" onclick="selectGameMode('liar')">🤫 라이어</button>
             <button class="tab-btn" id="tab-draw" onclick="selectGameMode('draw')">📐 도형그리기</button>
             <button class="tab-btn" id="tab-bomb" onclick="selectGameMode('bomb')">💣 폭탄돌리기</button>
             <button class="tab-btn" id="tab-speed" onclick="selectGameMode('speed')">⚡ 초성대결</button>
-            <button class="tab-btn" id="tab-balance" onclick="selectGameMode('balance')" style="grid-column: span 2;">⚖️ 밸런스 게임 (소수결)</button>
+            <button class="tab-btn" id="tab-balance" onclick="selectGameMode('balance')">⚖️ 밸런스</button>
+            <button class="tab-btn" id="tab-timing" onclick="selectGameMode('timing')">⏱️ 타이밍</button>
         </div>
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
         <ul id="player-list" class="player-list"></ul>
@@ -207,6 +208,7 @@
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
     </div>
 
+    <!-- 🤫 라이어 게임 스크린 -->
     <div id="game-liar-screen" class="screen">
         <h2>🤫 라이어 게임</h2>
         <h3>당신의 정체는?</h3>
@@ -214,6 +216,7 @@
         <button id="btn-back-lobby-liar" class="secondary btn-back-lobby">대기실로 돌아가기</button>
     </div>
 
+    <!-- 📐 도형그리기 게임 스크린 -->
     <div id="game-draw-screen" class="screen">
         <h2>📐 도형 정확히 그리기</h2>
         <p id="target-shape-text" style="color: var(--accent-color); font-weight: bold; font-size: 18px;">목표 도형: 불러오는 중...</p>
@@ -231,6 +234,7 @@
         <button id="btn-back-lobby-draw" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
+    <!-- 💣 폭탄돌리기 게임 스크린 -->
     <div id="game-bomb-screen" class="screen">
         <h2>💣 폭탄 돌리기</h2>
         <div id="bomb-icon" class="bomb-display">💣</div>
@@ -242,6 +246,7 @@
         <button id="btn-back-lobby-bomb" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
+    <!-- ⚡ 초성대결 게임 스크린 -->
     <div id="game-speed-screen" class="screen">
         <h2>⚡ 실시간 초성 대결</h2>
         <div class="quiz-container" style="border-color: var(--primary-color); background: #1a1a1e;">
@@ -261,6 +266,7 @@
         <button id="btn-back-lobby-speed" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
+    <!-- ⚖️ 밸런스 게임 스크린 -->
     <div id="game-balance-screen" class="screen">
         <h2>⚖️ 밸런스 게임 (소수결)</h2>
         <div class="quiz-container" style="border-color: var(--accent-color); background: #1e1e24; margin-bottom: 10px;">
@@ -287,6 +293,28 @@
 
         <button id="btn-reveal-balance" style="background-color: var(--success-color); color:#121214; display:none;">📊 투표 종료 및 결과 공개 (방장용)</button>
         <button id="btn-back-lobby-balance" class="secondary btn-back-lobby" style="margin-top: 10px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- ⏱️ Up & Down 타이밍 게임 스크린 -->
+    <div id="game-timing-screen" class="screen">
+        <h2>⏱️ Up & Down 타이밍</h2>
+        <div class="quiz-container" style="border-color: var(--success-color); background: #16221a; padding: 12px; margin-bottom: 10px;">
+            <div style="font-size: 13px; color: #8E9AA8;">🎯 목표 타이밍 숫자</div>
+            <div id="timing-target-display" style="font-size: 38px; font-weight: bold; color: var(--success-color);">00.00</div>
+        </div>
+        
+        <!-- 타이밍 캔버스 애니메이션 구동 구역 -->
+        <div style="background-color: #151518; border-radius: 12px; margin: 15px auto; width: 280px; height: 140px; border: 3px solid var(--success-color); position: relative;">
+            <canvas id="timing-canvas" width="280" height="140" style="position: absolute; top:0; left:0;"></canvas>
+        </div>
+
+        <button id="btn-stop-timing" style="background-color: var(--danger-color); color: white; font-size: 20px; padding: 16px; margin-bottom: 15px;">🛑 STOP!</button>
+
+        <div class="score-board">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 목표 근접도 실시간 랭킹 (오차 최소 순)</div>
+            <div id="timing-score-list">대기 중...</div>
+        </div>
+        <button id="btn-back-lobby-timing" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 </div>
 
@@ -403,6 +431,11 @@
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
     let currentAnswer = 0, isPenaltyActive = false, localBombActive = false;
 
+    // ⏱️ 타이밍 게임 로컬 변수
+    const timingCanvas = document.getElementById('timing-canvas');
+    const tCtx = timingCanvas.getContext('2d');
+    let timingAnimationId = null, timingValue = 0, timingDirection = 1, isTimingLocalActive = false;
+
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('join-mode-box').style.display = 'block';
         clearCanvas();
@@ -420,6 +453,12 @@
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
+        
+        // 타이밍 스크린 아닐 때 루프 종료 처리
+        if (screenId !== 'game-timing-screen' && timingAnimationId) {
+            cancelAnimationFrame(timingAnimationId);
+            timingAnimationId = null;
+        }
     }
 
     window.selectGameMode = function(gameMode) {
@@ -612,12 +651,118 @@
                     }
                     document.getElementById('btn-reveal-balance').style.display = (isHost && !data.balanceRevealed) ? 'block' : 'none';
                 }
+                else if (data.selectedGame === 'timing') {
+                    showScreen('game-timing-screen');
+                    const targetNum = data.timingTarget || 0;
+                    document.getElementById('timing-target-display').innerText = targetNum.toFixed(2);
+
+                    const timingScores = data.timingScores || {};
+                    const tScoreListEl = document.getElementById('timing-score-list');
+                    tScoreListEl.innerHTML = '';
+
+                    // 오차(절대값)가 가장 적은 사람 순서대로 소팅
+                    const sortedTiming = Object.keys(timingScores).map(id => {
+                        const val = timingScores[id];
+                        const diff = Math.abs(targetNum - val);
+                        return { nickname: players[id]?.nickname || '참가자', value: val, diff: diff, id: id };
+                    }).sort((a,b) => a.diff - b.diff);
+
+                    if (sortedTiming.length === 0) {
+                        tScoreListEl.innerHTML = '<div style="color:#8E9AA8;">아래 버튼을 눌러 정확한 타이밍에 멈추세요!</div>';
+                    } else {
+                        sortedTiming.forEach((s, idx) => {
+                            const row = document.createElement('div');
+                            row.className = 'score-row';
+                            let rankPrefix = idx === 0 ? '👑 ' : `${idx + 1}등 `;
+                            row.innerHTML = `<span>${rankPrefix} ${s.nickname}</span><span style="color:var(--success-color);">${s.value.toFixed(2)} (오차: ${s.diff.toFixed(2)})</span>`;
+                            tScoreListEl.appendChild(row);
+                        });
+                    }
+
+                    // 로컬 게이지 루프 핸들링
+                    if (!timingScores[myId]) {
+                        document.getElementById('btn-stop-timing').disabled = false;
+                        if (!isTimingLocalActive) {
+                            isTimingLocalActive = true;
+                            startTimingAnimationLoop();
+                        }
+                    } else {
+                        document.getElementById('btn-stop-timing').disabled = true;
+                        isTimingLocalActive = false;
+                        if (timingAnimationId) cancelAnimationFrame(timingAnimationId);
+                        drawStaticTimingGauge(timingScores[myId]);
+                    }
+                }
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => btn.style.display = isHost ? 'block' : 'none');
             }
-            if(data.status === 'waiting') { showScreen('lobby-screen'); clearCanvas(); }
+            if(data.status === 'waiting') { 
+                showScreen('lobby-screen'); 
+                clearCanvas(); 
+                isTimingLocalActive = false;
+            }
         });
     }
 
+    // ⏱️ 타이밍 게임 실시간 로컬 루프 엔진
+    function startTimingAnimationLoop() {
+        function render() {
+            if (!isTimingLocalActive) return;
+            // 게이지 증감 속도 조절
+            timingValue += timingDirection * 2.4; 
+            if (timingValue >= 100) { timingValue = 100; timingDirection = -1; }
+            if (timingValue <= 0) { timingValue = 0; timingDirection = 1; }
+
+            tCtx.clearRect(0, 0, timingCanvas.width, timingCanvas.height);
+            
+            // 배경 가이드선 그리기
+            tCtx.fillStyle = '#1E1E22';
+            tCtx.fillRect(10, 50, 260, 40);
+
+            // 실시간 게이지 바 바인딩
+            const fillWidth = (timingValue / 100) * 260;
+            tCtx.fillStyle = 'rgba(78, 250, 135, 0.8)';
+            tCtx.fillRect(10, 50, fillWidth, 40);
+
+            // 가운뎃선 텍스트 스캔
+            tCtx.fillStyle = '#FFFFFF';
+            tCtx.font = 'bold 16px Noto Sans KR';
+            tCtx.textAlign = 'center';
+            tCtx.fillText(timingValue.toFixed(2), timingCanvas.width / 2, 75);
+
+            timingAnimationId = requestAnimationFrame(render);
+        }
+        timingAnimationId = requestAnimationFrame(render);
+    }
+
+    function drawStaticTimingGauge(stoppedVal) {
+        tCtx.clearRect(0, 0, timingCanvas.width, timingCanvas.height);
+        tCtx.fillStyle = '#252529';
+        tCtx.fillRect(10, 50, 260, 40);
+        
+        const fillWidth = (stoppedVal / 100) * 260;
+        tCtx.fillStyle = 'var(--primary-color)';
+        tCtx.fillRect(10, 50, fillWidth, 40);
+
+        tCtx.fillStyle = '#FFFFFF';
+        tCtx.font = 'bold 16px Noto Sans KR';
+        tCtx.textAlign = 'center';
+        tCtx.fillText(`제출 수치: ${stoppedVal.toFixed(2)}`, timingCanvas.width / 2, 75);
+    }
+
+    document.getElementById('btn-stop-timing').addEventListener('click', () => {
+        if (!isTimingLocalActive) return;
+        isTimingLocalActive = false;
+        if (timingAnimationId) cancelAnimationFrame(timingAnimationId);
+
+        const finalStoppedValue = timingValue;
+        update(ref(db, `rooms/${currentRoomCode}/timingScores`), {
+            [myId]: finalStoppedValue
+        }).then(() => {
+            document.getElementById('btn-stop-timing').disabled = true;
+        });
+    });
+
+    // Canvas 좌표 헬퍼
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
         const cx = e.touches ? e.touches[0].clientX : e.clientX;
@@ -760,6 +905,10 @@
             } else if (selectedGame === 'balance') {
                 const randB = Math.floor(Math.random() * balancePool.length);
                 update(rRef, { status: 'playing', balanceIndex: randB, balanceVotes: null, balanceRevealed: false });
+            } else if (selectedGame === 'timing') {
+                // 50.00 ~ 95.00 사이의 타깃 난수 지정
+                const randTarget = 50 + Math.random() * 45;
+                update(rRef, { status: 'playing', timingTarget: randTarget, timingScores: null });
             }
         });
     });
@@ -769,7 +918,7 @@
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 status: 'waiting', word: '', category: '', liarId: '', targetShapeIndex: '', drawScores: null, drawImages: null, 
                 bombHolderId: '', bombExploded: false, speedChosungIndex: '', speedChosung: '', speedAnswers: null, speedLoserId: null,
-                balanceIndex: '', balanceVotes: null, balanceRevealed: false
+                balanceIndex: '', balanceVotes: null, balanceRevealed: false, timingTarget: null, timingScores: null
             });
         });
     });
