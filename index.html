@@ -155,7 +155,7 @@
             color: white;
         }
 
-        /* 🚪 깔끔하게 정리된 분기 버튼 링크 스타일 */
+        /* 분기 링크 스타일 */
         .switch-link {
             display: inline-block;
             margin-top: 15px;
@@ -208,10 +208,10 @@
             font-weight: 700;
         }
 
-        /* 🎨 완벽한 다크 캔버스 컨테이너 디자인 */
+        /* 완벽한 다크 캔버스 컨테이너 디자인 */
         #canvas-container {
             position: relative;
-            background-color: #151518 !important; /* 명시적으로 블랙 강제 */
+            background-color: #151518 !important;
             border-radius: 12px;
             margin: 15px auto;
             width: 280px;
@@ -237,34 +237,49 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            opacity: 0.5; /* 시인성 대폭 강화 */
+            opacity: 0.5;
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 1;
         }
 
+        /* 🖼️ 실시간 유저 그림 스코어보드 디자인 */
         .score-board {
             background-color: #151518;
             border-radius: 8px;
             padding: 12px;
             margin-top: 15px;
             text-align: left;
+            max-height: 250px;
+            overflow-y: auto;
         }
 
         .score-row {
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            padding: 6px 8px;
+            padding: 8px;
             border-bottom: 1px solid #252529;
             font-weight: bold;
         }
 
-        .score-row:last-child {
-            border-bottom: none;
+        .score-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
 
-        /* 💣 폭탄돌리기 퀴즈 영역 */
+        .user-drawing-thumbnail {
+            width: 55px;
+            height: 55px;
+            border: 1px solid #3A3A42;
+            border-radius: 6px;
+            background-color: #111;
+            object-fit: contain;
+        }
+
+        /* 폭탄돌리기 퀴즈 영역 */
         .bomb-display {
             font-size: 75px;
             margin: 20px 0;
@@ -323,7 +338,7 @@
             animation: shake 0.2s ease-in-out 2;
         }
 
-        /* 💥 폭발 파티클 이펙트용 컨테이너 */
+        /* 폭발 파티클 이펙트용 컨테이너 */
         #explosion-overlay {
             position: absolute;
             top: 0;
@@ -352,19 +367,18 @@
     <div id="explosion-overlay"></div>
     <h1>🎮 실시간 멀티 게임 패키지</h1>
 
-    <!-- 🚪 개선된 1화면: 로그인 및 방선택 (참여자 전용 직관적 뷰) -->
+    <!-- 🚪 첫 화면: 로그인 및 방선택 (기본값 강제 픽스) -->
     <div id="login-screen" class="screen active">
-        <!-- 닉네임과 입장 코드를 바로 치는 단순하고 깔끔한 구조 -->
         <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
         
-        <!-- 기본 모드: 방 들어가기 -->
+        <!-- 강제 기본 활성화: 방 참여 모드 -->
         <div id="join-mode-box">
             <input type="text" id="room-code-input" placeholder="방 코드 4자리 입력">
             <button id="btn-join-room">방 참여하기</button>
             <span class="switch-link" id="link-to-create">새로운 방을 직접 만들어야 하나요? (방장용)</span>
         </div>
 
-        <!-- 방장 전용 전환 모드 (클릭 시 토글됨) -->
+        <!-- 방장 전환용 박스 -->
         <div id="create-mode-box" style="display: none;">
             <p style="color: var(--accent-color); font-size: 14px; margin-bottom: 10px;">👑 방장 모드: 새로운 방을 개설합니다.</p>
             <button id="btn-create-room" style="background-color: var(--accent-color); color: #121214;">새로운 방 만들기</button>
@@ -372,11 +386,10 @@
         </div>
     </div>
 
-    <!-- 2화면: 대기실 (게임 선택 가능) -->
+    <!-- 대기실 -->
     <div id="lobby-screen" class="screen">
         <div class="room-info">방 코드: <span id="display-room-code">----</span></div>
         
-        <!-- 게임 모드 선택 탭 -->
         <p style="text-align: left; margin: 5px; font-weight: bold; color: var(--primary-color); font-size: 14px;">🎲 다음 게임 선택</p>
         <div class="game-tabs">
             <button class="tab-btn active" id="tab-liar" onclick="selectGameMode('liar')">🤫 라이어</button>
@@ -391,7 +404,7 @@
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
     </div>
 
-    <!-- 3-1화면: [라이어] 게임 화면 -->
+    <!-- [라이어] 게임 화면 -->
     <div id="game-liar-screen" class="screen">
         <h2>🤫 라이어 게임</h2>
         <h3>당신의 정체는?</h3>
@@ -399,7 +412,7 @@
         <button id="btn-back-lobby-liar" class="secondary btn-back-lobby">대기실로 돌아가기</button>
     </div>
 
-    <!-- 3-2화면: [도형 그리기 대결] 게임 화면 -->
+    <!-- [도형 그리기 대결] 게임 화면 -->
     <div id="game-draw-screen" class="screen">
         <h2>📐 도형 정확히 그리기</h2>
         <p id="target-shape-text" style="color: var(--accent-color); font-weight: bold; font-size: 18px;">목표 도형: 불러오는 중...</p>
@@ -411,37 +424,35 @@
             <canvas id="drawing-canvas" width="280" height="280"></canvas>
         </div>
 
-        <button id="btn-submit-score" style="background-color: var(--accent-color); color: #121214;">📐 내 그림 채점하여 제출하기</button>
+        <button id="btn-submit-score" style="background-color: var(--accent-color); color: #121214;">📐 내 그림 제출하고 채점받기</button>
         
-        <!-- 실시간 스코어보드 -->
+        <!-- 스코어보드 (상대방 그림 구경가능) -->
         <div class="score-board">
-            <div style="font-size: 14px; color: #8E9AA8; margin-bottom: 8px; font-weight: bold;">📊 참여자 스코어보드 (실시간)</div>
+            <div style="font-size: 14px; color: #8E9AA8; margin-bottom: 8px; font-weight: bold;">📊 참여자 스코어 & 그림 (실시간)</div>
             <div id="draw-score-list">대기 중...</div>
         </div>
 
         <button id="btn-back-lobby-draw" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
-    <!-- 3-3화면: [폭탄 돌리기] 게임 화면 -->
+    <!-- [폭탄 돌리기] 게임 화면 -->
     <div id="game-bomb-screen" class="screen">
         <h2>💣 폭탄 돌리기</h2>
         <div id="bomb-icon" class="bomb-display">💣</div>
         <div class="bomb-status" id="bomb-status-text">불러오는 중...</div>
         
-        <!-- 🧮 수학 퀴즈 컨테이너 -->
+        <!-- 수학 퀴즈 컨테이너 -->
         <div id="quiz-box" class="quiz-container" style="display: none;">
-            <p style="margin: 0 0 10px 0; font-size: 13px; color: #8E9AA8;">🔓 문제를 풀어 탈출하세요!</p>
+            <p style="margin: 0 0 10px 0; font-size: 13px; color: #8E9AA8;">🔓 사악한 수식을 풀고 폭탄을 넘기세요!</p>
             <div class="quiz-question" id="quiz-question-text">퀴즈 불러오는 중...</div>
-            <div class="quiz-options" id="quiz-options-box">
-                <!-- 여기에 동적으로 꼬아둔 4지선다가 무조건 들어옵니다 -->
-            </div>
+            <div class="quiz-options" id="quiz-options-box"></div>
         </div>
 
         <button id="btn-back-lobby-bomb" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 </div>
 
-<!-- Firebase SDK 불러오기 -->
+<!-- Firebase SDK -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, set, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
@@ -461,7 +472,7 @@
         "장소/핫플 🗺️": ["노래방", "클럽", "한강공원", "편의점", "제주도", "캠핑장", "영화관", "헬스장", "놀이공원", "백화점", "카페", "맛집", "바다", "계곡", "찜질방", "호텔", "펜션", "공항", "학교", "회사", "PC방", "포차"]
     };
 
-    // 📐 도형 그리기 목표 리스트 (정밀화된 10종 완비)
+    // 도형 목록
     const shapes = [
         { name: "세모 🔺", points: [{x:140, y:40}, {x:40, y:230}, {x:240, y:230}, {x:140, y:40}], svg: '<polygon points="140,40 40,230 240,230" />' },
         { name: "네모 🔲", points: [{x:50, y:50}, {x:230, y:50}, {x:230, y:230}, {x:50, y:230}, {x:50, y:50}], svg: '<rect x="50" y="50" width="180" height="180" />' },
@@ -481,19 +492,26 @@
     let isHost = false;
     let selectedGame = 'liar'; 
 
-    // 캔버스 엘리먼트 및 드로잉 로컬 환경 변수
     const canvas = document.getElementById('drawing-canvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
     let userDrawingPoints = [];
     let currentShapeIndex = 0;
 
-    // 폭탄 돌리기용 게임 전역 상태
     let currentAnswer = 0;
     let isPenaltyActive = false;
     let localBombActive = false;
 
-    // 🚪 첫 화면 방장/참여자 뷰 교체 링커 인터랙션
+    // 🌐 브라우저 로딩 시 방 참여 화면 강제 초기화 (엣지 대응)
+    window.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('join-mode-box').style.display = 'block';
+        document.getElementById('create-mode-box').style.display = 'none';
+        
+        canvas.style.backgroundColor = '#151518';
+        ctx.fillStyle = '#151518';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    });
+
     document.getElementById('link-to-create').addEventListener('click', () => {
         document.getElementById('join-mode-box').style.display = 'none';
         document.getElementById('create-mode-box').style.display = 'block';
@@ -504,13 +522,11 @@
         document.getElementById('join-mode-box').style.display = 'block';
     });
 
-    // 화면 이동 제어
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
     }
 
-    // 게임 모드 선택 탭 제어 (방장만 전송 허용)
     window.selectGameMode = function(gameMode) {
         if (!isHost) {
             alert("게임 모드는 방장만 변경할 수 있습니다!");
@@ -531,7 +547,6 @@
         return Math.floor(1000 + Math.random() * 9000).toString();
     }
 
-    // [방 만들기 실행]
     document.getElementById('btn-create-room').addEventListener('click', () => {
         const nickname = document.getElementById('nickname-input').value.trim();
         if(!nickname) return alert('닉네임을 입력해주세요!');
@@ -559,7 +574,6 @@
         });
     });
 
-    // [방 참여하기 실행]
     document.getElementById('btn-join-room').addEventListener('click', () => {
         const nickname = document.getElementById('nickname-input').value.trim();
         const roomCode = document.getElementById('room-code-input').value.trim();
@@ -593,7 +607,6 @@
         });
     });
 
-    // 실시간 데이터 동기화 리스너
     function initRoomListener(roomCode) {
         document.getElementById('display-room-code').innerText = roomCode;
         const roomRef = ref(db, `rooms/${roomCode}`);
@@ -607,7 +620,6 @@
             
             document.getElementById('player-count').innerText = playerIds.length;
 
-            // 1. 플레이어 동기화
             const playerListEl = document.getElementById('player-list');
             playerListEl.innerHTML = '';
             playerIds.forEach(id => {
@@ -626,12 +638,10 @@
                 playerListEl.appendChild(li);
             });
 
-            // 2. 탭 UI
             if (data.selectedGame) {
                 updateTabUI(data.selectedGame);
             }
 
-            // 3. 상태 분기
             if(data.status === 'playing') {
                 if(data.selectedGame === 'liar') {
                     showScreen('game-liar-screen');
@@ -648,24 +658,28 @@
                 else if (data.selectedGame === 'draw') {
                     showScreen('game-draw-screen');
                     
-                    // 📐 동적 도형 동기화 바인딩
                     currentShapeIndex = data.targetShapeIndex !== undefined ? data.targetShapeIndex : 0;
                     const targetShape = shapes[currentShapeIndex];
                     document.getElementById('target-shape-text').innerText = `목표 도형: ${targetShape.name}`;
                     document.getElementById('preview-svg').innerHTML = targetShape.svg;
 
-                    // 캔버스 배경 검정색 지킴이 강제 채색 (렌더링 안정성 확보)
                     canvas.style.backgroundColor = '#151518';
                     ctx.fillStyle = '#151518';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                    // 스코어보드 렌더링
+                    // 🖼️ 스코어보드 (상대방 그림 구경) 업데이트
                     const scores = data.drawScores || {};
+                    const images = data.drawImages || {}; // 다른 유저가 업로드한 데이터 URI 수신
                     const scoreBoardEl = document.getElementById('draw-score-list');
                     scoreBoardEl.innerHTML = '';
                     
                     const sortedScorers = Object.keys(scores)
-                        .map(id => ({ name: players[id]?.nickname || '탈퇴한 유저', score: scores[id] }))
+                        .map(id => ({ 
+                            id: id,
+                            name: players[id]?.nickname || '탈퇴한 유저', 
+                            score: scores[id],
+                            img: images[id] || null
+                        }))
                         .sort((a,b) => b.score - a.score);
 
                     if (sortedScorers.length === 0) {
@@ -674,7 +688,22 @@
                         sortedScorers.forEach(scorer => {
                             const row = document.createElement('div');
                             row.className = 'score-row';
-                            row.innerHTML = `<span>👤 ${scorer.name}</span> <span style="color:var(--accent-color);">${scorer.score}점</span>`;
+                            
+                            // 실시간 썸네일 노출
+                            let imgTag = '';
+                            if (scorer.img) {
+                                imgTag = `<img src="${scorer.img}" class="user-drawing-thumbnail" alt="user drawing">`;
+                            } else {
+                                imgTag = `<div class="user-drawing-thumbnail" style="display:flex;align-items:center;justify-content:center;font-size:9px;color:#555;">No Image</div>`;
+                            }
+
+                            row.innerHTML = `
+                                <div class="score-info">
+                                    <span>👤 ${scorer.name}</span>
+                                    <span style="color:var(--accent-color); font-size: 14px;">${scorer.score}점</span>
+                                </div>
+                                ${imgTag}
+                            `;
                             scoreBoardEl.appendChild(row);
                         });
                     }
@@ -698,7 +727,6 @@
                             statusTextEl.innerHTML = `<span style="color:var(--danger-color); font-size:18px;">🔥 내 차례입니다! 문제를 맞춰 탈출하세요! 🔥</span>`;
                             document.getElementById('quiz-box').style.display = 'block';
                             
-                            // 내가 새로운 폭탄 소지자가 되었고 로컬에 아직 문제가 세팅되지 않은 시점에만 무작위 퀴즈 출제
                             if (!localBombActive) {
                                 generateQuiz();
                                 localBombActive = true;
@@ -706,7 +734,7 @@
                         } else {
                             statusTextEl.innerHTML = `👤 현재 폭탄 소지자: <span style="color:var(--accent-color); font-weight:bold;">${holderNick}</span>`;
                             document.getElementById('quiz-box').style.display = 'none';
-                            localBombActive = false; // 타 유저 차례로 넘어갔을 때 로컬 빌드 상태 리셋
+                            localBombActive = false; 
                         }
                     }
                 }
@@ -724,7 +752,6 @@
         });
     }
 
-    // 📐 [도형 그리기] 검정색 다크 캔버스 위 드로잉 설정
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -741,12 +768,11 @@
         userDrawingPoints = [];
     }
 
-    // 드로잉 개시
     function startDrawing(coords) {
         isDrawing = true;
         ctx.beginPath();
         ctx.moveTo(coords.x, coords.y);
-        ctx.strokeStyle = '#5C9EFF'; // 네온 블루
+        ctx.strokeStyle = '#5C9EFF';
         ctx.lineWidth = 5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -767,7 +793,6 @@
 
     canvas.addEventListener('mouseup', () => { isDrawing = false; });
 
-    // 모바일 터치 이벤트 대응
     canvas.addEventListener('touchstart', (e) => {
         startDrawing(getCanvasCoordinates(e));
         e.preventDefault();
@@ -784,17 +809,17 @@
 
     canvas.addEventListener('touchend', () => { isDrawing = false; });
 
-    // 📐 도형 그리기 정밀 점수 채점 및 제출
+    // 📐 정교한 픽셀 데이터 매칭 및 가이드라인 오차 계산 채점 & 썸네일 업로드
     document.getElementById('btn-submit-score').addEventListener('click', () => {
         if (userDrawingPoints.length < 5) {
-            alert("가이드 라인에 맞추어 그림을 조금 그린 뒤에 제출해주세요!");
+            alert("도형을 조금 그린 뒤에 제출해주세요!");
             return;
         }
 
         const target = shapes[currentShapeIndex];
         let totalMinDist = 0;
 
-        // 사용자가 그린 점 기반의 가이드라인 최단 거리 오차 평가 산출 알고리즘
+        // 원본 오차 판별 채점 로직
         const sampleCount = Math.min(60, userDrawingPoints.length);
         const step = Math.floor(userDrawingPoints.length / sampleCount);
 
@@ -811,64 +836,77 @@
         }
 
         const avgDistance = totalMinDist / sampleCount;
-        let finalScore = Math.round(Math.max(5, 100 - (avgDistance * 1.6)));
+        let finalScore = Math.round(Math.max(0, 100 - (avgDistance * 1.5)));
+
+        // 🖼️ 내가 그린 그림 썸네일로 변환 (데이터 경량화를 위해 가로세로 60px 크기 작은 캔버스로 변환)
+        const thumbCanvas = document.createElement('canvas');
+        thumbCanvas.width = 60;
+        thumbCanvas.height = 60;
+        const thumbCtx = thumbCanvas.getContext('2d');
+        thumbCtx.drawImage(canvas, 0, 0, 60, 60);
+        const imgDataUri = thumbCanvas.toDataURL('image/jpeg', 0.6); // 60% 퀄리티 압축
 
         const scoreRef = ref(db, `rooms/${currentRoomCode}/drawScores/${myId}`);
+        const imageRef = ref(db, `rooms/${currentRoomCode}/drawImages/${myId}`);
+        
         set(scoreRef, finalScore).then(() => {
-            alert(`🎉 내 점수: ${finalScore}점! 스코어보드에 랭킹 등록 완료!`);
+            set(imageRef, imgDataUri).then(() => {
+                alert(`🎉 내 점수: ${finalScore}점! 나의 그림이 실시간 스코어보드에 업로드되었습니다!`);
+            });
         });
     });
 
 
-    // 💣 [폭탄 돌리기] 그럴싸한 정답 연산 퀴즈 및 4지선다 보기 생성 알고리즘
+    // 💣 [폭탄 돌리기] 사악한 난이도 연산 생성 및 정교한 4지선다 보기
     function generateQuiz() {
         if (isPenaltyActive) return;
 
-        const num1 = Math.floor(Math.random() * 8) + 2; // 2~9
-        const num2 = Math.floor(Math.random() * 8) + 2; // 2~9
-        const operators = ['+', '-', '*'];
-        const operator = operators[Math.floor(Math.random() * operators.length)];
-        
         let questionText = '';
         let answer = 0;
 
-        switch(operator) {
-            case '+':
-                questionText = `${num1} + ${num2} = ?`;
-                answer = num1 + num2;
-                break;
-            case '-':
-                const maxVal = Math.max(num1, num2);
-                const minVal = Math.min(num1, num2);
-                questionText = `${maxVal} - ${minVal} = ?`;
-                answer = maxVal - minVal;
-                break;
-            case '*':
-                questionText = `${num1} × ${num2} = ?`;
-                answer = num1 * num2;
-                break;
+        // 난이도 향상: 두 자릿수 사칙 연산 & 혼합 연산 3가지 패턴
+        const type = Math.floor(Math.random() * 3);
+
+        if (type === 0) {
+            // 패턴 1: (A × B) - C 형태
+            const a = Math.floor(Math.random() * 8) + 4; // 4 ~ 11
+            const b = Math.floor(Math.random() * 7) + 3; // 3 ~ 9
+            const c = Math.floor(Math.random() * 25) + 5; // 5 ~ 29
+            questionText = `(${a} × ${b}) - ${c} = ?`;
+            answer = (a * b) - c;
+        } else if (type === 1) {
+            // 패턴 2: 두 자릿수 덧뺄셈 혼합 (A + B - C)
+            const a = Math.floor(Math.random() * 40) + 25; // 25 ~ 64
+            const b = Math.floor(Math.random() * 30) + 15; // 15 ~ 44
+            const c = Math.floor(Math.random() * 20) + 10; // 10 ~ 29
+            questionText = `${a} + ${b} - ${c} = ?`;
+            answer = a + b - c;
+        } else {
+            // 패턴 3: 까다로운 나눗셈 곱셈 혼합 (A × B) 형태 (두 자릿수 타겟)
+            const a = Math.floor(Math.random() * 6) + 11; // 11 ~ 16
+            const b = Math.floor(Math.random() * 6) + 6;  // 6 ~ 11
+            questionText = `${a} × ${b} = ?`;
+            answer = a * b;
         }
 
         currentAnswer = answer;
 
-        // 보기 세트 구성 (정답 무조건 1개 보장 및 주변 오답 3개 꼬아두기)
         const options = new Set();
         options.add(answer); 
         
         while (options.size < 4) {
-            // 정답을 기준으로 -3~+3 사이에서 무작위 오답 생성하여 타이트한 난이도 유도
-            const offset = (Math.floor(Math.random() * 3) + 1) * (Math.random() < 0.5 ? 1 : -1);
-            const fakeAnswer = answer + offset;
+            // 오답을 교묘하게 생성하여 정답 주변으로 배치
+            const offsetList = [-10, -5, -2, -1, 1, 2, 5, 10];
+            const randOffset = offsetList[Math.floor(Math.random() * offsetList.length)];
+            const fakeAnswer = answer + randOffset;
             
             if (fakeAnswer !== answer && fakeAnswer > 0) {
                 options.add(fakeAnswer);
             }
         }
 
-        // 완성된 보기를 랜덤 정렬
         const optionsArray = Array.from(options).sort(() => Math.random() - 0.5);
 
-        // UI 마크업 갱신 (1, 2, 3, 4 디폴트 텍스트 무조건 오버라이트)
         document.getElementById('quiz-question-text').innerText = questionText;
         const optionsBox = document.getElementById('quiz-options-box');
         optionsBox.innerHTML = '';
@@ -882,14 +920,12 @@
         });
     }
 
-    // 💣 퀴즈 정답 검사 및 오답 락다운 페널티
     function checkQuizAnswer(selected, buttonElement) {
         if (isPenaltyActive) return;
 
         if (selected === currentAnswer) {
             passBombToNext();
         } else {
-            // 오답 시 1초 동안 다른 정답을 고를 수 없도록 락다운 페널티
             isPenaltyActive = true;
             buttonElement.classList.add('wrong-animation');
             
@@ -903,7 +939,6 @@
         }
     }
 
-    // 💣 다음 사람에게 실제로 폭탄 토스
     function passBombToNext() {
         const roomRef = ref(db, `rooms/${currentRoomCode}`);
         get(roomRef).then((snapshot) => {
@@ -923,7 +958,6 @@
         });
     }
 
-    // 💥 폭발 임팩트 연출 (CSS 파티클 생성)
     function triggerExplosionEffect() {
         const bodyEl = document.body;
         const mainContainer = document.getElementById('main-container');
@@ -966,8 +1000,6 @@
         }, 500);
     }
 
-
-    // [통합 게임 시작 버튼 컨트롤]
     document.getElementById('btn-start-game').addEventListener('click', () => {
         const playersRef = ref(db, `rooms/${currentRoomCode}/players`);
         
@@ -983,7 +1015,6 @@
 
             const roomRef = ref(db, `rooms/${currentRoomCode}`);
             
-            // 🤫 [라이어 게임 시작]
             if (selectedGame === 'liar') {
                 const categories = Object.keys(wordList);
                 const randomCategory = categories[Math.floor(Math.random() * categories.length)];
@@ -998,16 +1029,15 @@
                     liarId: randomLiarId
                 });
             } 
-            // 📐 [도형그리기 대결 시작] -> 무작위 10종 인덱스를 매판 섞어서 보냅니다.
             else if (selectedGame === 'draw') {
                 const randomShapeIndex = Math.floor(Math.random() * shapes.length);
                 update(roomRef, {
                     status: 'playing',
                     targetShapeIndex: randomShapeIndex,
-                    drawScores: null
+                    drawScores: null,
+                    drawImages: null
                 });
             }
-            // 💣 [폭탄돌리기 게임 시작]
             else if (selectedGame === 'bomb') {
                 const randomHolderId = playerIds[Math.floor(Math.random() * playerIds.length)];
                 update(roomRef, {
@@ -1015,7 +1045,8 @@
                     bombHolderId: randomHolderId,
                     bombExploded: false
                 }).then(() => {
-                    const randomBombTime = Math.floor(Math.random() * 20) + 20; 
+                    // ⏱️ 폭탄 제한 시간을 타이트하게 12초 ~ 22초 범위로 변경 완료!
+                    const randomBombTime = Math.floor(Math.random() * 11) + 12; 
                     setTimeout(() => {
                         get(roomRef).then((snap) => {
                             const currentRoomData = snap.val();
@@ -1032,7 +1063,6 @@
         });
     });
 
-    // [대기실로 돌아가기] 통합 처리
     document.querySelectorAll('.btn-back-lobby').forEach(btn => {
         btn.addEventListener('click', () => {
             const roomRef = ref(db, `rooms/${currentRoomCode}`);
@@ -1043,6 +1073,7 @@
                 liarId: '',
                 targetShapeIndex: '',
                 drawScores: null,
+                drawImages: null,
                 bombHolderId: '',
                 bombExploded: false
             });
