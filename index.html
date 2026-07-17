@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>온라인 라이어 게임</title>
+    <style>
+        :root {
+            --primary-color: #4A90E2;
+            --danger-color: #E04A4A;
+            --background-color: #F5F7FA;
+            --card-color: #FFFFFF;
+            --text-color: #333333;
+        }
+
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--card-color);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            color: var(--primary-color);
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 16px;
+            border: 2px solid #E1E8ED;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary-color);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #357ABD;
+        }
+
+        button.secondary {
+            background-color: #657786;
+        }
+        button.secondary:hover {
+            background-color: #505F6B;
+        }
+
+        .room-info {
+            background-color: #E8F0FE;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        .player-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .player-list li {
+            padding: 10px 14px;
+            background-color: #F8F9FA;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 4px solid var(--primary-color);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .host-badge {
+            font-size: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .role-box {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 40px 0;
+            padding: 20px;
+            border-radius: 12px;
+            background-color: #F8F9FA;
+            border: 2px dashed #CBD5E1;
+        }
+
+        .role-box.liar {
+            color: var(--danger-color);
+            background-color: #FFF5F5;
+            border-color: #FEB2B2;
+        }
+
+        .role-box.citizen {
+            color: #2B6CB0;
+            background-color: #EBF8FF;
+            border-color: #90CDF4;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🤫 온라인 라이어 게임</h1>
+
+    <!-- 1화면: 로그인 및 방 선택 -->
+    <div id="login-screen" class="screen active">
+        <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
+        <button id="btn-create-room">새로운 방 만들기</button>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #E1E8ED;">
+        <input type="text" id="room-code-input" placeholder="방 코드 4자리 입력">
+        <button id="btn-join-room" class="secondary">방 참여하기</button>
+    </div>
+
+    <!-- 2화면: 대기실 -->
+    <div id="lobby-screen" class="screen">
+        <div class="room-info">방 코드: <span id="display-room-code">----</span></div>
+        <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
+        <ul id="player-list" class="player-list"></ul>
+        <button id="btn-start-game" style="display: none;">게임 시작 (방장 전용)</button>
+        <p id="wait-message" style="color: #657786; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
+    </div>
+
+    <!-- 3화면: 역할 및 제시어 확인 -->
+    <div id="game-screen" class="screen">
+        <h3>당신의 정체는?</h3>
+        <div id="role-display" class="role-box">지정 중...</div>
+        <button id="btn-back-lobby" class="secondary">대기실로 돌아가기</button>
+    </div>
+</div>
+
+<!-- Firebase SDK 불러오기 (v10 라이브러리) -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, set, push, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // ⚠️ 중요: 테스트용 가상 Firebase 설정입니다. 
+    // 나중에 본인의 Firebase 프로젝트 생성 후 이 부분을 교체하시면 됩니다.
+    const firebaseConfig = {
+        databaseURL: "https://roulette-d9a12-default-rtdb.asia-southeast1.firebasedatabase.app/" 
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // 게임 데이터 (카테고리 및 제시어)
+    const wordList = {
+        "연예/방송 📺": ["유재석", "아이유", "BTS", "봉준호", "오징어게임", "손흥민", "뉴진스", "에스파", "블랙핑크", "임영웅", "김종국", "차은우", "박보검", "장원영", "런닝맨", "무한도전", "나는솔로", "더글로리", "피식대학", "유튜브", "넷플릭스", "슈퍼맨이돌아왔다"],
+        ""음식/야식 🍗": ["마라탕", "삼겹살", "불닭볶음면", "치즈볼", "탕후루", "떡볶이", "양꼬치", "짜장면", "치킨", "피자", "족발", "곱창", "닭발", "김치찌개", "라면", "초밥", "햄버거", "아이스크림", "붕어빵", "호떡", "김밥", "냉면", "순대"],
+        "일상/사물 🏠": ["스마트폰", "충전기", "물티슈", "에어컨", "슬리퍼", "노트북", "텀블러", "전자레인지", "리모컨", "이어폰", "선풍기", "냉장고", "세탁기", "안마의자", "우산", "베개", "거울", "화장지", "칫솔", "드라이기", "키보드", "마우스"],
+        "장소/핫플 🗺️": ["노래방", "클럽", "한강공원", "편의점", "제주도", "캠핑장", "영화관", "헬스장", "놀이공원", "백화점", "카페", "맛집", "바다", "계곡", "찜질방", "호텔", "펜션", "공항", "학교", "회사", "PC방", "포차"]
+    };
+
+    // 상태 관리 변수
+    let myId = '';
+    let myNickname = '';
+    let currentRoomCode = '';
+    let isHost = false;
+
+    // 화면 전환 함수
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    // 4자리 랜덤 방 코드 생성
+    function generateRoomCode() {
+        return Math.floor(1000 + Math.random() * 9000).toString();
+    }
+
+    // [방 만들기] 버튼 이벤트
+    document.getElementById('btn-create-room').addEventListener('click', () => {
+        const nickname = document.getElementById('nickname-input').value.trim();
+        if(!nickname) return alert('닉네임을 입력해주세요!');
+        
+        myNickname = nickname;
+        currentRoomCode = generateRoomCode();
+        myId = 'player_' + Math.random().toString(36).substr(2, 9);
+        isHost = true;
+
+        // DB에 방 생성 및 방장 유저 정보 등록
+        const roomRef = ref(db, `rooms/${currentRoomCode}`);
+        set(roomRef, {
+            status: 'waiting',
+            hostId: myId,
+            word: '',
+            category: '',
+            liarId: '',
+            players: {
+                [myId]: { nickname: nickname, isHost: true }
+            }
+        }).then(() => {
+            initRoomListener(currentRoomCode);
+            showScreen('lobby-screen');
+            document.getElementById('btn-start-game').style.display = 'block';
+            document.getElementById('wait-message').style.display = 'none';
+        });
+    });
+
+    // [방 참여하기] 버튼 이벤트
+    document.getElementById('btn-join-room').addEventListener('click', () => {
+        const nickname = document.getElementById('nickname-input').value.trim();
+        const roomCode = document.getElementById('room-code-input').value.trim();
+        if(!nickname) return alert('닉네임을 입력해주세요!');
+        if(!roomCode) return alert('방 코드를 입력해주세요!');
+
+        myNickname = nickname;
+        currentRoomCode = roomCode;
+        myId = 'player_' + Math.random().toString(36).substr(2, 9);
+        isHost = false;
+
+        // DB에서 해당 방이 존재하는지 확인하고 유저 추가
+        const playerRef = ref(db, `rooms/${roomCode}/players/${myId}`);
+        set(playerRef, {
+            nickname: nickname,
+            isHost: false
+        }).then(() => {
+            initRoomListener(roomCode);
+            showScreen('lobby-screen');
+            document.getElementById('btn-start-game').style.display = 'none';
+            document.getElementById('wait-message').style.display = 'block';
+        }).catch(err => {
+            alert('방을 찾을 수 없거나 입장 오류가 발생했습니다.');
+        });
+    });
+
+    // 실시간 방 데이터 동기화 리스너
+    function initRoomListener(roomCode) {
+        document.getElementById('display-room-code').innerText = roomCode;
+        const roomRef = ref(db, `rooms/${roomCode}`);
+
+        onValue(roomRef, (snapshot) => {
+            const data = snapshot.val();
+            if(!data) return;
+
+            // 1. 참여자 명단 업데이트
+            const playerListEl = document.getElementById('player-list');
+            playerListEl.innerHTML = '';
+            const players = data.players || {};
+            const playerIds = Object.keys(players);
+            
+            document.getElementById('player-count').innerText = playerIds.length;
+
+            playerIds.forEach(id => {
+                const li = document.createElement('li');
+                li.innerText = players[id].nickname;
+                if(players[id].isHost) {
+                    const badge = document.createElement('span');
+                    badge.className = 'host-badge';
+                    badge.innerText = '방장';
+                    li.appendChild(badge);
+                }
+                playerListEl.appendChild(li);
+            });
+
+            // 2. 게임 상태 감지 (대기 상태 -> 게임 중으로 바뀔 때)
+            if(data.status === 'playing') {
+                showScreen('game-screen');
+                const roleDisplay = document.getElementById('role-display');
+
+                if(data.liarId === myId) {
+                    roleDisplay.innerText = "🕵️‍♂️ 당신은 라이어입니다!";
+                    roleDisplay.className = "role-box liar";
+                } else {
+                    roleDisplay.innerHTML = `<span style="font-size:16px; color:#657786;">제시어 [${data.category}]</span><br>🍕 ${data.word}`;
+                    roleDisplay.className = "role-box citizen";
+                }
+            }
+
+            // 3. 게임 상태 감지 (다시 대기 상태로 돌아왔을 때)
+            if(data.status === 'waiting') {
+                showScreen('lobby-screen');
+            }
+        });
+    }
+
+    // [게임 시작] 버튼 이벤트 (방장 전용)
+    document.getElementById('btn-start-game').addEventListener('click', () => {
+        const roomRef = ref(db, `rooms/${currentRoomCode}`);
+        
+        // 현재 방의 플레이어 정보 가져오기 전용 일회성 로직 대신 간단한 트랜잭션/업데이트 처리
+        onValue(ref(db, `rooms/${currentRoomCode}/players`), (snapshot) => {
+            const players = snapshot.val();
+            if(!players) return;
+            
+            const playerIds = Object.keys(players);
+            if(playerIds.length < 2) {
+                alert('최소 2명 이상 모여야 시작할 수 있습니다!');
+                return;
+            }
+
+            // 무작위 카테고리 및 제시어 선정
+            const categories = Object.keys(wordList);
+            const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+            const words = wordList[randomCategory];
+            const randomWord = words[Math.floor(Math.random() * words.length)];
+
+            // 무작위 라이어 선정
+            const randomLiarId = playerIds[Math.floor(Math.random() * playerIds.length)];
+
+            // DB 업데이트로 모든 플레이어에게 게임 시작 알림
+            update(roomRef, {
+                status: 'playing',
+                category: randomCategory,
+                word: randomWord,
+                liarId: randomLiarId
+            });
+        }, { onlyOnce: true });
+    });
+
+    // [대기실로 돌아가기] 버튼 이벤트
+    document.getElementById('btn-back-lobby').addEventListener('click', () => {
+        const roomRef = ref(db, `rooms/${currentRoomCode}`);
+        update(roomRef, {
+            status: 'waiting',
+            word: '',
+            category: '',
+            liarId: ''
+        });
+    });
+</script>
+
+</body>
+</html>
