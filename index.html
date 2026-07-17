@@ -310,6 +310,9 @@
 
         <button id="btn-stop-timing" style="background-color: var(--danger-color); color: white; font-size: 20px; padding: 16px; margin-bottom: 15px;">🛑 STOP!</button>
 
+        <!-- 🚨 꼴찌 정보 노출 영역 -->
+        <div id="timing-loser-box" class="role-box liar" style="display: none; font-size: 18px; margin-bottom: 15px;"></div>
+
         <div class="score-board">
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 목표 근접도 실시간 랭킹 (오차 최소 순)</div>
             <div id="timing-score-list">대기 중...</div>
@@ -333,22 +336,6 @@
     const firebaseConfig = { databaseURL: "https://roulette-d9a12-default-rtdb.asia-southeast1.firebasedatabase.app/" };
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-
-    // 🤫 라이어 게임 제시어 데이터베이스 총 50개 대확장 유지
-    const wordList = {
-        "연예/콘텐츠 📺": [
-            "유재석", "아이유", "BTS", "뉴진스", "에스파", "아이브", "르세라핌", "세븐틴", "임영웅", "침착맨", "피식대학", "흑백요리사", "오징어게임"
-        ],
-        "요즘 먹거리 🍗": [
-            "마라탕", "탕후루", "두바이 초콜릿", "삼겹살", "치킨", "피자", "초밥", "햄버거", "요아정", "크루키", "로제떡볶이", "불닭볶음면", "소금빵"
-        ],
-        "일상/라이프 🏠": [
-            "스마트폰", "노트북", "텀블러", "제로콜라", "다이슨 에어랩", "당근마켓", "무선 이어폰", "스타벅스", "유튜브 쇼츠", "인스타그램", "애플워치", "보조배터리"
-        ],
-        "핫플레이스 📍": [
-            "성수동", "홍대", "다이소", "올리브영", "인생네컷", "한강공원", "스타필드", "제주도", "편의점", "코인노래방", "더현대", "팝업스토어"
-        ]
-    };
 
     // 📐 도형 리스트 13개 완비 유지
     const shapes = [
@@ -424,6 +411,7 @@
         { q: "더 듣기 싫은 소리는?", a: "손톱으로 칠판 칠판 사정없이 긁는 소리", b: "옆 사람이 밥 먹을 때 쩝쩝 소리 크게 내는 소리" },
         { q: "인생의 중대한 선택!", a: "타임머신 타고 20년 전 과거의 나 만나기", b: "타임머신 타고 20년 후 미래의 나 만나기" }
     ];
+
 
     let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
     const canvas = document.getElementById('drawing-canvas');
@@ -679,8 +667,34 @@
                         });
                     }
 
+                    // 🚨 실시간 꼴찌 추정 및 최종 낙점 로직 바인딩
+                    const tLoserBox = document.getElementById('timing-loser-box');
+                    if (data.timingLoserId) {
+                        const loserNick = players[data.timingLoserId]?.nickname || "참가자";
+                        tLoserBox.innerHTML = `💥 타이밍 대결 탈락 완료! 💥<br><span style="color:var(--accent-color); font-size:22px;">🚨 ${loserNick} 꼴찌 낙점! 벌칙 당첨! 🚨</span>`;
+                        tLoserBox.style.display = 'block';
+                        document.getElementById('btn-stop-timing').disabled = true;
+                        
+                        // 내가 꼴찌인 경우 기기 폭발 이펙트 적용
+                        if(data.timingLoserId === myId) { triggerExplosionEffect(); }
+                    } else {
+                        // 모든 멤버가 게이지를 제출 완료했다면 방장 주도로 꼴찌 확정 처리 실행
+                        if (sortedTiming.length > 0) {
+                            const currentWorst = sortedTiming[sortedTiming.length - 1];
+                            tLoserBox.innerHTML = `⚠️ 실시간 현재 꼴찌: <span style="color:var(--danger-color); font-weight:bold;">${currentWorst.nickname}</span> (오차: ${currentWorst.diff.toFixed(2)})`;
+                            tLoserBox.style.display = 'block';
+
+                            // 방장이 실시간 데이터 비교 후 전원 제출 시 DB에 꼴찌(LoserId) 기록
+                            if (isHost && sortedTiming.length === playerIds.length) {
+                                update(ref(db, `rooms/${currentRoomCode}`), { timingLoserId: currentWorst.id });
+                            }
+                        } else {
+                            tLoserBox.style.display = 'none';
+                        }
+                    }
+
                     // 로컬 게이지 루프 핸들링
-                    if (!timingScores[myId]) {
+                    if (!timingScores[myId] && !data.timingLoserId) {
                         document.getElementById('btn-stop-timing').disabled = false;
                         if (!isTimingLocalActive) {
                             isTimingLocalActive = true;
@@ -690,7 +704,10 @@
                         document.getElementById('btn-stop-timing').disabled = true;
                         isTimingLocalActive = false;
                         if (timingAnimationId) cancelAnimationFrame(timingAnimationId);
-                        drawStaticTimingGauge(timingScores[myId]);
+                        
+                        // 이미 멈춘 값 혹은 꼴찌 상태 표시
+                        const mySavedVal = timingScores[myId] || 0;
+                        drawStaticTimingGauge(mySavedVal);
                     }
                 }
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => btn.style.display = isHost ? 'block' : 'none');
@@ -908,7 +925,7 @@
             } else if (selectedGame === 'timing') {
                 // 50.00 ~ 95.00 사이의 타깃 난수 지정
                 const randTarget = 50 + Math.random() * 45;
-                update(rRef, { status: 'playing', timingTarget: randTarget, timingScores: null });
+                update(rRef, { status: 'playing', timingTarget: randTarget, timingScores: null, timingLoserId: null });
             }
         });
     });
@@ -918,7 +935,7 @@
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 status: 'waiting', word: '', category: '', liarId: '', targetShapeIndex: '', drawScores: null, drawImages: null, 
                 bombHolderId: '', bombExploded: false, speedChosungIndex: '', speedChosung: '', speedAnswers: null, speedLoserId: null,
-                balanceIndex: '', balanceVotes: null, balanceRevealed: false, timingTarget: null, timingScores: null
+                balanceIndex: '', balanceVotes: null, balanceRevealed: false, timingTarget: null, timingScores: null, timingLoserId: null
             });
         });
     });
