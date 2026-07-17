@@ -160,7 +160,6 @@
         .role-box.liar { background-color: #3d1d1d; border-color: var(--danger-color); color: #ff8b8b; }
         .role-box.citizen { background-color: #1d3322; border-color: #5cff86; color: #aeffc3; line-height: 1.6; }
 
-        /* 신규 생존 라벨 및 게이지 스타일 */
         .status-badge { font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: bold; }
         .status-badge.waiting { background-color: #3A3A42; color: #B3B3B9; }
         .status-badge.success { background-color: #1D3322; color: var(--success-color); border: 1px solid var(--success-color); }
@@ -250,7 +249,6 @@
             <div class="quiz-question" id="speed-chosung-display" style="font-size: 42px; color: #66B2FF; letter-spacing: 5px;">???</div>
         </div>
         
-        <!-- 초성 대결 실시간 패배 박스 및 명단 인터페이스 -->
         <div id="speed-explosion-box" class="role-box liar" style="display: none; font-size: 18px; margin-bottom: 15px;"></div>
         
         <div class="score-board" style="margin-bottom: 15px;">
@@ -263,7 +261,6 @@
         <button id="btn-back-lobby-speed" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
-    <!-- 신규 추가: ⚖️ 밸런스 게임 스크린 -->
     <div id="game-balance-screen" class="screen">
         <h2>⚖️ 밸런스 게임 (소수결)</h2>
         <div class="quiz-container" style="border-color: var(--accent-color); background: #1e1e24; margin-bottom: 10px;">
@@ -366,15 +363,38 @@
         { chosung: "ㅍㄷ", answers: ["포도", "파도", "판다", "푸딩", "폭탄", "풍두", "포두", "패도", "편도", "팔도", "풍도", "폭도", "피도", "포동", "평도", "포데", "파동", "폐단", "풍덕", "포덕"] }
     ];
 
-    // ⚖️ 신규: 밸런스 게임 질문 Pool
+    // ⚖️ 밸런스 게임 질문 Pool 30개 대량 구축 완료
     const balancePool = [
         { q: "평생 동안 먹어야 한다면?", a: "매일 삼겹살만 먹기", b: "매일 라면만 먹기" },
-        { q: "더 끔찍한 출퇴근 상황은?", a: "왕복 4시간 앉아서 가기", b: "왕복 1시간 지옥철 서서 가기" },
-        { q: "로또 1등 당첨 시 행동은?", a: "주변에 절대 숨기고 조용히 살기", b: "가족과 친한 친구에겐 쏘며 자랑하기" },
+        { q: "더 끔찍한 출퇴근 상황은?", a: "왕복 4시간 편하게 앉아서 가기", b: "왕복 1시간 지옥철 서서 낑겨 가기" },
+        { q: "로또 1등 당첨 시 행동은?", a: "주변에 절대 숨기고 조용히 살기", b: "가족과 친한 친구에겐 한턱 쏘며 자랑하기" },
         { q: "다시 태어난다면 내 직업은?", a: "월 300 버는 백수 안 부러운 한량", b: "월 2000 버는 잠 못 자는 대기업 임원" },
         { q: "연인과 가기 더 싫은 곳은?", a: "내 전 애인과 동행하는 술자리", b: "상대방의 전 애인이 운영하는 가게" },
-        { q: "스마트폰 없이 살기 vs 탄산음료 없이 살기", a: "평생 스마트폰 없이 살기", b: "평생 모든 탄산음료 끊기" },
-        { q: "과거로 갈 수 있다면?", a: "10년 전 과거로 가서 비트코인 사기", b: "50년 후 미래로 가서 기술 훔쳐오기" }
+        { q: "평생 하나만 끊어야 한다면?", a: "평생 스마트폰 없이 살기", b: "평생 모든 탄산음료 끊기" },
+        { q: "과거와 미래 중 하나로 갈 수 있다면?", a: "10년 전 과거로 가서 비트코인 사기", b: "50년 후 미래로 가서 기술 훔쳐오기" },
+        { q: "평생 한 계절로만 살아야 한다면?", a: "에어컨 없는 무더운 여름", b: "보일러 안 들어오는 한겨울" },
+        { q: "더 참기 힘든 룸메이트 유형은?", a: "내 물건 말없이 막 쓰는 사람", b: "절대 청소 안 해서 집 쓰레기장 만드는 사람" },
+        { q: "친구가 내 연인에게 깻잎을 떼어줄 때?", a: "매너니까 전혀 상관없다, 쿨하게 패스", b: "젓가락 왜 가냐? 깻잎에 불 지르고 싶다" },
+        { q: "더 선호하는 초능력은?", a: "남들의 속마음을 다 읽을 수 있는 독심술", b: "원하는 곳 어디든 갈 수 있는 순간이동" },
+        { q: "내 전재산을 투자한다면 어디에?", a: "안정적이지만 연 이율 2% 적금", b: "대박 아니면 쪽박인 고위험 주식/코인" },
+        { q: "더 화가 나는 상황은?", a: "약속 시간 1시간 늦는 친구", b: "약속 시간 5분 전에 약속 취소하는 친구" },
+        { q: "재입대 vs 군대 다시 가기 (보상 차이)?", a: "1억 받고 군대 2년 재입대 하기", b: "그냥 지금 이대로 평범하게 살기" },
+        { q: "내 사생활이 공개된다면?", a: "부모님에게 내 스마트폰 갤러리 다 열기", b: "직장 직속 상사에게 내 카톡 대화방 다 열기" },
+        { q: "더 짜증나는 카톡 대화 스타일은?", a: "답장 한참 뒤에 와놓고 읽씹하기", b: "답장은 엄청 빠른데 무성의한 'ㅇㅇ' 도배" },
+        { q: "평생 직장 생활 조건은?", a: "일은 진짜 편한데 빌런 상사 가득한 곳", b: "일은 야근 폭탄인데 천사 같은 상사들만 있는 곳" },
+        { q: "더 원하지 않는 외모 조건은?", a: "얼굴은 완벽한 이상형인데 패션 테러리스트", b: "패션 센스는 연예인급인데 얼굴이 완전 꽝" },
+        { q: "치킨 먹을 때 당신의 선택은?", a: "평생 부드러운 닭다리만 먹기", b: "평생 담백하고 퍽퍽한 닭가슴살만 먹기" },
+        { q: "노래방에서 더 싫은 빌런은?", a: "내가 예약한 노래 중간에 취소하는 사람", b: "내가 노래 부를 때 화음 무리하게 넣으며 뺏는 사람" },
+        { q: "100% 확률로 이뤄진다면?", a: "내가 원하는 꿈속 세계에서 10년 살기", b: "현실 세계에서 수명 10년 연장하기" },
+        { q: "더 괴로운 상태는?", a: "이틀 동안 잠 한숨도 못 자서 피곤함", b: "이틀 동안 밥 한 끼도 못 먹어서 배고픔" },
+        { q: "음식 취향 존중 대결!", a: "새콤달콤 소스 탕수육 '부먹'", b: "바삭함 유지 소스 따로 '찍먹'" },
+        { q: "친구와 동업을 하게 된다면?", a: "능력은 최고인데 성격 파탄자인 친구", b: "성격은 천사인데 일 진짜 못하는 친구" },
+        { q: "더 참을 수 없는 상황은?", a: "한여름에 모기 10마리 있는 방에서 자기", b: "한겨울에 난방 안 되는 텐트에서 자기" },
+        { q: "여행 갈 때 나의 스타일은?", a: "분 단위로 일정 다 짜는 철저한 계획파(J)", b: "비행기표만 끊고 마음 가는 대로 가기(P)" },
+        { q: "더 받아들이기 힘든 이별은?", a: "아무 말도 없이 번호 바꾸고 잠수 타는 잠수이별", b: "카톡 메시지 딱 한 줄 보내고 차단하는 환승이별" },
+        { q: "내가 타게 될 차는?", a: "수리비 엄청 깨지는 연식 오래된 외제 중고차", b: "승차감은 그냥 그렇지만 연비 최고인 국산 경차" },
+        { q: "더 듣기 싫은 소리는?", a: "손톱으로 칠판 칠판 사정없이 긁는 소리", b: "옆 사람이 밥 먹을 때 쩝쩝 소리 크게 내는 소리" },
+        { q: "인생의 중대한 선택!", a: "타임머신 타고 20년 전 과거의 나 만나기", b: "타임머신 타고 20년 후 미래의 나 만나기" }
     ];
 
     let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
@@ -465,7 +485,6 @@
 
             if (data.selectedGame) updateTabUI(data.selectedGame);
 
-            // 대기실 유저 목록 동기화
             const playerListEl = document.getElementById('player-list');
             if(playerListEl) {
                 playerListEl.innerHTML = '';
@@ -533,7 +552,6 @@
                         liveContainer.appendChild(row);
                     });
 
-                    // 탈락자(마지막 생존자) 판정 연출 활성화
                     const expBox = document.getElementById('speed-explosion-box');
                     if (data.speedLoserId) {
                         const loserNick = players[data.speedLoserId]?.nickname || "참가자";
@@ -647,14 +665,12 @@
             const players = rData.players || {}; const pIds = Object.keys(players);
             const currentAnswers = rData.speedAnswers || {};
             
-            // 이미 정답을 낸 유저가 또 내는것 방지
             if (currentAnswers[myId]) return;
 
             const updates = {};
             updates[`rooms/${currentRoomCode}/speedAnswers/${myId}`] = userAns;
 
             const answeredCount = Object.keys(currentAnswers).length + 1;
-            // 꼴찌(마지막 생존 탈락자) 자동 확정 트리거
             if (answeredCount === pIds.length - 1) {
                 const loserId = pIds.find(id => id !== myId && !currentAnswers[id]);
                 if(loserId) updates[`rooms/${currentRoomCode}/speedLoserId`] = loserId;
