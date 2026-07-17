@@ -4,17 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>온라인 라이어 게임</title>
+    <!-- 구글 Noto Sans KR 폰트 불러오기 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    
     <style>
+        /* 다크모드 테마 색상 정의 */
         :root {
-            --primary-color: #4A90E2;
-            --danger-color: #E04A4A;
-            --background-color: #F5F7FA;
-            --card-color: #FFFFFF;
-            --text-color: #333333;
+            --primary-color: #5C9EFF;
+            --danger-color: #FF6B6B;
+            --background-color: #121214;
+            --card-color: #1E1E22;
+            --text-color: #EAEAEA;
+            --input-border: #3A3A42;
+            --input-bg: #252529;
+            --secondary-btn: #4E5561;
         }
 
         body {
-            font-family: 'Malgun Gothic', sans-serif;
+            font-family: 'Noto Sans KR', sans-serif;
             background-color: var(--background-color);
             color: var(--text-color);
             margin: 0;
@@ -30,16 +39,18 @@
             background-color: var(--card-color);
             padding: 30px;
             border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             width: 100%;
             max-width: 400px;
             text-align: center;
+            border: 1px solid #2D2D34;
         }
 
         h1 {
             font-size: 24px;
             margin-bottom: 24px;
             color: var(--primary-color);
+            font-weight: 700;
         }
 
         .screen {
@@ -54,9 +65,12 @@
             width: 100%;
             padding: 12px;
             margin-bottom: 16px;
-            border: 2px solid #E1E8ED;
+            border: 2px solid var(--input-border);
+            background-color: var(--input-bg);
+            color: var(--text-color);
             border-radius: 8px;
             font-size: 16px;
+            font-family: 'Noto Sans KR', sans-serif;
             box-sizing: border-box;
             outline: none;
             transition: border-color 0.2s;
@@ -70,35 +84,35 @@
             width: 100%;
             padding: 14px;
             background-color: var(--primary-color);
-            color: white;
+            color: #121214;
             border: none;
             border-radius: 8px;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 700;
+            font-family: 'Noto Sans KR', sans-serif;
             cursor: pointer;
             margin-bottom: 12px;
-            transition: background-color 0.2s;
+            transition: opacity 0.2s;
         }
 
         button:hover {
-            background-color: #357ABD;
+            opacity: 0.9;
         }
 
         button.secondary {
-            background-color: #657786;
-        }
-        button.secondary:hover {
-            background-color: #505F6B;
+            background-color: var(--secondary-btn);
+            color: white;
         }
 
         .room-info {
-            background-color: #E8F0FE;
+            background-color: #252A36;
             padding: 12px;
             border-radius: 8px;
             font-size: 18px;
-            font-weight: bold;
+            font-weight: 700;
             color: var(--primary-color);
             margin-bottom: 20px;
+            border: 1px solid #2D3748;
         }
 
         .player-list {
@@ -110,42 +124,44 @@
 
         .player-list li {
             padding: 10px 14px;
-            background-color: #F8F9FA;
+            background-color: #252529;
             margin-bottom: 8px;
             border-radius: 6px;
             border-left: 4px solid var(--primary-color);
             display: flex;
             justify-content: space-between;
+            align-items: center;
         }
 
         .host-badge {
             font-size: 12px;
             background-color: var(--primary-color);
-            color: white;
+            color: #121214;
             padding: 2px 6px;
             border-radius: 4px;
+            font-weight: 700;
         }
 
         .role-box {
-            font-size: 28px;
-            font-weight: bold;
+            font-size: 24px;
+            font-weight: 700;
             margin: 40px 0;
-            padding: 20px;
+            padding: 25px 20px;
             border-radius: 12px;
-            background-color: #F8F9FA;
-            border: 2px dashed #CBD5E1;
+            background-color: #252529;
+            border: 2px dashed #3A3A42;
         }
 
         .role-box.liar {
             color: var(--danger-color);
-            background-color: #FFF5F5;
-            border-color: #FEB2B2;
+            background-color: #2D1F1F;
+            border-color: #5A3333;
         }
 
         .role-box.citizen {
-            color: #2B6CB0;
-            background-color: #EBF8FF;
-            border-color: #90CDF4;
+            color: var(--primary-color);
+            background-color: #1F2633;
+            border-color: #334466;
         }
     </style>
 </head>
@@ -158,7 +174,7 @@
     <div id="login-screen" class="screen active">
         <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
         <button id="btn-create-room">새로운 방 만들기</button>
-        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #E1E8ED;">
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #2D2D34;">
         <input type="text" id="room-code-input" placeholder="방 코드 4자리 입력">
         <button id="btn-join-room" class="secondary">방 참여하기</button>
     </div>
@@ -169,7 +185,7 @@
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
         <ul id="player-list" class="player-list"></ul>
         <button id="btn-start-game" style="display: none;">게임 시작 (방장 전용)</button>
-        <p id="wait-message" style="color: #657786; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
+        <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
     </div>
 
     <!-- 3화면: 역할 및 제시어 확인 -->
@@ -183,7 +199,7 @@
 <!-- Firebase SDK 불러오기 -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, push, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, set, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
         databaseURL: "https://roulette-d9a12-default-rtdb.asia-southeast1.firebasedatabase.app/" 
@@ -256,7 +272,6 @@
         myId = 'player_' + Math.random().toString(36).substr(2, 9);
         isHost = false;
 
-        // 방 존재 여부 검사 후 참여 진행
         const roomRef = ref(db, `rooms/${roomCode}`);
         get(roomRef).then((snapshot) => {
             if (!snapshot.exists()) {
@@ -317,11 +332,10 @@
                     roleDisplay.innerText = "🕵️‍♂️ 당신은 라이어입니다!";
                     roleDisplay.className = "role-box liar";
                 } else {
-                    roleDisplay.innerHTML = `<span style="font-size:16px; color:#657786;">제시어 [${data.category}]</span><br>🍕 ${data.word}`;
+                    roleDisplay.innerHTML = `<span style="font-size:14px; color:#8E9AA8; font-weight:400;">제시어 [${data.category}]</span><br><span style="margin-top:10px; display:inline-block;">🍕 ${data.word}</span>`;
                     roleDisplay.className = "role-box citizen";
                 }
 
-                // 방장만 대기실로 돌아가기 버튼 노출 (게임 수명 제어)
                 const backBtn = document.getElementById('btn-back-lobby');
                 if (isHost) {
                     backBtn.style.display = 'block';
@@ -337,7 +351,7 @@
         });
     }
 
-    // [게임 시작] 버튼 이벤트 (방장 전용) - get()으로 개선
+    // [게임 시작] 버튼 이벤트
     document.getElementById('btn-start-game').addEventListener('click', () => {
         const playersRef = ref(db, `rooms/${currentRoomCode}/players`);
         
@@ -351,16 +365,12 @@
                 return;
             }
 
-            // 무작위 카테고리 및 제시어 선정
             const categories = Object.keys(wordList);
             const randomCategory = categories[Math.floor(Math.random() * categories.length)];
             const words = wordList[randomCategory];
             const randomWord = words[Math.floor(Math.random() * words.length)];
-
-            // 무작위 라이어 선정
             const randomLiarId = playerIds[Math.floor(Math.random() * playerIds.length)];
 
-            // 게임 시작 상태 업데이트
             const roomRef = ref(db, `rooms/${currentRoomCode}`);
             update(roomRef, {
                 status: 'playing',
