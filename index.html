@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>모임용 실시간 멀티플레이 게임천국</title>
+    <title>모임용 실시간 멀티 게임 패키지</title>
     <!-- 구글 Noto Sans KR 폰트 불러오기 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +34,25 @@
             align-items: center;
             min-height: 100vh;
             box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        /* 폭발 시 화면 진동 효과 */
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            10% { transform: translate(-5px, -5px) rotate(-1deg); }
+            20% { transform: translate(5px, 5px) rotate(1deg); }
+            30% { transform: translate(-5px, 5px) rotate(-1deg); }
+            40% { transform: translate(5px, -5px) rotate(1deg); }
+            50% { transform: translate(-5px, -5px) rotate(-1deg); }
+            60% { transform: translate(5px, 5px) rotate(1deg); }
+            70% { transform: translate(-5px, 5px) rotate(-1deg); }
+            80% { transform: translate(5px, -5px) rotate(1deg); }
+            90% { transform: translate(-5px, -5px) rotate(-1deg); }
+        }
+
+        body.explode-shake {
+            animation: shake 0.5s ease-in-out;
         }
 
         .container {
@@ -46,6 +65,7 @@
             text-align: center;
             border: 1px solid #2D2D34;
             box-sizing: border-box;
+            position: relative;
         }
 
         h1 {
@@ -102,7 +122,6 @@
             color: var(--text-color);
             border-radius: 8px;
             font-size: 16px;
-            font-family: 'Noto Sans KR', sans-serif;
             box-sizing: border-box;
             outline: none;
             transition: border-color 0.2s;
@@ -121,7 +140,6 @@
             border-radius: 8px;
             font-size: 16px;
             font-weight: 700;
-            font-family: 'Noto Sans KR', sans-serif;
             cursor: pointer;
             margin-bottom: 12px;
             transition: opacity 0.2s;
@@ -202,16 +220,16 @@
             border-color: #334466;
         }
 
-        /* 그리기 캔버스 영역 */
+        /* 🎨 로컬 도형 그리기 캔버스 영역 */
         #canvas-container {
             position: relative;
             background: #ffffff;
-            border-radius: 8px;
+            border-radius: 12px;
             margin: 15px auto;
-            width: 300px;
-            height: 300px;
+            width: 280px;
+            height: 280px;
             overflow: hidden;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+            border: 3px solid var(--primary-color);
         }
 
         canvas {
@@ -220,29 +238,125 @@
             cursor: crosshair;
         }
 
-        /* 폭탄돌리기 연출 */
+        #target-shape-preview {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.15;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .score-board {
+            background-color: #151518;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 8px;
+            border-bottom: 1px solid #252529;
+            font-weight: bold;
+        }
+
+        .score-row:last-child {
+            border-bottom: none;
+        }
+
+        /* 💣 폭탄돌리기 퀴즈 영역 */
         .bomb-display {
-            font-size: 70px;
-            margin: 30px 0;
-            animation: pulse 1s infinite alternate;
+            font-size: 75px;
+            margin: 20px 0;
+            position: relative;
+            display: inline-block;
         }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            100% { transform: scale(1.15); }
-        }
+
         .bomb-status {
             background-color: #252529;
             padding: 15px;
             border-radius: 8px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+        }
+
+        .quiz-container {
+            background: #252529;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 2px solid var(--danger-color);
+        }
+
+        .quiz-question {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--accent-color);
+        }
+
+        .quiz-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .quiz-btn {
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: var(--secondary-btn);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .quiz-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .quiz-btn.wrong-animation {
+            background-color: var(--danger-color) !important;
+            animation: shake 0.2s ease-in-out 2;
+        }
+
+        /* 💥 폭발 파티클 이펙트용 컨테이너 */
+        #explosion-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+            overflow: hidden;
+            border-radius: 16px;
+        }
+
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: var(--danger-color);
+            border-radius: 50%;
+            opacity: 0;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="container" id="main-container">
+    <div id="explosion-overlay"></div>
     <h1>🎮 실시간 멀티 게임 패키지</h1>
 
     <!-- 1화면: 로그인 및 방 선택 -->
@@ -262,14 +376,14 @@
         <p style="text-align: left; margin: 5px; font-weight: bold; color: var(--primary-color); font-size: 14px;">🎲 다음 게임 선택</p>
         <div class="game-tabs">
             <button class="tab-btn active" id="tab-liar" onclick="selectGameMode('liar')">🤫 라이어</button>
-            <button class="tab-btn" id="tab-draw" onclick="selectGameMode('draw')">🎨 그림공유</button>
+            <button class="tab-btn" id="tab-draw" onclick="selectGameMode('draw')">📐 도형그리기</button>
             <button class="tab-btn" id="tab-bomb" onclick="selectGameMode('bomb')">💣 폭탄돌리기</button>
         </div>
 
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
         <ul id="player-list" class="player-list"></ul>
         
-        <button id="btn-start-game" style="display: none;">게임 시작 (방장 전용)</button>
+        <button id="btn-start-game">게임 시작</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
     </div>
 
@@ -281,17 +395,27 @@
         <button id="btn-back-lobby-liar" class="secondary btn-back-lobby">대기실로 돌아가기</button>
     </div>
 
-    <!-- 3-2화면: [실시간 그리기] 게임 화면 -->
+    <!-- 3-2화면: [각자 도형 그리기 대결] 게임 화면 -->
     <div id="game-draw-screen" class="screen">
-        <h2>🎨 실시간 그림 공유</h2>
-        <p id="drawer-info" style="color: var(--accent-color); font-weight: bold;">그리는 사람: 불러오는 중...</p>
+        <h2>📐 도형 정확히 그리기</h2>
+        <p id="target-shape-text" style="color: var(--accent-color); font-weight: bold; font-size: 18px;">목표 도형: 불러오는 중...</p>
         
         <div id="canvas-container">
-            <canvas id="drawing-canvas" width="300" height="300"></canvas>
+            <div id="target-shape-preview">
+                <svg id="preview-svg" width="200" height="200" style="stroke: rgba(92,159,255,0.4); stroke-width: 6; fill: none;"></svg>
+            </div>
+            <canvas id="drawing-canvas" width="280" height="280"></canvas>
         </div>
 
-        <button id="btn-clear-canvas" style="display: none; background-color: var(--danger-color); color: white;">그림 초기화 (출제자 전용)</button>
-        <button id="btn-back-lobby-draw" class="secondary btn-back-lobby">대기실로 돌아가기</button>
+        <button id="btn-submit-score" style="background-color: var(--accent-color); color: #121214;">📐 내 그림 채점하여 제출하기</button>
+        
+        <!-- 실시간 스코어보드 -->
+        <div class="score-board">
+            <div style="font-size: 14px; color: #8E9AA8; margin-bottom: 8px; font-weight: bold;">📊 참여자 스코어보드 (실시간)</div>
+            <div id="draw-score-list">대기 중...</div>
+        </div>
+
+        <button id="btn-back-lobby-draw" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <!-- 3-3화면: [폭탄 돌리기] 게임 화면 -->
@@ -300,7 +424,18 @@
         <div id="bomb-icon" class="bomb-display">💣</div>
         <div class="bomb-status" id="bomb-status-text">불러오는 중...</div>
         
-        <button id="btn-pass-bomb" style="background-color: var(--danger-color); color: #fff; font-size: 20px; padding: 18px 0; display: none;">🔥 나 아님! 폭탄 넘기기!! 🔥</button>
+        <!-- 🧮 수학 퀴즈 컨테이너 (내 차례일 때만 나타남) -->
+        <div id="quiz-box" class="quiz-container" style="display: none;">
+            <p style="margin: 0 0 10px 0; font-size: 13px; color: #8E9AA8;">🔓 문제를 풀어 탈출하세요!</p>
+            <div class="quiz-question" id="quiz-question-text">5 + 7 = ?</div>
+            <div class="quiz-options" id="quiz-options-box">
+                <button class="quiz-btn">1</button>
+                <button class="quiz-btn">2</button>
+                <button class="quiz-btn">3</button>
+                <button class="quiz-btn">4</button>
+            </div>
+        </div>
+
         <button id="btn-back-lobby-bomb" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 </div>
@@ -317,7 +452,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // 라이어 게임 제시어 데이터
+    // 라이어 게임 데이터
     const wordList = {
         "연예/방송 📺": ["유재석", "아이유", "BTS", "봉준호", "오징어게임", "손흥민", "뉴진스", "에스파", "블랙핑크", "임영웅", "김종국", "차은우", "박보검", "장원영", "런닝맨", "무한도전", "나는솔로", "더글로리", "피식대학", "유튜브", "넷플릭스", "슈퍼맨이돌아왔다"],
         "음식/야식 🍗": ["마라탕", "삼겹살", "불닭볶음면", "치즈볼", "탕후루", "떡볶이", "양꼬치", "짜장면", "치킨", "피자", "족발", "곱창", "닭발", "김치찌개", "라면", "초밥", "햄버거", "아이스크림", "붕어빵", "호떡", "김밥", "냉면", "순대"],
@@ -325,21 +460,29 @@
         "장소/핫플 🗺️": ["노래방", "클럽", "한강공원", "편의점", "제주도", "캠핑장", "영화관", "헬스장", "놀이공원", "백화점", "카페", "맛집", "바다", "계곡", "찜질방", "호텔", "펜션", "공항", "학교", "회사", "PC방", "포차"]
     };
 
+    // 도형 그리기 목표 리스트 (정점 좌표 0~280 기준 정의)
+    const shapes = [
+        { name: "세모 🔺", path: "M 140 50 L 50 220 L 230 220 Z", points: [{x:140, y:50}, {x:50, y:220}, {x:230, y:220}, {x:140, y:50}], svg: '<polygon points="140,40 40,220 240,220"/>' },
+        { name: "네모 🔲", path: "M 60 60 L 220 60 L 220 220 L 60 220 Z", points: [{x:60, y:60}, {x:220, y:60}, {x:220, y:220}, {x:60, y:220}, {x:60, y:60}], svg: '<rect x="50" y="50" width="180" height="180"/>' },
+        { name: "별 모양 ⭐", path: "M 140 30 L 170 100 L 250 110 L 190 160 L 210 230 L 140 190 L 70 230 L 90 160 L 30 110 L 110 100 Z", points: [{x:140,y:30},{x:170,y:100},{x:250,y:110},{x:190,y:160},{x:210,y:230},{x:140,y:190},{x:70,y:230},{x:90,y:160},{x:30,y:110},{x:110,y:100},{x:140,y:30}], svg: '<polygon points="100,20 120,80 180,80 130,110 150,170 100,140 50,170 70,110 20,80 80,80"/>' }
+    ];
+
     let myId = '';
     let myNickname = '';
     let currentRoomCode = '';
     let isHost = false;
-    let selectedGame = 'liar'; // 기본값
+    let selectedGame = 'liar'; 
 
-    // 실시간 드로잉을 위한 변수
+    // 도형그리기 로컬 변수
     const canvas = document.getElementById('drawing-canvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
-    let isMyTurnToDraw = false;
+    let userDrawingPoints = [];
+    let currentShapeIndex = 0;
 
-    // 폭탄 돌리기 변수
-    let bombTimer = null;
-    let localBombActive = false;
+    // 폭탄 돌리기 퀴즈용 로컬 상태
+    let currentAnswer = 0;
+    let isPenaltyActive = false;
 
     // 화면 전환 함수
     function showScreen(screenId) {
@@ -369,7 +512,7 @@
         return Math.floor(1000 + Math.random() * 9000).toString();
     }
 
-    // [방 만들기] 버튼 이벤트
+    // [방 만들기]
     document.getElementById('btn-create-room').addEventListener('click', () => {
         const nickname = document.getElementById('nickname-input').value.trim();
         if(!nickname) return alert('닉네임을 입력해주세요!');
@@ -397,7 +540,7 @@
         });
     });
 
-    // [방 참여하기] 버튼 이벤트
+    // [방 참여하기]
     document.getElementById('btn-join-room').addEventListener('click', () => {
         const nickname = document.getElementById('nickname-input').value.trim();
         const roomCode = document.getElementById('room-code-input').value.trim();
@@ -485,15 +628,31 @@
                 } 
                 else if (data.selectedGame === 'draw') {
                     showScreen('game-draw-screen');
-                    const drawerNick = players[data.drawerId]?.nickname || "미확인";
-                    document.getElementById('drawer-info').innerText = `✏️ 출제자: ${drawerNick}`;
                     
-                    if (data.drawerId === myId) {
-                        isMyTurnToDraw = true;
-                        document.getElementById('btn-clear-canvas').style.display = 'block';
+                    // 목표 도형 렌더링 설정
+                    currentShapeIndex = data.targetShapeIndex || 0;
+                    const targetShape = shapes[currentShapeIndex];
+                    document.getElementById('target-shape-text').innerText = `목표 도형: ${targetShape.name}`;
+                    document.getElementById('preview-svg').innerHTML = targetShape.svg;
+
+                    // 실시간으로 갱신되는 스코어보드 렌더링
+                    const scores = data.drawScores || {};
+                    const scoreBoardEl = document.getElementById('draw-score-list');
+                    scoreBoardEl.innerHTML = '';
+                    
+                    const sortedScorers = Object.keys(scores)
+                        .map(id => ({ name: players[id]?.nickname || '탈퇴한 유저', score: scores[id] }))
+                        .sort((a,b) => b.score - a.score);
+
+                    if (sortedScorers.length === 0) {
+                        scoreBoardEl.innerHTML = '<div style="color:#8E9AA8; padding: 4px;">아직 제출자가 없습니다. 먼저 그려보세요!</div>';
                     } else {
-                        isMyTurnToDraw = false;
-                        document.getElementById('btn-clear-canvas').style.display = 'none';
+                        sortedScorers.forEach(scorer => {
+                            const row = document.createElement('div');
+                            row.className = 'score-row';
+                            row.innerHTML = `<span>👤 ${scorer.name}</span> <span style="color:var(--accent-color);">${scorer.score}점</span>`;
+                            scoreBoardEl.appendChild(row);
+                        });
                     }
                 }
                 else if (data.selectedGame === 'bomb') {
@@ -507,15 +666,25 @@
                     if(data.bombExploded) {
                         bombIcon.innerText = "💥";
                         statusTextEl.innerHTML = `<span style="color:var(--danger-color); font-size:24px;">퍼어엉!!!</span><br><br>🚨 [${holderNick}] 님이 패배했습니다!`;
-                        document.getElementById('btn-pass-bomb').style.display = 'none';
+                        document.getElementById('quiz-box').style.display = 'none';
+                        
+                        // 시각적 폭발 연출 실행
+                        triggerExplosionEffect();
                     } else {
                         bombIcon.innerText = "💣";
                         if (currentHolderId === myId) {
-                            statusTextEl.innerHTML = `<span style="color:var(--danger-color);">🚨 내 폰에 폭탄이 있습니다! 빠르게 넘기세요! 🚨</span>`;
-                            document.getElementById('btn-pass-bomb').style.display = 'block';
+                            statusTextEl.innerHTML = `<span style="color:var(--danger-color); font-size:18px;">🔥 내 차례입니다! 문제를 맞춰 탈출하세요! 🔥</span>`;
+                            document.getElementById('quiz-box').style.display = 'block';
+                            
+                            // 내가 폭탄 주인이 되었을 때, 로컬에 퀴즈가 활성화되어 있지 않다면 퀴즈 하나 출제
+                            if (!localBombActive) {
+                                generateQuiz();
+                                localBombActive = true;
+                            }
                         } else {
                             statusTextEl.innerHTML = `👤 현재 폭탄 소지자: <span style="color:var(--accent-color); font-weight:bold;">${holderNick}</span>`;
-                            document.getElementById('btn-pass-bomb').style.display = 'none';
+                            document.getElementById('quiz-box').style.display = 'none';
+                            localBombActive = false; // 타인 차례 시 내 상태 리셋
                         }
                     }
                 }
@@ -528,50 +697,13 @@
 
             if(data.status === 'waiting') {
                 showScreen('lobby-screen');
-                ctx.clearRect(0, 0, canvas.width, canvas.height); // 캔버스 잔상 초기화
-            }
-        });
-
-        // 그림판 전용 실시간 리스너 연결
-        const drawingRef = ref(db, `rooms/${roomCode}/drawing`);
-        onValue(drawingRef, (snapshot) => {
-            const points = snapshot.val();
-            if (!points) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                return;
-            }
-            drawCanvasFromData(points);
-        });
-    }
-
-    // 🎨 [그림] 점 데이터 복원하여 캔버스에 그리는 함수
-    function drawCanvasFromData(points) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = '#121214';
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        const keys = Object.keys(points).sort();
-        let isDrawingLocal = false;
-
-        keys.forEach(key => {
-            const pt = points[key];
-            if (pt.type === 'start') {
-                ctx.beginPath();
-                ctx.moveTo(pt.x, pt.y);
-                isDrawingLocal = true;
-            } else if (pt.type === 'move' && isDrawingLocal) {
-                ctx.lineTo(pt.x, pt.y);
-                ctx.stroke();
-            } else if (pt.type === 'end') {
-                ctx.closePath();
-                isDrawingLocal = false;
+                clearCanvas();
+                document.getElementById('main-container').style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.3)';
             }
         });
     }
 
-    // 🎨 [그림] 그리기 입력 이벤트 바인딩 (출제자 전용)
+    // 📐 [도형 그리기] 로컬 드로잉 이벤트 연동
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -582,61 +714,245 @@
         };
     }
 
-    function pushDrawingPoint(type, x, y) {
-        if (!isMyTurnToDraw) return;
-        const pointRef = ref(db, `rooms/${currentRoomCode}/drawing/${Date.now()}_${Math.random().toString(36).substr(2,4)}`);
-        set(pointRef, { type, x, y });
+    function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        userDrawingPoints = [];
     }
 
     canvas.addEventListener('mousedown', (e) => {
-        if (!isMyTurnToDraw) return;
         isDrawing = true;
         const coords = getCanvasCoordinates(e);
-        pushDrawingPoint('start', coords.x, coords.y);
+        ctx.beginPath();
+        ctx.moveTo(coords.x, coords.y);
+        ctx.strokeStyle = '#121214';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        userDrawingPoints.push(coords);
     });
 
     canvas.addEventListener('mousemove', (e) => {
-        if (!isDrawing || !isMyTurnToDraw) return;
+        if (!isDrawing) return;
         const coords = getCanvasCoordinates(e);
-        pushDrawingPoint('move', coords.x, coords.y);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
+        userDrawingPoints.push(coords);
     });
 
-    canvas.addEventListener('mouseup', () => {
-        if (!isMyTurnToDraw) return;
-        isDrawing = false;
-        pushDrawingPoint('end', 0, 0);
-    });
+    canvas.addEventListener('mouseup', () => { isDrawing = false; });
 
-    // 모바일 터치 이벤트 연동
+    // 모바일 터치 대응
     canvas.addEventListener('touchstart', (e) => {
-        if (!isMyTurnToDraw) return;
         isDrawing = true;
         const coords = getCanvasCoordinates(e);
-        pushDrawingPoint('start', coords.x, coords.y);
+        ctx.beginPath();
+        ctx.moveTo(coords.x, coords.y);
+        ctx.strokeStyle = '#121214';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        userDrawingPoints.push(coords);
         e.preventDefault();
     });
 
     canvas.addEventListener('touchmove', (e) => {
-        if (!isDrawing || !isMyTurnToDraw) return;
+        if (!isDrawing) return;
         const coords = getCanvasCoordinates(e);
-        pushDrawingPoint('move', coords.x, coords.y);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
+        userDrawingPoints.push(coords);
         e.preventDefault();
     });
 
-    canvas.addEventListener('touchend', () => {
-        if (!isMyTurnToDraw) return;
-        isDrawing = false;
-        pushDrawingPoint('end', 0, 0);
+    canvas.addEventListener('touchend', () => { isDrawing = false; });
+
+    // 📐 [도형 그리기] 알고리즘을 이용한 오차 점수 채점 및 제출
+    document.getElementById('btn-submit-score').addEventListener('click', () => {
+        if (userDrawingPoints.length < 5) {
+            alert("그림을 더 성의 있게 그려주세요!");
+            return;
+        }
+
+        const target = shapes[currentShapeIndex];
+        let totalMinDist = 0;
+
+        // 사용자가 그린 점들 중 일부를 샘플링하여 타겟 가이드라인과의 평균 최단 거리 연산 (단순 수학적 유사 점수 계산)
+        const sampleCount = Math.min(50, userDrawingPoints.length);
+        const step = Math.floor(userDrawingPoints.length / sampleCount);
+
+        for (let i = 0; i < userDrawingPoints.length; i += step) {
+            const uPt = userDrawingPoints[i];
+            let minDist = Infinity;
+            target.points.forEach(tPt => {
+                const dist = Math.sqrt((uPt.x - tPt.x) ** 2 + (uPt.y - tPt.y) ** 2);
+                if (dist < minDist) minDist = dist;
+            });
+            totalMinDist += minDist;
+        }
+
+        const avgDistance = totalMinDist / sampleCount;
+        let finalScore = Math.round(Math.max(10, 100 - (avgDistance * 1.5)));
+
+        // 점수 Firebase에 기록
+        const scoreRef = ref(db, `rooms/${currentRoomCode}/drawScores/${myId}`);
+        set(scoreRef, finalScore).then(() => {
+            alert(`🎉 내 점수: ${finalScore}점! 제출 완료되었습니다.`);
+        });
     });
 
-    // [그림 초기화] 버튼 클릭 이벤트
-    document.getElementById('btn-clear-canvas').addEventListener('click', () => {
-        const drawingRef = ref(db, `rooms/${currentRoomCode}/drawing`);
-        set(drawingRef, null);
-    });
+
+    // 💣 [폭탄 돌리기] 연산 퀴즈 생성 로직
+    function generateQuiz() {
+        if (isPenaltyActive) return;
+
+        const num1 = Math.floor(Math.random() * 8) + 2; // 2~9
+        const num2 = Math.floor(Math.random() * 8) + 2; // 2~9
+        const operators = ['+', '-', '*'];
+        const operator = operators[Math.floor(Math.random() * operators.length)];
+        
+        let questionText = '';
+        let answer = 0;
+
+        switch(operator) {
+            case '+':
+                questionText = `${num1} + ${num2} = ?`;
+                answer = num1 + num2;
+                break;
+            case '-':
+                const maxVal = Math.max(num1, num2);
+                const minVal = Math.min(num1, num2);
+                questionText = `${maxVal} - ${minVal} = ?`;
+                answer = maxVal - minVal;
+                break;
+            case '*':
+                questionText = `${num1} × ${num2} = ?`;
+                answer = num1 * num2;
+                break;
+        }
+
+        currentAnswer = answer;
+
+        // 보기 4개 만들기 (오답 난수 3개 구성)
+        const options = new Set();
+        options.add(answer);
+        while (options.size < 4) {
+            const offset = (Math.floor(Math.random() * 5) + 1) * (Math.random() < 0.5 ? 1 : -1);
+            const fakeAnswer = answer + offset;
+            if (fakeAnswer > 0) options.add(fakeAnswer);
+        }
+
+        const optionsArray = Array.from(options).sort(() => Math.random() - 0.5);
+
+        // UI에 출력하기
+        document.getElementById('quiz-question-text').innerText = questionText;
+        const optionsBox = document.getElementById('quiz-options-box');
+        optionsBox.innerHTML = '';
+
+        optionsArray.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'quiz-btn';
+            btn.innerText = opt;
+            btn.onclick = () => checkQuizAnswer(opt, btn);
+            optionsBox.appendChild(btn);
+        });
+    }
+
+    // 💣 퀴즈 정답 검사
+    function checkQuizAnswer(selected, buttonElement) {
+        if (isPenaltyActive) return;
+
+        if (selected === currentAnswer) {
+            // 정답 시 다음 사람에게 토스
+            passBombToNext();
+        } else {
+            // 오답 시 1초 동안 다른 선택 차단 및 흔들기 연출
+            isPenaltyActive = true;
+            buttonElement.classList.add('wrong-animation');
+            
+            // 모든 보기 임시 비활성화
+            document.querySelectorAll('.quiz-btn').forEach(btn => btn.disabled = true);
+
+            setTimeout(() => {
+                buttonElement.classList.remove('wrong-animation');
+                document.querySelectorAll('.quiz-btn').forEach(btn => btn.disabled = false);
+                isPenaltyActive = false;
+            }, 1000);
+        }
+    }
+
+    // 💣 다음 사람에게 실제로 폭탄 토스
+    function passBombToNext() {
+        const roomRef = ref(db, `rooms/${currentRoomCode}`);
+        get(roomRef).then((snapshot) => {
+            const data = snapshot.val();
+            if (!data || data.bombExploded) return;
+
+            const players = data.players || {};
+            const playerIds = Object.keys(players);
+            const currentIndex = playerIds.indexOf(myId);
+            
+            // 내 다음 차례인 인덱스 탐색
+            const nextIndex = (currentIndex + 1) % playerIds.length;
+            const nextHolderId = playerIds[nextIndex];
+
+            update(roomRef, { bombHolderId: nextHolderId }).then(() => {
+                localBombActive = false; // 내 성공 로컬 플래그 리셋
+            });
+        });
+    }
+
+    // 💥 폭발 임팩트 연출 (CSS 파티클 생성)
+    function triggerExplosionEffect() {
+        // 진동 효과 부여
+        const bodyEl = document.body;
+        const mainContainer = document.getElementById('main-container');
+        bodyEl.classList.add('explode-shake');
+        mainContainer.style.boxShadow = '0 0 50px #FF6B6B';
+        
+        const overlay = document.getElementById('explosion-overlay');
+        overlay.innerHTML = '';
+
+        // 30개의 랜덤 파편 입자 발사
+        for (let i = 0; i < 30; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            
+            // 무작위 크기 및 색상
+            const size = Math.floor(Math.random() * 8) + 6;
+            particle.style.width = `${size}px`;
+            particle.style.height = `${size}px`;
+            particle.style.backgroundColor = Math.random() < 0.5 ? '#FF6B6B' : '#FFD25C';
+            
+            // 화면 정중앙 좌표 설정
+            particle.style.left = '50%';
+            particle.style.top = '50%';
+            overlay.appendChild(particle);
+
+            // 목적지 무작위 각도 및 거리
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.floor(Math.random() * 200) + 50;
+            const targetX = Math.cos(angle) * distance;
+            const targetY = Math.sin(angle) * distance;
+
+            // 웹 애니메이션 API를 사용해 물리 효과처럼 확산
+            particle.animate([
+                { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                { transform: `translate(${targetX - 5}px, ${targetY - 5}px) scale(0)`, opacity: 0 }
+            ], {
+                duration: 600 + Math.random() * 400,
+                easing: 'cubic-bezier(0.1, 0.8, 0.3, 1)',
+                fill: 'forwards'
+            });
+        }
+
+        // 0.5초 후 흔들림 효과 제거
+        setTimeout(() => {
+            bodyEl.classList.remove('explode-shake');
+        }, 500);
+    }
 
 
-    // [게임 시작] 버튼 이벤트
+    // [게임 시작] 통합 버튼 제어
     document.getElementById('btn-start-game').addEventListener('click', () => {
         const playersRef = ref(db, `rooms/${currentRoomCode}/players`);
         
@@ -652,7 +968,7 @@
 
             const roomRef = ref(db, `rooms/${currentRoomCode}`);
             
-            // 🤫 [라이어 게임 시작 세팅]
+            // 🤫 [라이어 게임 시작]
             if (selectedGame === 'liar') {
                 const categories = Object.keys(wordList);
                 const randomCategory = categories[Math.floor(Math.random() * categories.length)];
@@ -667,16 +983,16 @@
                     liarId: randomLiarId
                 });
             } 
-            // 🎨 [그림공유 게임 시작 세팅]
+            // 📐 [도형그리기 대결 시작]
             else if (selectedGame === 'draw') {
-                const randomDrawerId = playerIds[Math.floor(Math.random() * playerIds.length)];
-                set(ref(db, `rooms/${currentRoomCode}/drawing`), null); // 초기 그림 리셋
+                const randomShapeIndex = Math.floor(Math.random() * shapes.length);
                 update(roomRef, {
                     status: 'playing',
-                    drawerId: randomDrawerId
+                    targetShapeIndex: randomShapeIndex,
+                    drawScores: null // 이전 랭킹 데이터 초기화
                 });
             }
-            // 💣 [폭탄돌리기 게임 시작 세팅]
+            // 💣 [폭탄돌리기 게임 시작]
             else if (selectedGame === 'bomb') {
                 const randomHolderId = playerIds[Math.floor(Math.random() * playerIds.length)];
                 update(roomRef, {
@@ -684,10 +1000,9 @@
                     bombHolderId: randomHolderId,
                     bombExploded: false
                 }).then(() => {
-                    // 방장이 직접 타이머를 카운트하는 것이 아닌, 무작위 초(15초~35초) 후에 터지도록 타임아웃 구성
-                    const randomBombTime = Math.floor(Math.random() * 20) + 15; // 15 ~ 35초
+                    // 무작위 초(20초 ~ 40초 사이) 뒤 폭발 설정
+                    const randomBombTime = Math.floor(Math.random() * 20) + 20; 
                     setTimeout(() => {
-                        // 폭탄 시간 종료 후 서버 터트리기 기록
                         get(roomRef).then((snap) => {
                             const currentRoomData = snap.val();
                             if (currentRoomData && currentRoomData.status === 'playing' && currentRoomData.selectedGame === 'bomb') {
@@ -703,26 +1018,7 @@
         });
     });
 
-    // 💣 [폭탄 넘기기] 버튼 클릭 이벤트 (순서대로 다음 사람 지정)
-    document.getElementById('btn-pass-bomb').addEventListener('click', () => {
-        const roomRef = ref(db, `rooms/${currentRoomCode}`);
-        get(roomRef).then((snapshot) => {
-            const data = snapshot.val();
-            if (!data || data.bombExploded) return;
-
-            const players = data.players || {};
-            const playerIds = Object.keys(players);
-            const currentIndex = playerIds.indexOf(myId);
-            
-            // 내 다음 차례인 인덱스 탐색
-            const nextIndex = (currentIndex + 1) % playerIds.length;
-            const nextHolderId = playerIds[nextIndex];
-
-            update(roomRef, { bombHolderId: nextHolderId });
-        });
-    });
-
-    // [대기실로 돌아가기] 통합 버튼 처리
+    // [대기실로 돌아가기] 통합 처리
     document.querySelectorAll('.btn-back-lobby').forEach(btn => {
         btn.addEventListener('click', () => {
             const roomRef = ref(db, `rooms/${currentRoomCode}`);
@@ -731,12 +1027,11 @@
                 word: '',
                 category: '',
                 liarId: '',
-                drawerId: '',
+                targetShapeIndex: '',
+                drawScores: null,
                 bombHolderId: '',
                 bombExploded: false
             });
-            // 캔버스 데이터 클리어
-            set(ref(db, `rooms/${currentRoomCode}/drawing`), null);
         });
     });
 </script>
