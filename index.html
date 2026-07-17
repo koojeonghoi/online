@@ -220,10 +220,10 @@
             border-color: #334466;
         }
 
-        /* 🎨 로컬 도형 그리기 캔버스 영역 */
+        /* 🎨 다크 캔버스 영역 */
         #canvas-container {
             position: relative;
-            background: #ffffff;
+            background: #151518; /* 다크 테마 배경 */
             border-radius: 12px;
             margin: 15px auto;
             width: 280px;
@@ -235,6 +235,10 @@
         canvas {
             display: block;
             background: transparent;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
             cursor: crosshair;
         }
 
@@ -245,10 +249,11 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            opacity: 0.15;
+            opacity: 0.4; /* 점선 가이드 시인성 확보 */
             display: flex;
             justify-content: center;
             align-items: center;
+            z-index: 1;
         }
 
         .score-board {
@@ -310,8 +315,8 @@
         }
 
         .quiz-btn {
-            padding: 12px;
-            font-size: 16px;
+            padding: 14px;
+            font-size: 18px;
             font-weight: bold;
             background-color: var(--secondary-btn);
             color: #fff;
@@ -395,14 +400,14 @@
         <button id="btn-back-lobby-liar" class="secondary btn-back-lobby">대기실로 돌아가기</button>
     </div>
 
-    <!-- 3-2화면: [각자 도형 그리기 대결] 게임 화면 -->
+    <!-- 3-2화면: [도형 그리기 대결] 게임 화면 -->
     <div id="game-draw-screen" class="screen">
         <h2>📐 도형 정확히 그리기</h2>
         <p id="target-shape-text" style="color: var(--accent-color); font-weight: bold; font-size: 18px;">목표 도형: 불러오는 중...</p>
         
         <div id="canvas-container">
             <div id="target-shape-preview">
-                <svg id="preview-svg" width="200" height="200" style="stroke: rgba(92,159,255,0.4); stroke-width: 6; fill: none;"></svg>
+                <svg id="preview-svg" width="280" height="280" viewBox="0 0 280 280" style="stroke: rgba(92,159,255,0.4); stroke-width: 4; stroke-dasharray: 6 4; fill: none;"></svg>
             </div>
             <canvas id="drawing-canvas" width="280" height="280"></canvas>
         </div>
@@ -424,7 +429,7 @@
         <div id="bomb-icon" class="bomb-display">💣</div>
         <div class="bomb-status" id="bomb-status-text">불러오는 중...</div>
         
-        <!-- 🧮 수학 퀴즈 컨테이너 (내 차례일 때만 나타남) -->
+        <!-- 🧮 수학 퀴즈 컨테이너 -->
         <div id="quiz-box" class="quiz-container" style="display: none;">
             <p style="margin: 0 0 10px 0; font-size: 13px; color: #8E9AA8;">🔓 문제를 풀어 탈출하세요!</p>
             <div class="quiz-question" id="quiz-question-text">5 + 7 = ?</div>
@@ -460,11 +465,18 @@
         "장소/핫플 🗺️": ["노래방", "클럽", "한강공원", "편의점", "제주도", "캠핑장", "영화관", "헬스장", "놀이공원", "백화점", "카페", "맛집", "바다", "계곡", "찜질방", "호텔", "펜션", "공항", "학교", "회사", "PC방", "포차"]
     };
 
-    // 도형 그리기 목표 리스트 (정점 좌표 0~280 기준 정의)
+    // 📐 도형 그리기 목표 리스트 (총 10개 완비, SVG 뷰박스 크기 280x280 기준 정교화 설계)
     const shapes = [
-        { name: "세모 🔺", path: "M 140 50 L 50 220 L 230 220 Z", points: [{x:140, y:50}, {x:50, y:220}, {x:230, y:220}, {x:140, y:50}], svg: '<polygon points="140,40 40,220 240,220"/>' },
-        { name: "네모 🔲", path: "M 60 60 L 220 60 L 220 220 L 60 220 Z", points: [{x:60, y:60}, {x:220, y:60}, {x:220, y:220}, {x:60, y:220}, {x:60, y:60}], svg: '<rect x="50" y="50" width="180" height="180"/>' },
-        { name: "별 모양 ⭐", path: "M 140 30 L 170 100 L 250 110 L 190 160 L 210 230 L 140 190 L 70 230 L 90 160 L 30 110 L 110 100 Z", points: [{x:140,y:30},{x:170,y:100},{x:250,y:110},{x:190,y:160},{x:210,y:230},{x:140,y:190},{x:70,y:230},{x:90,y:160},{x:30,y:110},{x:110,y:100},{x:140,y:30}], svg: '<polygon points="100,20 120,80 180,80 130,110 150,170 100,140 50,170 70,110 20,80 80,80"/>' }
+        { name: "세모 🔺", points: [{x:140, y:40}, {x:40, y:230}, {x:240, y:230}, {x:140, y:40}], svg: '<polygon points="140,40 40,230 240,230" />' },
+        { name: "네모 🔲", points: [{x:50, y:50}, {x:230, y:50}, {x:230, y:230}, {x:50, y:230}, {x:50, y:50}], svg: '<rect x="50" y="50" width="180" height="180" />' },
+        { name: "오각형 ⬠", points: [{x:140, y:40}, {x:235, y:110}, {x:198, y:225}, {x:82, y:225}, {x:45, y:110}, {x:140, y:40}], svg: '<polygon points="140,40 235,110 198,225 82,225 45,110" />' },
+        { name: "다이아몬드 💎", points: [{x:140, y:30}, {x:240, y:140}, {x:140, y:250}, {x:40, y:140}, {x:140, y:30}], svg: '<polygon points="140,30 240,140 140,250 40,140" />' },
+        { name: "별 모양 ⭐", points: [{x:140, y:30}, {x:172, y:102}, {x:250, y:110}, {x:190, y:162}, {x:208, y:238}, {x:140, y:196}, {x:72, y:238}, {x:90, y:162}, {x:30, y:110}, {x:108, y:102}, {x:140, y:30}], svg: '<polygon points="140,30 172,102 250,110 190,162 208,238 140,196 72,238 90,162 30,110 108,102" />' },
+        { name: "사랑의 하트 ❤️", points: [{x:140, y:90}, {x:180, y:50}, {x:230, y:60}, {x:240, y:110}, {x:140, y:230}, {x:40, y:110}, {x:50, y:60}, {x:100, y:50}, {x:140, y:90}], svg: '<path d="M 140 90 C 180 30, 260 70, 240 130 C 210 180, 170 210, 140 230 C 110 210, 70 180, 40 130 C 20 70, 100 30, 140 90 Z" />' },
+        { name: "번개 ⚡", points: [{x:160, y:30}, {x:60, y:140}, {x:130, y:140}, {x:100, y:250}, {x:210, y:120}, {x:140, y:120}, {x:160, y:30}], svg: '<polygon points="160,30 60,140 130,140 100,250 210,120 140,120" />' },
+        { name: "초승달 🌙", points: [{x:160, y:40}, {x:180, y:80}, {x:180, y:180}, {x:110, y:230}, {x:60, y:180}, {x:50, y:110}, {x:110, y:50}, {x:160, y:40}], svg: '<path d="M 160 40 C 70 40, 50 220, 180 220 C 100 200, 100 80, 160 40 Z" />' },
+        { name: "뭉게구름 ☁️", points: [{x:90, y:100}, {x:140, y:70}, {x:200, y:100}, {x:230, y:140}, {x:190, y:200}, {x:90, y:200}, {x:60, y:150}, {x:90, y:100}], svg: '<path d="M 90 130 C 90 90, 140 70, 160 100 C 190 80, 230 110, 220 150 C 240 180, 190 210, 160 200 C 130 220, 80 210, 80 180 C 50 170, 60 130, 90 130 Z" />' },
+        { name: "물방울 💧", points: [{x:140, y:40}, {x:210, y:160}, {x:200, y:210}, {x:140, y:240}, {x:80, y:210}, {x:70, y:160}, {x:140, y:40}], svg: '<path d="M 140 40 C 180 110, 220 160, 210 200 C 190 250, 90 250, 70 200 C 60 160, 100 110, 140 40 Z" />' }
     ];
 
     let myId = '';
@@ -483,6 +495,7 @@
     // 폭탄 돌리기 퀴즈용 로컬 상태
     let currentAnswer = 0;
     let isPenaltyActive = false;
+    let localBombActive = false;
 
     // 화면 전환 함수
     function showScreen(screenId) {
@@ -490,7 +503,7 @@
         document.getElementById(screenId).classList.add('active');
     }
 
-    // 대기실에서 게임 모드 선택 (방장만 전파 가능)
+    // 대기실에서 게임 모드 선택
     window.selectGameMode = function(gameMode) {
         if (!isHost) {
             alert("게임 모드는 방장만 변경할 수 있습니다!");
@@ -574,7 +587,7 @@
         });
     });
 
-    // 실시간 방 데이터 동기화 리스너 (모든 게임 정보 통합 수신)
+    // 실시간 방 데이터 동기화 리스너
     function initRoomListener(roomCode) {
         document.getElementById('display-room-code').innerText = roomCode;
         const roomRef = ref(db, `rooms/${roomCode}`);
@@ -583,14 +596,14 @@
             const data = snapshot.val();
             if(!data) return;
 
-            // 1. 참여자 명단 및 명수 업데이트
-            const playerListEl = document.getElementById('player-list');
-            playerListEl.innerHTML = '';
             const players = data.players || {};
             const playerIds = Object.keys(players);
             
             document.getElementById('player-count').innerText = playerIds.length;
 
+            // 1. 참여자 명단 업데이트
+            const playerListEl = document.getElementById('player-list');
+            playerListEl.innerHTML = '';
             playerIds.forEach(id => {
                 const li = document.createElement('li');
                 li.innerText = players[id].nickname;
@@ -607,12 +620,12 @@
                 playerListEl.appendChild(li);
             });
 
-            // 2. 방장이 갱신한 게임 종류 탭 실시간 동기화
+            // 2. 게임 종류 탭 동기화
             if (data.selectedGame) {
                 updateTabUI(data.selectedGame);
             }
 
-            // 3. 게임 상태 분기 처리 (대기 vs 진행중)
+            // 3. 게임 상태별 UI 렌더링
             if(data.status === 'playing') {
                 if(data.selectedGame === 'liar') {
                     showScreen('game-liar-screen');
@@ -629,13 +642,11 @@
                 else if (data.selectedGame === 'draw') {
                     showScreen('game-draw-screen');
                     
-                    // 목표 도형 렌더링 설정
                     currentShapeIndex = data.targetShapeIndex || 0;
                     const targetShape = shapes[currentShapeIndex];
                     document.getElementById('target-shape-text').innerText = `목표 도형: ${targetShape.name}`;
                     document.getElementById('preview-svg').innerHTML = targetShape.svg;
 
-                    // 실시간으로 갱신되는 스코어보드 렌더링
                     const scores = data.drawScores || {};
                     const scoreBoardEl = document.getElementById('draw-score-list');
                     scoreBoardEl.innerHTML = '';
@@ -645,7 +656,7 @@
                         .sort((a,b) => b.score - a.score);
 
                     if (sortedScorers.length === 0) {
-                        scoreBoardEl.innerHTML = '<div style="color:#8E9AA8; padding: 4px;">아직 제출자가 없습니다. 먼저 그려보세요!</div>';
+                        scoreBoardEl.innerHTML = '<div style="color:#8E9AA8; padding: 4px;">아직 제출자가 없습니다. 캔버스에 형광 선을 그려 제출해보세요!</div>';
                     } else {
                         sortedScorers.forEach(scorer => {
                             const row = document.createElement('div');
@@ -667,8 +678,6 @@
                         bombIcon.innerText = "💥";
                         statusTextEl.innerHTML = `<span style="color:var(--danger-color); font-size:24px;">퍼어엉!!!</span><br><br>🚨 [${holderNick}] 님이 패배했습니다!`;
                         document.getElementById('quiz-box').style.display = 'none';
-                        
-                        // 시각적 폭발 연출 실행
                         triggerExplosionEffect();
                     } else {
                         bombIcon.innerText = "💣";
@@ -676,7 +685,6 @@
                             statusTextEl.innerHTML = `<span style="color:var(--danger-color); font-size:18px;">🔥 내 차례입니다! 문제를 맞춰 탈출하세요! 🔥</span>`;
                             document.getElementById('quiz-box').style.display = 'block';
                             
-                            // 내가 폭탄 주인이 되었을 때, 로컬에 퀴즈가 활성화되어 있지 않다면 퀴즈 하나 출제
                             if (!localBombActive) {
                                 generateQuiz();
                                 localBombActive = true;
@@ -684,12 +692,11 @@
                         } else {
                             statusTextEl.innerHTML = `👤 현재 폭탄 소지자: <span style="color:var(--accent-color); font-weight:bold;">${holderNick}</span>`;
                             document.getElementById('quiz-box').style.display = 'none';
-                            localBombActive = false; // 타인 차례 시 내 상태 리셋
+                            localBombActive = false;
                         }
                     }
                 }
 
-                // 호스트 전용 대기실 귀환 버튼 가시성
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => {
                     btn.style.display = isHost ? 'block' : 'none';
                 });
@@ -703,7 +710,7 @@
         });
     }
 
-    // 📐 [도형 그리기] 로컬 드로잉 이벤트 연동
+    // 📐 [도형 그리기] 검정색 다크 캔버스 위 드로잉 설정
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -719,16 +726,20 @@
         userDrawingPoints = [];
     }
 
-    canvas.addEventListener('mousedown', (e) => {
+    // 드로잉 개시
+    function startDrawing(coords) {
         isDrawing = true;
-        const coords = getCanvasCoordinates(e);
         ctx.beginPath();
         ctx.moveTo(coords.x, coords.y);
-        ctx.strokeStyle = '#121214';
-        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#5C9EFF'; // 네온 블루 선 컬러
+        ctx.lineWidth = 5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         userDrawingPoints.push(coords);
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        startDrawing(getCanvasCoordinates(e));
     });
 
     canvas.addEventListener('mousemove', (e) => {
@@ -741,17 +752,9 @@
 
     canvas.addEventListener('mouseup', () => { isDrawing = false; });
 
-    // 모바일 터치 대응
+    // 모바일 터치 이벤트 대응
     canvas.addEventListener('touchstart', (e) => {
-        isDrawing = true;
-        const coords = getCanvasCoordinates(e);
-        ctx.beginPath();
-        ctx.moveTo(coords.x, coords.y);
-        ctx.strokeStyle = '#121214';
-        ctx.lineWidth = 6;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        userDrawingPoints.push(coords);
+        startDrawing(getCanvasCoordinates(e));
         e.preventDefault();
     });
 
@@ -766,23 +769,25 @@
 
     canvas.addEventListener('touchend', () => { isDrawing = false; });
 
-    // 📐 [도형 그리기] 알고리즘을 이용한 오차 점수 채점 및 제출
+    // 📐 [도형 그리기] 점수 정밀 채점 및 제출 로직
     document.getElementById('btn-submit-score').addEventListener('click', () => {
         if (userDrawingPoints.length < 5) {
-            alert("그림을 더 성의 있게 그려주세요!");
+            alert("그림을 조금 더 선을 그어 그린 다음 제출해 주세요!");
             return;
         }
 
         const target = shapes[currentShapeIndex];
         let totalMinDist = 0;
 
-        // 사용자가 그린 점들 중 일부를 샘플링하여 타겟 가이드라인과의 평균 최단 거리 연산 (단순 수학적 유사 점수 계산)
-        const sampleCount = Math.min(50, userDrawingPoints.length);
+        // 사용자가 그린 궤적 샘플링 채점
+        const sampleCount = Math.min(60, userDrawingPoints.length);
         const step = Math.floor(userDrawingPoints.length / sampleCount);
 
         for (let i = 0; i < userDrawingPoints.length; i += step) {
+            if (!userDrawingPoints[i]) continue;
             const uPt = userDrawingPoints[i];
             let minDist = Infinity;
+            
             target.points.forEach(tPt => {
                 const dist = Math.sqrt((uPt.x - tPt.x) ** 2 + (uPt.y - tPt.y) ** 2);
                 if (dist < minDist) minDist = dist;
@@ -791,17 +796,16 @@
         }
 
         const avgDistance = totalMinDist / sampleCount;
-        let finalScore = Math.round(Math.max(10, 100 - (avgDistance * 1.5)));
+        let finalScore = Math.round(Math.max(5, 100 - (avgDistance * 1.6)));
 
-        // 점수 Firebase에 기록
         const scoreRef = ref(db, `rooms/${currentRoomCode}/drawScores/${myId}`);
         set(scoreRef, finalScore).then(() => {
-            alert(`🎉 내 점수: ${finalScore}점! 제출 완료되었습니다.`);
+            alert(`🎉 내 점수: ${finalScore}점! 실시간 랭킹보드에 반영되었습니다.`);
         });
     });
 
 
-    // 💣 [폭탄 돌리기] 연산 퀴즈 생성 로직
+    // 💣 [폭탄 돌리기] 그럴싸한 정답 연산 퀴즈 생성 로직
     function generateQuiz() {
         if (isPenaltyActive) return;
 
@@ -832,18 +836,23 @@
 
         currentAnswer = answer;
 
-        // 보기 4개 만들기 (오답 난수 3개 구성)
+        // 정답을 포함하며, 정답 주변에 촘촘히 꼬아둔 4지선다 보기 배열 생성
         const options = new Set();
-        options.add(answer);
+        options.add(answer); // 1. 무조건 정답 선포함!
+        
         while (options.size < 4) {
-            const offset = (Math.floor(Math.random() * 5) + 1) * (Math.random() < 0.5 ? 1 : -1);
+            // 정답과의 차이가 -3 ~ +3 사이의 밀착된 그럴싸한 오답을 유도
+            const offset = (Math.floor(Math.random() * 3) + 1) * (Math.random() < 0.5 ? 1 : -1);
             const fakeAnswer = answer + offset;
-            if (fakeAnswer > 0) options.add(fakeAnswer);
+            
+            if (fakeAnswer !== answer) {
+                options.add(fakeAnswer);
+            }
         }
 
         const optionsArray = Array.from(options).sort(() => Math.random() - 0.5);
 
-        // UI에 출력하기
+        // 보기 렌더링
         document.getElementById('quiz-question-text').innerText = questionText;
         const optionsBox = document.getElementById('quiz-options-box');
         optionsBox.innerHTML = '';
@@ -862,14 +871,12 @@
         if (isPenaltyActive) return;
 
         if (selected === currentAnswer) {
-            // 정답 시 다음 사람에게 토스
             passBombToNext();
         } else {
             // 오답 시 1초 동안 다른 선택 차단 및 흔들기 연출
             isPenaltyActive = true;
             buttonElement.classList.add('wrong-animation');
             
-            // 모든 보기 임시 비활성화
             document.querySelectorAll('.quiz-btn').forEach(btn => btn.disabled = true);
 
             setTimeout(() => {
@@ -891,19 +898,17 @@
             const playerIds = Object.keys(players);
             const currentIndex = playerIds.indexOf(myId);
             
-            // 내 다음 차례인 인덱스 탐색
             const nextIndex = (currentIndex + 1) % playerIds.length;
             const nextHolderId = playerIds[nextIndex];
 
             update(roomRef, { bombHolderId: nextHolderId }).then(() => {
-                localBombActive = false; // 내 성공 로컬 플래그 리셋
+                localBombActive = false; 
             });
         });
     }
 
     // 💥 폭발 임팩트 연출 (CSS 파티클 생성)
     function triggerExplosionEffect() {
-        // 진동 효과 부여
         const bodyEl = document.body;
         const mainContainer = document.getElementById('main-container');
         bodyEl.classList.add('explode-shake');
@@ -912,29 +917,24 @@
         const overlay = document.getElementById('explosion-overlay');
         overlay.innerHTML = '';
 
-        // 30개의 랜덤 파편 입자 발사
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 35; i++) {
             const particle = document.createElement('div');
             particle.className = 'particle';
             
-            // 무작위 크기 및 색상
             const size = Math.floor(Math.random() * 8) + 6;
             particle.style.width = `${size}px`;
             particle.style.height = `${size}px`;
             particle.style.backgroundColor = Math.random() < 0.5 ? '#FF6B6B' : '#FFD25C';
             
-            // 화면 정중앙 좌표 설정
             particle.style.left = '50%';
             particle.style.top = '50%';
             overlay.appendChild(particle);
 
-            // 목적지 무작위 각도 및 거리
             const angle = Math.random() * Math.PI * 2;
             const distance = Math.floor(Math.random() * 200) + 50;
             const targetX = Math.cos(angle) * distance;
             const targetY = Math.sin(angle) * distance;
 
-            // 웹 애니메이션 API를 사용해 물리 효과처럼 확산
             particle.animate([
                 { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
                 { transform: `translate(${targetX - 5}px, ${targetY - 5}px) scale(0)`, opacity: 0 }
@@ -945,7 +945,6 @@
             });
         }
 
-        // 0.5초 후 흔들림 효과 제거
         setTimeout(() => {
             bodyEl.classList.remove('explode-shake');
         }, 500);
@@ -983,13 +982,13 @@
                     liarId: randomLiarId
                 });
             } 
-            // 📐 [도형그리기 대결 시작]
+            // 📐 [도형그리기 대결 시작] -> 무작위로 설계된 10종의 도형 인덱스 전달
             else if (selectedGame === 'draw') {
                 const randomShapeIndex = Math.floor(Math.random() * shapes.length);
                 update(roomRef, {
                     status: 'playing',
                     targetShapeIndex: randomShapeIndex,
-                    drawScores: null // 이전 랭킹 데이터 초기화
+                    drawScores: null
                 });
             }
             // 💣 [폭탄돌리기 게임 시작]
@@ -1000,7 +999,6 @@
                     bombHolderId: randomHolderId,
                     bombExploded: false
                 }).then(() => {
-                    // 무작위 초(20초 ~ 40초 사이) 뒤 폭발 설정
                     const randomBombTime = Math.floor(Math.random() * 20) + 20; 
                     setTimeout(() => {
                         get(roomRef).then((snap) => {
