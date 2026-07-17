@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>온라인 라이어 게임</title>
+    <title>모임용 실시간 멀티플레이 게임천국</title>
     <!-- 구글 Noto Sans KR 폰트 불러오기 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,6 +20,7 @@
             --input-border: #3A3A42;
             --input-bg: #252529;
             --secondary-btn: #4E5561;
+            --accent-color: #FFD25C;
         }
 
         body {
@@ -27,7 +28,7 @@
             background-color: var(--background-color);
             color: var(--text-color);
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -37,20 +38,51 @@
 
         .container {
             background-color: var(--card-color);
-            padding: 30px;
+            padding: 25px 20px;
             border-radius: 16px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             width: 100%;
-            max-width: 400px;
+            max-width: 440px;
             text-align: center;
             border: 1px solid #2D2D34;
+            box-sizing: border-box;
         }
 
         h1 {
-            font-size: 24px;
-            margin-bottom: 24px;
+            font-size: 22px;
+            margin-bottom: 20px;
             color: var(--primary-color);
             font-weight: 700;
+        }
+
+        /* 게임 선택 탭 스타일 */
+        .game-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            background: #151518;
+            padding: 6px;
+            border-radius: 10px;
+            border: 1px solid #2D2D34;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 5px;
+            font-size: 13px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: transparent;
+            color: #8E9AA8;
+            transition: all 0.2s;
+            margin: 0;
+        }
+
+        .tab-btn.active {
+            background-color: var(--primary-color);
+            color: #121214;
         }
 
         .screen {
@@ -93,6 +125,7 @@
             cursor: pointer;
             margin-bottom: 12px;
             transition: opacity 0.2s;
+            box-sizing: border-box;
         }
 
         button:hover {
@@ -133,6 +166,11 @@
             align-items: center;
         }
 
+        .player-list li.me {
+            border-left-color: var(--accent-color);
+            background-color: #2e2e1f;
+        }
+
         .host-badge {
             font-size: 12px;
             background-color: var(--primary-color);
@@ -143,9 +181,9 @@
         }
 
         .role-box {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
-            margin: 40px 0;
+            margin: 30px 0;
             padding: 25px 20px;
             border-radius: 12px;
             background-color: #252529;
@@ -163,12 +201,49 @@
             background-color: #1F2633;
             border-color: #334466;
         }
+
+        /* 그리기 캔버스 영역 */
+        #canvas-container {
+            position: relative;
+            background: #ffffff;
+            border-radius: 8px;
+            margin: 15px auto;
+            width: 300px;
+            height: 300px;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        canvas {
+            display: block;
+            background: transparent;
+            cursor: crosshair;
+        }
+
+        /* 폭탄돌리기 연출 */
+        .bomb-display {
+            font-size: 70px;
+            margin: 30px 0;
+            animation: pulse 1s infinite alternate;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.15); }
+        }
+        .bomb-status {
+            background-color: #252529;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🤫 온라인 라이어 게임</h1>
+    <h1>🎮 실시간 멀티 게임 패키지</h1>
 
     <!-- 1화면: 로그인 및 방 선택 -->
     <div id="login-screen" class="screen active">
@@ -179,20 +254,54 @@
         <button id="btn-join-room" class="secondary">방 참여하기</button>
     </div>
 
-    <!-- 2화면: 대기실 -->
+    <!-- 2화면: 대기실 (게임 선택 가능) -->
     <div id="lobby-screen" class="screen">
         <div class="room-info">방 코드: <span id="display-room-code">----</span></div>
+        
+        <!-- 게임 모드 선택 탭 -->
+        <p style="text-align: left; margin: 5px; font-weight: bold; color: var(--primary-color); font-size: 14px;">🎲 다음 게임 선택</p>
+        <div class="game-tabs">
+            <button class="tab-btn active" id="tab-liar" onclick="selectGameMode('liar')">🤫 라이어</button>
+            <button class="tab-btn" id="tab-draw" onclick="selectGameMode('draw')">🎨 그림공유</button>
+            <button class="tab-btn" id="tab-bomb" onclick="selectGameMode('bomb')">💣 폭탄돌리기</button>
+        </div>
+
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
         <ul id="player-list" class="player-list"></ul>
+        
         <button id="btn-start-game" style="display: none;">게임 시작 (방장 전용)</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
     </div>
 
-    <!-- 3화면: 역할 및 제시어 확인 -->
-    <div id="game-screen" class="screen">
+    <!-- 3-1화면: [라이어] 게임 화면 -->
+    <div id="game-liar-screen" class="screen">
+        <h2>🤫 라이어 게임</h2>
         <h3>당신의 정체는?</h3>
         <div id="role-display" class="role-box">지정 중...</div>
-        <button id="btn-back-lobby" class="secondary">대기실로 돌아가기</button>
+        <button id="btn-back-lobby-liar" class="secondary btn-back-lobby">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 3-2화면: [실시간 그리기] 게임 화면 -->
+    <div id="game-draw-screen" class="screen">
+        <h2>🎨 실시간 그림 공유</h2>
+        <p id="drawer-info" style="color: var(--accent-color); font-weight: bold;">그리는 사람: 불러오는 중...</p>
+        
+        <div id="canvas-container">
+            <canvas id="drawing-canvas" width="300" height="300"></canvas>
+        </div>
+
+        <button id="btn-clear-canvas" style="display: none; background-color: var(--danger-color); color: white;">그림 초기화 (출제자 전용)</button>
+        <button id="btn-back-lobby-draw" class="secondary btn-back-lobby">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 3-3화면: [폭탄 돌리기] 게임 화면 -->
+    <div id="game-bomb-screen" class="screen">
+        <h2>💣 폭탄 돌리기</h2>
+        <div id="bomb-icon" class="bomb-display">💣</div>
+        <div class="bomb-status" id="bomb-status-text">불러오는 중...</div>
+        
+        <button id="btn-pass-bomb" style="background-color: var(--danger-color); color: #fff; font-size: 20px; padding: 18px 0; display: none;">🔥 나 아님! 폭탄 넘기기!! 🔥</button>
+        <button id="btn-back-lobby-bomb" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 </div>
 
@@ -208,7 +317,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // 게임 데이터
+    // 라이어 게임 제시어 데이터
     const wordList = {
         "연예/방송 📺": ["유재석", "아이유", "BTS", "봉준호", "오징어게임", "손흥민", "뉴진스", "에스파", "블랙핑크", "임영웅", "김종국", "차은우", "박보검", "장원영", "런닝맨", "무한도전", "나는솔로", "더글로리", "피식대학", "유튜브", "넷플릭스", "슈퍼맨이돌아왔다"],
         "음식/야식 🍗": ["마라탕", "삼겹살", "불닭볶음면", "치즈볼", "탕후루", "떡볶이", "양꼬치", "짜장면", "치킨", "피자", "족발", "곱창", "닭발", "김치찌개", "라면", "초밥", "햄버거", "아이스크림", "붕어빵", "호떡", "김밥", "냉면", "순대"],
@@ -220,10 +329,40 @@
     let myNickname = '';
     let currentRoomCode = '';
     let isHost = false;
+    let selectedGame = 'liar'; // 기본값
 
+    // 실시간 드로잉을 위한 변수
+    const canvas = document.getElementById('drawing-canvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let isMyTurnToDraw = false;
+
+    // 폭탄 돌리기 변수
+    let bombTimer = null;
+    let localBombActive = false;
+
+    // 화면 전환 함수
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
+    }
+
+    // 대기실에서 게임 모드 선택 (방장만 전파 가능)
+    window.selectGameMode = function(gameMode) {
+        if (!isHost) {
+            alert("게임 모드는 방장만 변경할 수 있습니다!");
+            return;
+        }
+        const roomRef = ref(db, `rooms/${currentRoomCode}`);
+        update(roomRef, { selectedGame: gameMode });
+    }
+
+    // 탭 하이라이트 함수
+    function updateTabUI(gameMode) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        const activeTab = document.getElementById(`tab-${gameMode}`);
+        if(activeTab) activeTab.classList.add('active');
+        selectedGame = gameMode;
     }
 
     function generateRoomCode() {
@@ -244,9 +383,7 @@
         set(roomRef, {
             status: 'waiting',
             hostId: myId,
-            word: '',
-            category: '',
-            liarId: '',
+            selectedGame: 'liar',
             players: {
                 [myId]: { nickname: nickname, isHost: true }
             }
@@ -294,7 +431,7 @@
         });
     });
 
-    // 실시간 방 데이터 동기화 리스너
+    // 실시간 방 데이터 동기화 리스너 (모든 게임 정보 통합 수신)
     function initRoomListener(roomCode) {
         document.getElementById('display-room-code').innerText = roomCode;
         const roomRef = ref(db, `rooms/${roomCode}`);
@@ -303,7 +440,7 @@
             const data = snapshot.val();
             if(!data) return;
 
-            // 1. 참여자 명단 업데이트
+            // 1. 참여자 명단 및 명수 업데이트
             const playerListEl = document.getElementById('player-list');
             playerListEl.innerHTML = '';
             const players = data.players || {};
@@ -314,6 +451,10 @@
             playerIds.forEach(id => {
                 const li = document.createElement('li');
                 li.innerText = players[id].nickname;
+                if (id === myId) {
+                    li.classList.add('me');
+                    li.innerText += " (나)";
+                }
                 if(players[id].isHost) {
                     const badge = document.createElement('span');
                     badge.className = 'host-badge';
@@ -323,33 +464,177 @@
                 playerListEl.appendChild(li);
             });
 
-            // 2. 게임 상태 감지 (대기 상태 -> 게임 중으로 바뀔 때)
-            if(data.status === 'playing') {
-                showScreen('game-screen');
-                const roleDisplay = document.getElementById('role-display');
-
-                if(data.liarId === myId) {
-                    roleDisplay.innerText = "🕵️‍♂️ 당신은 라이어입니다!";
-                    roleDisplay.className = "role-box liar";
-                } else {
-                    roleDisplay.innerHTML = `<span style="font-size:14px; color:#8E9AA8; font-weight:400;">제시어 [${data.category}]</span><br><span style="margin-top:10px; display:inline-block;">🍕 ${data.word}</span>`;
-                    roleDisplay.className = "role-box citizen";
-                }
-
-                const backBtn = document.getElementById('btn-back-lobby');
-                if (isHost) {
-                    backBtn.style.display = 'block';
-                } else {
-                    backBtn.style.display = 'none';
-                }
+            // 2. 방장이 갱신한 게임 종류 탭 실시간 동기화
+            if (data.selectedGame) {
+                updateTabUI(data.selectedGame);
             }
 
-            // 3. 게임 상태 감지 (다시 대기 상태로 돌아왔을 때)
+            // 3. 게임 상태 분기 처리 (대기 vs 진행중)
+            if(data.status === 'playing') {
+                if(data.selectedGame === 'liar') {
+                    showScreen('game-liar-screen');
+                    const roleDisplay = document.getElementById('role-display');
+
+                    if(data.liarId === myId) {
+                        roleDisplay.innerText = "🕵️‍♂️ 당신은 라이어입니다!";
+                        roleDisplay.className = "role-box liar";
+                    } else {
+                        roleDisplay.innerHTML = `<span style="font-size:14px; color:#8E9AA8; font-weight:400;">제시어 [${data.category}]</span><br><span style="margin-top:10px; display:inline-block;">🍕 ${data.word}</span>`;
+                        roleDisplay.className = "role-box citizen";
+                    }
+                } 
+                else if (data.selectedGame === 'draw') {
+                    showScreen('game-draw-screen');
+                    const drawerNick = players[data.drawerId]?.nickname || "미확인";
+                    document.getElementById('drawer-info').innerText = `✏️ 출제자: ${drawerNick}`;
+                    
+                    if (data.drawerId === myId) {
+                        isMyTurnToDraw = true;
+                        document.getElementById('btn-clear-canvas').style.display = 'block';
+                    } else {
+                        isMyTurnToDraw = false;
+                        document.getElementById('btn-clear-canvas').style.display = 'none';
+                    }
+                }
+                else if (data.selectedGame === 'bomb') {
+                    showScreen('game-bomb-screen');
+                    const currentHolderId = data.bombHolderId;
+                    const holderNick = players[currentHolderId]?.nickname || "대기중";
+                    
+                    const statusTextEl = document.getElementById('bomb-status-text');
+                    const bombIcon = document.getElementById('bomb-icon');
+
+                    if(data.bombExploded) {
+                        bombIcon.innerText = "💥";
+                        statusTextEl.innerHTML = `<span style="color:var(--danger-color); font-size:24px;">퍼어엉!!!</span><br><br>🚨 [${holderNick}] 님이 패배했습니다!`;
+                        document.getElementById('btn-pass-bomb').style.display = 'none';
+                    } else {
+                        bombIcon.innerText = "💣";
+                        if (currentHolderId === myId) {
+                            statusTextEl.innerHTML = `<span style="color:var(--danger-color);">🚨 내 폰에 폭탄이 있습니다! 빠르게 넘기세요! 🚨</span>`;
+                            document.getElementById('btn-pass-bomb').style.display = 'block';
+                        } else {
+                            statusTextEl.innerHTML = `👤 현재 폭탄 소지자: <span style="color:var(--accent-color); font-weight:bold;">${holderNick}</span>`;
+                            document.getElementById('btn-pass-bomb').style.display = 'none';
+                        }
+                    }
+                }
+
+                // 호스트 전용 대기실 귀환 버튼 가시성
+                document.querySelectorAll('.btn-back-lobby').forEach(btn => {
+                    btn.style.display = isHost ? 'block' : 'none';
+                });
+            }
+
             if(data.status === 'waiting') {
                 showScreen('lobby-screen');
+                ctx.clearRect(0, 0, canvas.width, canvas.height); // 캔버스 잔상 초기화
+            }
+        });
+
+        // 그림판 전용 실시간 리스너 연결
+        const drawingRef = ref(db, `rooms/${roomCode}/drawing`);
+        onValue(drawingRef, (snapshot) => {
+            const points = snapshot.val();
+            if (!points) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                return;
+            }
+            drawCanvasFromData(points);
+        });
+    }
+
+    // 🎨 [그림] 점 데이터 복원하여 캔버스에 그리는 함수
+    function drawCanvasFromData(points) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#121214';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        const keys = Object.keys(points).sort();
+        let isDrawingLocal = false;
+
+        keys.forEach(key => {
+            const pt = points[key];
+            if (pt.type === 'start') {
+                ctx.beginPath();
+                ctx.moveTo(pt.x, pt.y);
+                isDrawingLocal = true;
+            } else if (pt.type === 'move' && isDrawingLocal) {
+                ctx.lineTo(pt.x, pt.y);
+                ctx.stroke();
+            } else if (pt.type === 'end') {
+                ctx.closePath();
+                isDrawingLocal = false;
             }
         });
     }
+
+    // 🎨 [그림] 그리기 입력 이벤트 바인딩 (출제자 전용)
+    function getCanvasCoordinates(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+    }
+
+    function pushDrawingPoint(type, x, y) {
+        if (!isMyTurnToDraw) return;
+        const pointRef = ref(db, `rooms/${currentRoomCode}/drawing/${Date.now()}_${Math.random().toString(36).substr(2,4)}`);
+        set(pointRef, { type, x, y });
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (!isMyTurnToDraw) return;
+        isDrawing = true;
+        const coords = getCanvasCoordinates(e);
+        pushDrawingPoint('start', coords.x, coords.y);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing || !isMyTurnToDraw) return;
+        const coords = getCanvasCoordinates(e);
+        pushDrawingPoint('move', coords.x, coords.y);
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        if (!isMyTurnToDraw) return;
+        isDrawing = false;
+        pushDrawingPoint('end', 0, 0);
+    });
+
+    // 모바일 터치 이벤트 연동
+    canvas.addEventListener('touchstart', (e) => {
+        if (!isMyTurnToDraw) return;
+        isDrawing = true;
+        const coords = getCanvasCoordinates(e);
+        pushDrawingPoint('start', coords.x, coords.y);
+        e.preventDefault();
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (!isDrawing || !isMyTurnToDraw) return;
+        const coords = getCanvasCoordinates(e);
+        pushDrawingPoint('move', coords.x, coords.y);
+        e.preventDefault();
+    });
+
+    canvas.addEventListener('touchend', () => {
+        if (!isMyTurnToDraw) return;
+        isDrawing = false;
+        pushDrawingPoint('end', 0, 0);
+    });
+
+    // [그림 초기화] 버튼 클릭 이벤트
+    document.getElementById('btn-clear-canvas').addEventListener('click', () => {
+        const drawingRef = ref(db, `rooms/${currentRoomCode}/drawing`);
+        set(drawingRef, null);
+    });
+
 
     // [게임 시작] 버튼 이벤트
     document.getElementById('btn-start-game').addEventListener('click', () => {
@@ -365,32 +650,93 @@
                 return;
             }
 
-            const categories = Object.keys(wordList);
-            const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-            const words = wordList[randomCategory];
-            const randomWord = words[Math.floor(Math.random() * words.length)];
-            const randomLiarId = playerIds[Math.floor(Math.random() * playerIds.length)];
-
             const roomRef = ref(db, `rooms/${currentRoomCode}`);
-            update(roomRef, {
-                status: 'playing',
-                category: randomCategory,
-                word: randomWord,
-                liarId: randomLiarId
-            });
+            
+            // 🤫 [라이어 게임 시작 세팅]
+            if (selectedGame === 'liar') {
+                const categories = Object.keys(wordList);
+                const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+                const words = wordList[randomCategory];
+                const randomWord = words[Math.floor(Math.random() * words.length)];
+                const randomLiarId = playerIds[Math.floor(Math.random() * playerIds.length)];
+
+                update(roomRef, {
+                    status: 'playing',
+                    category: randomCategory,
+                    word: randomWord,
+                    liarId: randomLiarId
+                });
+            } 
+            // 🎨 [그림공유 게임 시작 세팅]
+            else if (selectedGame === 'draw') {
+                const randomDrawerId = playerIds[Math.floor(Math.random() * playerIds.length)];
+                set(ref(db, `rooms/${currentRoomCode}/drawing`), null); // 초기 그림 리셋
+                update(roomRef, {
+                    status: 'playing',
+                    drawerId: randomDrawerId
+                });
+            }
+            // 💣 [폭탄돌리기 게임 시작 세팅]
+            else if (selectedGame === 'bomb') {
+                const randomHolderId = playerIds[Math.floor(Math.random() * playerIds.length)];
+                update(roomRef, {
+                    status: 'playing',
+                    bombHolderId: randomHolderId,
+                    bombExploded: false
+                }).then(() => {
+                    // 방장이 직접 타이머를 카운트하는 것이 아닌, 무작위 초(15초~35초) 후에 터지도록 타임아웃 구성
+                    const randomBombTime = Math.floor(Math.random() * 20) + 15; // 15 ~ 35초
+                    setTimeout(() => {
+                        // 폭탄 시간 종료 후 서버 터트리기 기록
+                        get(roomRef).then((snap) => {
+                            const currentRoomData = snap.val();
+                            if (currentRoomData && currentRoomData.status === 'playing' && currentRoomData.selectedGame === 'bomb') {
+                                update(roomRef, { bombExploded: true });
+                            }
+                        });
+                    }, randomBombTime * 1000);
+                });
+            }
+
         }).catch(err => {
             alert('게임 시작 실패: ' + err.message);
         });
     });
 
-    // [대기실로 돌아가기] 버튼 이벤트
-    document.getElementById('btn-back-lobby').addEventListener('click', () => {
+    // 💣 [폭탄 넘기기] 버튼 클릭 이벤트 (순서대로 다음 사람 지정)
+    document.getElementById('btn-pass-bomb').addEventListener('click', () => {
         const roomRef = ref(db, `rooms/${currentRoomCode}`);
-        update(roomRef, {
-            status: 'waiting',
-            word: '',
-            category: '',
-            liarId: ''
+        get(roomRef).then((snapshot) => {
+            const data = snapshot.val();
+            if (!data || data.bombExploded) return;
+
+            const players = data.players || {};
+            const playerIds = Object.keys(players);
+            const currentIndex = playerIds.indexOf(myId);
+            
+            // 내 다음 차례인 인덱스 탐색
+            const nextIndex = (currentIndex + 1) % playerIds.length;
+            const nextHolderId = playerIds[nextIndex];
+
+            update(roomRef, { bombHolderId: nextHolderId });
+        });
+    });
+
+    // [대기실로 돌아가기] 통합 버튼 처리
+    document.querySelectorAll('.btn-back-lobby').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const roomRef = ref(db, `rooms/${currentRoomCode}`);
+            update(roomRef, {
+                status: 'waiting',
+                word: '',
+                category: '',
+                liarId: '',
+                drawerId: '',
+                bombHolderId: '',
+                bombExploded: false
+            });
+            // 캔버스 데이터 클리어
+            set(ref(db, `rooms/${currentRoomCode}/drawing`), null);
         });
     });
 </script>
