@@ -61,8 +61,9 @@
         h1 { font-size: 22px; margin-bottom: 20px; color: var(--primary-color); font-weight: 700; }
 
         .game-tabs {
-            display: flex;
-            gap: 8px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
             margin-bottom: 20px;
             background: #151518;
             padding: 6px;
@@ -71,7 +72,6 @@
         }
 
         .tab-btn {
-            flex: 1;
             padding: 10px 5px;
             font-size: 13px;
             font-weight: bold;
@@ -133,11 +133,17 @@
         canvas { display: block; background-color: transparent !important; position: absolute; top: 0; left: 0; z-index: 2; cursor: crosshair; }
         #target-shape-preview { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: .4; display: flex; justify-content: center; align-items: center; z-index: 1; }
 
-        /* 🖼️ 실시간 유저 그림 스코어보드 스타일 */
         .score-board { background-color: #151518; border-radius: 8px; padding: 12px; margin-top: 15px; text-align: left; max-height: 250px; overflow-y: auto; }
         .score-row { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #252529; font-weight: bold; }
         .score-info { display: flex; flex-direction: column; gap: 2px; }
-        .user-drawing-thumbnail { width: 55px; height: 55px; border: 1px solid #3A3A42; border-radius: 6px; background-color: #000; object-fit: contain; }
+        .user-drawing-thumbnail { width: 55px; height: 55px; border: 1px solid #3A3A42; border-radius: 6px; background-color: #000; object-fit: contain; cursor: pointer; transition: transform 0.2s; }
+        .user-drawing-thumbnail:hover { transform: scale(1.05); }
+
+        /* 🔍 그림 확대 보기용 모달 팝업 스타일 */
+        .image-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; }
+        .modal-content { background: var(--card-color); border: 2px solid var(--primary-color); border-radius: 16px; padding: 20px; text-align: center; position: relative; max-width: 320px; width: 90%; }
+        .modal-content img { width: 280px; height: 280px; border-radius: 8px; background: #151518; object-fit: contain; border: 1px solid #3A3A42; }
+        .modal-close { margin-top: 15px; padding: 10px; background: var(--secondary-btn); border: none; border-radius: 8px; color: white; cursor: pointer; width: 100%; font-weight: bold; }
 
         .bomb-display { font-size: 75px; margin: 20px 0; display: inline-block; }
         .bomb-status { background-color: #252529; padding: 15px; border-radius: 8px; font-size: 16px; font-weight: bold; margin-bottom: 15px; }
@@ -178,6 +184,7 @@
             <button class="tab-btn active" id="tab-liar" onclick="selectGameMode('liar')">🤫 라이어</button>
             <button class="tab-btn" id="tab-draw" onclick="selectGameMode('draw')">📐 도형그리기</button>
             <button class="tab-btn" id="tab-bomb" onclick="selectGameMode('bomb')">💣 폭탄돌리기</button>
+            <button class="tab-btn" id="tab-speed" onclick="selectGameMode('speed')">⚡ 초성대결</button>
         </div>
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
         <ul id="player-list" class="player-list"></ul>
@@ -203,7 +210,7 @@
         </div>
         <button id="btn-submit-score" style="background-color: var(--accent-color); color: #121214;">📐 내 그림 제출하고 채점받기</button>
         <div class="score-board">
-            <div style="font-size: 14px; color: #8E9AA8; margin-bottom: 8px; font-weight: bold;">📊 참여자 스코어 & 그림 (실시간)</div>
+            <div style="font-size: 14px; color: #8E9AA8; margin-bottom: 8px; font-weight: bold;">📊 참여자 스코어 & 그림 (클릭시 확대)</div>
             <div id="draw-score-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-draw" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
@@ -218,6 +225,29 @@
             <div class="quiz-options" id="quiz-options-box"></div>
         </div>
         <button id="btn-back-lobby-bomb" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <div id="game-speed-screen" class="screen">
+        <h2>⚡ 실시간 초성 대결</h2>
+        <div class="quiz-container" style="border-color: var(--primary-color);">
+            <div style="font-size: 14px; color: #8E9AA8; margin-bottom: 5px;">제시된 초성</div>
+            <div class="quiz-question" id="speed-chosung-display" style="font-size: 36px; color: var(--primary-color);">???</div>
+        </div>
+        <div id="speed-winner-box" style="background: #151518; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; font-size: 15px;">
+            🥇 현재 정답자: <span id="speed-winner-text" style="color: var(--accent-color);">대기 중...</span>
+        </div>
+        <input type="text" id="speed-answer-input" placeholder="정답 단어를 입력하세요!">
+        <button id="btn-submit-speed" style="background-color: var(--primary-color); color: #121214;">제출하기</button>
+        <button id="btn-back-lobby-speed" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+</div>
+
+<!-- 🔍 그림 확대 팝업 모달 레이아웃 -->
+<div id="global-image-modal" class="image-modal">
+    <div class="modal-content">
+        <h3 id="modal-user-title" style="margin-top: 0; color: var(--primary-color);">그림 보기</h3>
+        <img id="modal-target-img" src="" alt="확대그림">
+        <button class="modal-close" id="btn-close-modal">닫기</button>
     </div>
 </div>
 
@@ -240,6 +270,14 @@
         { name: "네모 🔲", points: [{x:50, y:50}, {x:230, y:50}, {x:230, y:230}, {x:50, y:230}, {x:50, y:50}], svg: '<rect x="50" y="50" width="180" height="180" />' },
         { name: "다이아몬드 💎", points: [{x:140, y:30}, {x:240, y:140}, {x:140, y:250}, {x:40, y:140}, {x:140, y:30}], svg: '<polygon points="140,30 240,140 140,250 40,140" />' },
         { name: "별 모양 ⭐", points: [{x:140, y:30}, {x:172, y:102}, {x:250, y:110}, {x:190, y:162}, {x:208, y:238}, {x:140, y:196}, {x:72, y:238}, {x:90, y:162}, {x:30, y:110}, {x:108, y:102}, {x:140, y:30}], svg: '<polygon points="140,30 172,102 250,110 190,162 208,238 140,196 72,238 90,162 30,110 108,102" />' }
+    ];
+
+    const chosungPool = [
+        { chosung: "🎰 ㄱㄴㄷ", answers: ["가나다", "강남도", "국내단", "겨냥도"] },
+        { chosung: "🍗 치킨 초성: ㅊㅋ", answers: ["치킨", "추천", "창고", "체크", "초코"] },
+        { chosung: "💻 컴퓨터 초성: ㅋㅍㅌ", answers: ["컴퓨터"] },
+        { chosung: "🍉 과일 초성: 수박 ㅅㅂ", answers: ["수박", "신발", "소비", "새벽", "선배"] },
+        { chosung: "💡 🚀 ㅇㅇㄷㅇ", answers: ["아이디어"] }
     ];
 
     let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
@@ -278,6 +316,22 @@
         if(document.getElementById(`tab-${gameMode}`)) document.getElementById(`tab-${gameMode}`).classList.add('active');
         selectedGame = gameMode;
     }
+
+    // 🔍 이미지 확대 팝업 관리 이벤트 함수 연동
+    window.openImageModal = function(nickname, imgData) {
+        if(!imgData) return;
+        document.getElementById('modal-user-title').innerText = `👑 ${nickname}님의 그림`;
+        document.getElementById('modal-target-img').src = imgData;
+        document.getElementById('global-image-modal').style.display = 'flex';
+    };
+    document.getElementById('btn-close-modal').addEventListener('click', () => {
+        document.getElementById('global-image-modal').style.display = 'none';
+    });
+    document.getElementById('global-image-modal').addEventListener('click', (e) => {
+        if(e.target === document.getElementById('global-image-modal')) {
+            document.getElementById('global-image-modal').style.display = 'none';
+        }
+    });
 
     document.getElementById('btn-create-room').addEventListener('click', () => {
         const nickname = document.getElementById('nickname-input').value.trim();
@@ -342,14 +396,13 @@
                     document.getElementById('target-shape-text').innerText = `목표 도형: ${shapes[currentShapeIndex].name}`;
                     document.getElementById('preview-svg').innerHTML = shapes[currentShapeIndex].svg;
 
-                    // 🖼️ 누락 없는 실시간 유저 점수 및 썸네일 통합 렌더링
                     const scores = data.drawScores || {};
                     const images = data.drawImages || {};
                     const scoreBoardEl = document.getElementById('draw-score-list');
                     scoreBoardEl.innerHTML = '';
                     
                     const sorted = Object.keys(scores).map(id => ({
-                        name: players[id]?.nickname || '참가자',
+                        nickname: players[id]?.nickname || '참가자',
                         score: scores[id],
                         img: images[id] || null
                     })).sort((a,b) => b.score - a.score);
@@ -359,8 +412,10 @@
                     } else {
                         sorted.forEach(s => {
                             const row = document.createElement('div'); row.className = 'score-row';
-                            const imgTag = s.img ? `<img src="${s.img}" class="user-drawing-thumbnail">` : `<div class="user-drawing-thumbnail"></div>`;
-                            row.innerHTML = `<div class="score-info"><span>👤 ${s.name}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`;
+                            
+                            // 🔍 썸네일에 onclick 속성을 부여하여 확대 함수 연동
+                            const imgTag = s.img ? `<img src="${s.img}" class="user-drawing-thumbnail" onclick="openImageModal('${s.nickname}', '${s.img}')">` : `<div class="user-drawing-thumbnail"></div>`;
+                            row.innerHTML = `<div class="score-info"><span>👤 ${s.nickname}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`;
                             scoreBoardEl.appendChild(row);
                         });
                     }
@@ -386,6 +441,17 @@
                         }
                     }
                 }
+                else if (data.selectedGame === 'speed') {
+                    showScreen('game-speed-screen');
+                    document.getElementById('speed-chosung-display').innerText = data.speedChosung || "???";
+                    if(data.speedWinner) {
+                        document.getElementById('speed-winner-text').innerText = `${data.speedWinner} (${data.speedAnswer})`;
+                        document.getElementById('btn-submit-speed').disabled = true;
+                    } else {
+                        document.getElementById('speed-winner-text').innerText = "아직 없음 (먼저 맞추세요!)";
+                        document.getElementById('btn-submit-speed').disabled = false;
+                    }
+                }
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => btn.style.display = isHost ? 'block' : 'none');
             }
             if(data.status === 'waiting') { showScreen('lobby-screen'); clearCanvas(); }
@@ -408,7 +474,6 @@
     canvas.addEventListener('touchmove', (e) => { if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); e.preventDefault(); });
     canvas.addEventListener('touchend', () => isDrawing = false);
 
-    // 📐 점수와 썸네일을 한꺼번에 동기화하여 누락 버그 해결
     document.getElementById('btn-submit-score').addEventListener('click', () => {
         if (userDrawingPoints.length < 5) return alert("도형을 그린 뒤 제출해주세요!");
         const target = shapes[currentShapeIndex]; let totalMinDist = 0;
@@ -426,18 +491,40 @@
         }
         let finalScore = Math.round(Math.max(0, 100 - ((totalMinDist / sampleCount) * 1.5)));
 
-        // 축소형 썸네일 생성 인코딩
         const thumb = document.createElement('canvas'); thumb.width = 60; thumb.height = 60;
         const tCtx = thumb.getContext('2d'); tCtx.drawImage(canvas, 0, 0, 60, 60);
         const base64Image = thumb.toDataURL('image/jpeg', 0.5);
 
-        // 파이어베이스 쪼개짐 현상 방지 통합 업데이트
         const updates = {};
         updates[`rooms/${currentRoomCode}/drawScores/${myId}`] = finalScore;
         updates[`rooms/${currentRoomCode}/drawImages/${myId}`] = base64Image;
 
         update(ref(db), updates).then(() => {
             alert(`🎉 제출 성공! 내 점수: ${finalScore}점`);
+        });
+    });
+
+    // ⚡ 초성 대결 정답 판정 및 제출 연동 로직
+    document.getElementById('btn-submit-speed').addEventListener('click', () => {
+        const userAns = document.getElementById('speed-answer-input').value.trim().replace(/\s+/g, "");
+        if(!userAns) return alert("단어를 입력하세요!");
+
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const rData = snap.val(); if(!rData || rData.speedWinner) return;
+            const targetIdx = rData.speedChosungIndex;
+            const validAnswers = chosungPool[targetIdx].answers;
+
+            if(validAnswers.includes(userAns)) {
+                const up = {};
+                up[`rooms/${currentRoomCode}/speedWinner`] = myNickname;
+                up[`rooms/${currentRoomCode}/speedAnswer`] = userAns;
+                update(ref(db), up).then(() => {
+                    document.getElementById('speed-answer-input').value = '';
+                    alert("🎉 정답입니다! 첫 번째로 맞추셨습니다.");
+                });
+            } else {
+                alert("❌ 오답이거나 유효하지 않은 단어입니다.");
+            }
         });
     });
 
@@ -506,13 +593,16 @@
                 update(rRef, { status: 'playing', bombHolderId: pIds[Math.floor(Math.random()*pIds.length)], bombExploded: false }).then(() => {
                     setTimeout(() => { get(rRef).then((s) => { if(s.val()?.status === 'playing' && s.val()?.selectedGame === 'bomb') update(rRef, { bombExploded: true }); }); }, (Math.floor(Math.random()*11) + 12) * 1000);
                 });
+            } else if (selectedGame === 'speed') {
+                const randIdx = Math.floor(Math.random() * chosungPool.length);
+                update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedWinner: null, speedAnswer: null });
             }
         });
     });
 
     document.querySelectorAll('.btn-back-lobby').forEach(btn => {
         btn.addEventListener('click', () => {
-            update(ref(db, `rooms/${currentRoomCode}`), { status: 'waiting', word: '', category: '', liarId: '', targetShapeIndex: '', drawScores: null, drawImages: null, bombHolderId: '', bombExploded: false });
+            update(ref(db, `rooms/${currentRoomCode}`), { status: 'waiting', word: '', category: '', liarId: '', targetShapeIndex: '', drawScores: null, drawImages: null, bombHolderId: '', bombExploded: false, speedChosungIndex: '', speedChosung: '', speedWinner: null, speedAnswer: null });
         });
     });
 </script>
