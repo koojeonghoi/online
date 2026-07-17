@@ -180,13 +180,11 @@
     </div>
 </div>
 
-<!-- Firebase SDK 불러오기 (v10 라이브러리) -->
+<!-- Firebase SDK 불러오기 -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, push, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, set, push, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // ⚠️ 중요: 테스트용 가상 Firebase 설정입니다. 
-    // 나중에 본인의 Firebase 프로젝트 생성 후 이 부분을 교체하시면 됩니다.
     const firebaseConfig = {
         databaseURL: "https://roulette-d9a12-default-rtdb.asia-southeast1.firebasedatabase.app/" 
     };
@@ -194,7 +192,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // 게임 데이터 (카테고리 및 제시어)
+    // 게임 데이터
     const wordList = {
         "연예/방송 📺": ["유재석", "아이유", "BTS", "봉준호", "오징어게임", "손흥민", "뉴진스", "에스파", "블랙핑크", "임영웅", "김종국", "차은우", "박보검", "장원영", "런닝맨", "무한도전", "나는솔로", "더글로리", "피식대학", "유튜브", "넷플릭스", "슈퍼맨이돌아왔다"],
         "음식/야식 🍗": ["마라탕", "삼겹살", "불닭볶음면", "치즈볼", "탕후루", "떡볶이", "양꼬치", "짜장면", "치킨", "피자", "족발", "곱창", "닭발", "김치찌개", "라면", "초밥", "햄버거", "아이스크림", "붕어빵", "호떡", "김밥", "냉면", "순대"],
@@ -202,19 +200,16 @@
         "장소/핫플 🗺️": ["노래방", "클럽", "한강공원", "편의점", "제주도", "캠핑장", "영화관", "헬스장", "놀이공원", "백화점", "카페", "맛집", "바다", "계곡", "찜질방", "호텔", "펜션", "공항", "학교", "회사", "PC방", "포차"]
     };
 
-    // 상태 관리 변수
     let myId = '';
     let myNickname = '';
     let currentRoomCode = '';
     let isHost = false;
 
-    // 화면 전환 함수
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
     }
 
-    // 4자리 랜덤 방 코드 생성
     function generateRoomCode() {
         return Math.floor(1000 + Math.random() * 9000).toString();
     }
@@ -229,7 +224,6 @@
         myId = 'player_' + Math.random().toString(36).substr(2, 9);
         isHost = true;
 
-        // DB에 방 생성 및 방장 유저 정보 등록
         const roomRef = ref(db, `rooms/${currentRoomCode}`);
         set(roomRef, {
             status: 'waiting',
@@ -245,6 +239,8 @@
             showScreen('lobby-screen');
             document.getElementById('btn-start-game').style.display = 'block';
             document.getElementById('wait-message').style.display = 'none';
+        }).catch(err => {
+            alert('방 생성 오류: ' + err.message);
         });
     });
 
@@ -260,18 +256,26 @@
         myId = 'player_' + Math.random().toString(36).substr(2, 9);
         isHost = false;
 
-        // DB에서 해당 방이 존재하는지 확인하고 유저 추가
-        const playerRef = ref(db, `rooms/${roomCode}/players/${myId}`);
-        set(playerRef, {
-            nickname: nickname,
-            isHost: false
-        }).then(() => {
-            initRoomListener(roomCode);
-            showScreen('lobby-screen');
-            document.getElementById('btn-start-game').style.display = 'none';
-            document.getElementById('wait-message').style.display = 'block';
+        // 방 존재 여부 검사 후 참여 진행
+        const roomRef = ref(db, `rooms/${roomCode}`);
+        get(roomRef).then((snapshot) => {
+            if (!snapshot.exists()) {
+                alert('존재하지 않는 방 번호입니다.');
+                return;
+            }
+            
+            const playerRef = ref(db, `rooms/${roomCode}/players/${myId}`);
+            set(playerRef, {
+                nickname: nickname,
+                isHost: false
+            }).then(() => {
+                initRoomListener(roomCode);
+                showScreen('lobby-screen');
+                document.getElementById('btn-start-game').style.display = 'none';
+                document.getElementById('wait-message').style.display = 'block';
+            });
         }).catch(err => {
-            alert('방을 찾을 수 없거나 입장 오류가 발생했습니다.');
+            alert('입장 오류가 발생했습니다: ' + err.message);
         });
     });
 
@@ -316,6 +320,14 @@
                     roleDisplay.innerHTML = `<span style="font-size:16px; color:#657786;">제시어 [${data.category}]</span><br>🍕 ${data.word}`;
                     roleDisplay.className = "role-box citizen";
                 }
+
+                // 방장만 대기실로 돌아가기 버튼 노출 (게임 수명 제어)
+                const backBtn = document.getElementById('btn-back-lobby');
+                if (isHost) {
+                    backBtn.style.display = 'block';
+                } else {
+                    backBtn.style.display = 'none';
+                }
             }
 
             // 3. 게임 상태 감지 (다시 대기 상태로 돌아왔을 때)
@@ -325,12 +337,11 @@
         });
     }
 
-    // [게임 시작] 버튼 이벤트 (방장 전용)
+    // [게임 시작] 버튼 이벤트 (방장 전용) - get()으로 개선
     document.getElementById('btn-start-game').addEventListener('click', () => {
-        const roomRef = ref(db, `rooms/${currentRoomCode}`);
+        const playersRef = ref(db, `rooms/${currentRoomCode}/players`);
         
-        // 현재 방의 플레이어 정보 가져오기 전용 일회성 로직 대신 간단한 트랜잭션/업데이트 처리
-        onValue(ref(db, `rooms/${currentRoomCode}/players`), (snapshot) => {
+        get(playersRef).then((snapshot) => {
             const players = snapshot.val();
             if(!players) return;
             
@@ -349,14 +360,17 @@
             // 무작위 라이어 선정
             const randomLiarId = playerIds[Math.floor(Math.random() * playerIds.length)];
 
-            // DB 업데이트로 모든 플레이어에게 게임 시작 알림
+            // 게임 시작 상태 업데이트
+            const roomRef = ref(db, `rooms/${currentRoomCode}`);
             update(roomRef, {
                 status: 'playing',
                 category: randomCategory,
                 word: randomWord,
                 liarId: randomLiarId
             });
-        }, { onlyOnce: true });
+        }).catch(err => {
+            alert('게임 시작 실패: ' + err.message);
+        });
     });
 
     // [대기실로 돌아가기] 버튼 이벤트
