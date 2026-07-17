@@ -6,7 +6,7 @@
     <title>모임용 실시간 멀티 게임 패키지</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght=400;700&display=swap" rel="stylesheet">
     
     <style>
         :root {
@@ -137,9 +137,7 @@
         .score-row { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #252529; font-weight: bold; }
         .score-info { display: flex; flex-direction: column; gap: 2px; }
         .user-drawing-thumbnail { width: 55px; height: 55px; border: 1px solid #3A3A42; border-radius: 6px; background-color: #000; object-fit: contain; cursor: pointer; transition: transform 0.2s; }
-        .user-drawing-thumbnail:hover { transform: scale(1.05); }
 
-        /* 🔍 그림 확대 보기용 모달 팝업 스타일 */
         .image-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; }
         .modal-content { background: var(--card-color); border: 2px solid var(--primary-color); border-radius: 16px; padding: 20px; text-align: center; position: relative; max-width: 320px; width: 90%; }
         .modal-content img { width: 280px; height: 280px; border-radius: 8px; background: #151518; object-fit: contain; border: 1px solid #3A3A42; }
@@ -155,6 +153,10 @@
 
         #explosion-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; overflow: hidden; border-radius: 16px; }
         .particle { position: absolute; width: 10px; height: 10px; background-color: var(--danger-color); border-radius: 50%; opacity: 0; }
+        
+        .role-box { padding: 20px; border-radius: 12px; font-size: 22px; font-weight: bold; margin: 20px 0; border: 2px solid transparent; }
+        .role-box.liar { background-color: #3d1d1d; border-color: var(--danger-color); color: #ff8b8b; }
+        .role-box.citizen { background-color: #1d3322; border-color: #5cff86; color: #aeffc3; line-height: 1.6; }
     </style>
 </head>
 <body>
@@ -229,20 +231,19 @@
 
     <div id="game-speed-screen" class="screen">
         <h2>⚡ 실시간 초성 대결</h2>
-        <div class="quiz-container" style="border-color: var(--primary-color);">
-            <div style="font-size: 14px; color: #8E9AA8; margin-bottom: 5px;">제시된 초성</div>
-            <div class="quiz-question" id="speed-chosung-display" style="font-size: 36px; color: var(--primary-color);">???</div>
+        <div class="quiz-container" style="border-color: var(--primary-color); background: #1a1a1e;">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 8px; letter-spacing: 1px;">제시된 순수 초성</div>
+            <div class="quiz-question" id="speed-chosung-display" style="font-size: 42px; color: #66B2FF; letter-spacing: 5px;">???</div>
         </div>
         <div id="speed-winner-box" style="background: #151518; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; font-size: 15px;">
-            🥇 현재 정답자: <span id="speed-winner-text" style="color: var(--accent-color);">대기 중...</span>
+            🥇 현재 1등 선점자: <span id="speed-winner-text" style="color: var(--accent-color);">대기 중...</span>
         </div>
-        <input type="text" id="speed-answer-input" placeholder="정답 단어를 입력하세요!">
-        <button id="btn-submit-speed" style="background-color: var(--primary-color); color: #121214;">제출하기</button>
+        <input type="text" id="speed-answer-input" placeholder="떠오르는 정답 단어를 빠르게 입력!">
+        <button id="btn-submit-speed" style="background-color: var(--primary-color); color: #121214;">⚡ 전송하기</button>
         <button id="btn-back-lobby-speed" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 </div>
 
-<!-- 🔍 그림 확대 팝업 모달 레이아웃 -->
 <div id="global-image-modal" class="image-modal">
     <div class="modal-content">
         <h3 id="modal-user-title" style="margin-top: 0; color: var(--primary-color);">그림 보기</h3>
@@ -259,25 +260,65 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    // 🤫 라이어 게임 제시어 데이터베이스 총 50개 대확장 유지
     const wordList = {
-        "연예/방송 📺": ["유재석", "아이유", "BTS", "봉준호", "손흥민", "뉴진스", "에스파"],
-        "음식/야식 🍗": ["마라탕", "삼겹살", "치킨", "피자", "족발", "초밥", "햄버거"],
-        "일상/사물 🏠": ["스마트폰", "충전기", "물티슈", "에어컨", "노트북", "텀블러"]
+        "연예/콘텐츠 📺": [
+            "유재석", "아이유", "BTS", "뉴진스", "에스파", "아이브", "르세라핌", "세븐틴", "임영웅", 
+            "침착맨", "피식대학", "흑백요리사", "오징어게임"
+        ],
+        "요즘 먹거리 🍗": [
+            "마라탕", "탕후루", "두바이 초콜릿", "삼겹살", "치킨", "피자", "초밥", "햄버거", 
+            "요아정", "크루키", "로제떡볶이", "불닭볶음면", "소금빵"
+        ],
+        "일상/라이프 🏠": [
+            "스마트폰", "노트북", "텀블러", "제로콜라", "다이슨 에어랩", "당근마켓", "무선 이어폰", 
+            "스타벅스", "유튜브 쇼츠", "인스타그램", "애플워치", "보조배터리"
+        ],
+        "핫플레이스 📍": [
+            "성수동", "홍대", "다이소", "올리브영", "인생네컷", "한강공원", "스타필드", "제주도", 
+            "편의점", "코인노래방", "더현대", "팝업스토어"
+        ]
     };
 
+    // 📐 도형 리스트 13개 완비 유지
     const shapes = [
         { name: "세모 🔺", points: [{x:140, y:40}, {x:40, y:230}, {x:240, y:230}, {x:140, y:40}], svg: '<polygon points="140,40 40,230 240,230" />' },
         { name: "네모 🔲", points: [{x:50, y:50}, {x:230, y:50}, {x:230, y:230}, {x:50, y:230}, {x:50, y:50}], svg: '<rect x="50" y="50" width="180" height="180" />' },
         { name: "다이아몬드 💎", points: [{x:140, y:30}, {x:240, y:140}, {x:140, y:250}, {x:40, y:140}, {x:140, y:30}], svg: '<polygon points="140,30 240,140 140,250 40,140" />' },
-        { name: "별 모양 ⭐", points: [{x:140, y:30}, {x:172, y:102}, {x:250, y:110}, {x:190, y:162}, {x:208, y:238}, {x:140, y:196}, {x:72, y:238}, {x:90, y:162}, {x:30, y:110}, {x:108, y:102}, {x:140, y:30}], svg: '<polygon points="140,30 172,102 250,110 190,162 208,238 140,196 72,238 90,162 30,110 108,102" />' }
+        { name: "별 모양 ⭐", points: [{x:140, y:30}, {x:172, y:102}, {x:250, y:110}, {x:190, y:162}, {x:208, y:238}, {x:140, y:196}, {x:72, y:238}, {x:90, y:162}, {x:30, y:110}, {x:108, y:102}, {x:140, y:30}], svg: '<polygon points="140,30 172,102 250,110 190,162 208,238 140,196 72,238 90,162 30,110 108,102" />' },
+        { name: "오각형 ⬠", points: [{x:140, y:40}, {x:240, y:110}, {x:200, y:230}, {x:80, y:230}, {x:40, y:110}, {x:140, y:40}], svg: '<polygon points="140,40 240,110 200,230 80,230 40,110" />' },
+        { name: "화살표 ➔", points: [{x:40, y:110}, {x:160, y:110}, {x:160, y:50}, {x:240, y:140}, {x:160, y:230}, {x:160, y:170}, {x:40, y:170}, {x:40, y:110}], svg: '<polygon points="40,110 160,110 160,50 240,140 160,230 160,170 40,170" />' },
+        { name: "하트 ❤️", points: [{x:140, y:90}, {x:185, y:45}, {x:235, y:70}, {x:235, y:120}, {x:140, y:230}, {x:45, y:120}, {x:45, y:70}, {x:95, y:45}, {x:140, y:90}], svg: '<path d="M 140 90 C 160 30, 250 50, 235 120 C 220 180, 160 210, 140 230 C 120 210, 60 180, 45 120 C 30 50, 120 30, 140 90 Z" />' },
+        { name: "십자가 ➕", points: [{x:100, y:40}, {x:180, y:40}, {x:180, y:100}, {x:240, y:100}, {x:240, y:180}, {x:180, y:180}, {x:180, y:240}, {x:100, y:240}, {x:100, y:180}, {x:40, y:180}, {x:40, y:100}, {x:100, y:100}, {x:100, y:40}], svg: '<polygon points="100,40 180,40 180,100 240,100 240,180 180,180 180,240 100,240 100,180 40,180 40,100 100,100" />' },
+        { name: "모래시계 ⏳", points: [{x:50, y:50}, {x:230, y:50}, {x:140, y:140}, {x:230, y:230}, {x:50, y:230}, {x:140, y:140}, {x:50, y:50}], svg: '<polygon points="50,50 230,50 140,140 230,230 50,230 140,140" />' },
+        { name: "초승달 🌙", points: [{x:160, y:40}, {x:180, y:80}, {x:180, y:180}, {x:110, y:230}, {x:60, y:180}, {x:50, y:110}, {x:110, y:50}, {x:160, y:40}], svg: '<path d="M 160 40 C 70 40, 50 220, 180 220 C 100 200, 100 80, 160 40 Z" />' },
+        { name: "뭉게구름 ☁️", points: [{x:90, y:100}, {x:140, y:70}, {x:200, y:100}, {x:230, y:140}, {x:190, y:200}, {x:90, y:200}, {x:60, y:150}, {x:90, y:100}], svg: '<path d="M 90 130 C 90 90, 140 70, 160 100 C 190 80, 230 110, 220 150 C 240 180, 190 210, 160 200 C 130 220, 80 210, 80 180 C 50 170, 60 130, 90 130 Z" />' },
+        { name: "물방울 💧", points: [{x:140, y:40}, {x:210, y:160}, {x:200, y:210}, {x:140, y:240}, {x:80, y:210}, {x:70, y:160}, {x:140, y:40}], svg: '<path d="M 140 40 C 180 110, 220 160, 210 200 C 190 250, 90 250, 70 200 C 60 160, 100 110, 140 40 Z" />' },
+        { name: "번개 ⚡", points: [{x:160, y:30}, {x:60, y:150}, {x:130, y:150}, {x:100, y:250}, {x:210, y:120}, {x:140, y:120}, {x:160, y:30}], svg: '<polygon points="160,30 60,150 130,150 100,250 210,120 140,120" />' }
     ];
 
+    // ⚡ 초성대결 Pool 20개 (오류 항목 2개 완벽 수정 완료)
     const chosungPool = [
-        { chosung: "🎰 ㄱㄴㄷ", answers: ["가나다", "강남도", "국내단", "겨냥도"] },
-        { chosung: "🍗 치킨 초성: ㅊㅋ", answers: ["치킨", "추천", "창고", "체크", "초코"] },
-        { chosung: "💻 컴퓨터 초성: ㅋㅍㅌ", answers: ["컴퓨터"] },
-        { chosung: "🍉 과일 초성: 수박 ㅅㅂ", answers: ["수박", "신발", "소비", "새벽", "선배"] },
-        { chosung: "💡 🚀 ㅇㅇㄷㅇ", answers: ["아이디어"] }
+        { chosung: "ㄱㅂ", answers: ["가방", "김밥", "갈비", "고부", "국밥", "가볍", "기부", "거부", "골방", "건배", "공반", "경비", "구방", "공방", "기반", "간부", "강변", "계반", "구비"] },
+        { chosung: "ㄷㄹ", answers: ["다리", "도로", "도리", "드론", "대리", "도락", "두루", "대란", "단련", "달력", "도련", "동료", "달래", "다락", "동굴", "동래", "대량", "두목", "달빛"] },
+        { chosung: "ㅅㅂ", answers: ["수박", "신발", "소비", "새벽", "선배", "서부", "수반", "식빵", "사발", "시비", "수비", "상방", "소반", "삭발", "성벽", "수포", "상부", "시민", "수분", "심방"] },
+        { chosung: "ㅂㅈ", answers: ["바지", "반지", "부자", "비자", "백제", "본질", "분쟁", "방주", "보장", "발전", "배추", "보직", "비장", "배점", "표정", "분포", "백정", "병정"] },
+        { chosung: "ㅇㅅ", answers: ["의사", "우산", "이사", "역사", "인사", "요셉", "위성", "약사", "양상", "원서", "예술", "유산", "일상", "안전", "여성", "야식", "연습", "열쇠", "온도", "요리"] },
+        { chosung: "ㅈㄱ", answers: ["조건", "장갑", "지구", "제과", "전공", "지갑", "중국", "작가", "증권", "직업", "지각", "정국", "주가", "주말", "재고", "장고", "진격", "저격", "제국"] },
+        { chosung: "ㅊㅋ", answers: ["치킨", "추천", "창고", "체크", "초코", "치카", "차키", "추카", "초크", "치코", "청킹", "초킹", "체킹", "치클", "초케", "체쿠", "치쿠", "초키", "치킹", "청쿠"] },
+        { chosung: "ㅌㅍ", answers: ["투표", "타파", "태풍", "토포", "투포", "타포", "특파", "돌풍", "통풍", "타피", "탈피", "택배", "텐트", "타패", "팀장", "토피", "투피", "특폐", "통패", "태평"] },
+        { chosung: "ㅎㅁ", answers: ["항목", "화면", "학문", "할망", "후미", "허무", "현명", "해물", "해맑", "해묵", "흑막", "효모", "향미", "한문", "항만", "호물", "희망", "황망", "환멸", "항무", "후무"] }, // '할머니' 제거 및 2글자 정답 보완
+        { chosung: "ㄱㄴ", answers: ["그네", "국내", "그냥", "개념", "겨냥", "가나", "강남", "과녁", "귀농", "권능", "기념", "고뇌", "그늘", "건낭", "계낭", "가내", "광년", "기녀", "금년", "가노"] }, // 'ㄱ낭' 오타를 정상 초성 'ㄱㄴ'으로 수정
+        { chosung: "ㄹㄷ", answers: ["런던", "레드", "로또", "리더", "라단", "레도", "로단", "리두", "로드", "루트", "리본", "라면", "리듬", "레몬", "루머", "로봇"] },
+        { chosung: "ㅁㅈ", answers: ["모자", "문장", "매장", "먼지", "명작", "민족", "목적", "무지", "매주", "마술", "만두", "물주", "미로", "마을", "미전", "무전", "무직", "마장", "멸종", "문직"] },
+        { chosung: "ㅂㄷ", answers: ["바다", "반도", "배달", "부담", "빌딩", "바둑", "부두", "부디", "밴드", "버퍼", "바닥", "방전", "변동", "비동", "보도", "복도", "백도", "방도", "부도"] },
+        { chosung: "ㅅㄱ", answers: ["사과", "수박", "선거", "시계", "수고", "성공", "사고", "생각", "시간", "소금", "시골", "상가", "서점", "식가", "사간", "신고", "사고", "식기"] },
+        { chosung: "ㅇㅈ", answers: ["의자", "우주", "인장", "액션", "엔진", "역전", "양주", "완주", "안전", "인정", "유적", "원정", "유자", "여정", "연장", "영전", "오전", "우전", "안주", "연합"] },
+        { chosung: "ㅈㅇ", answers: ["지옥", "자유", "주의", "정원", "주인", "작업", "전전", "자원", "장인", "장어", "종이", "조우", "진우", "직원", "좌우", "중앙", "조약", "조의", "주야", "장외"] },
+        { chosung: "ㅊㅂ", answers: ["출발", "처방", "초밥", "차별", "창문", "측면", "책방", "춘방", "추방", "체벌", "취반", "치부", "철벽", "참배", "천벌", "초반", "치방", "축구", "치마", "창방"] },
+        { chosung: "ㅋㅍ", answers: ["커피", "카페", "쿠폰", "캠핑", "코풍", "카포", "코파", "키포", "킹포", "카피", "키퍼", "코피", "카풀", "캄보", "코퍼", "카프", "쿠페", "콤비", "캠퍼", "카펫"] },
+        { chosung: "ㅌㄹ", answers: ["트럭", "트리", "타락", "토론", "탈출", "투란", "타루", "투루", "테러", "토리", "통로", "탄력", "퇴근", "타로", "투표", "튜립", "트랙"] },
+        { chosung: "ㅍㄷ", answers: ["포도", "파도", "판다", "푸딩", "폭탄", "풍두", "포두", "패도", "편도", "팔도", "풍도", "폭도", "피도", "포동", "평도", "포데", "파동", "폐단", "풍덕", "포덕"] }
     ];
 
     let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
@@ -317,7 +358,6 @@
         selectedGame = gameMode;
     }
 
-    // 🔍 이미지 확대 팝업 관리 이벤트 함수 연동
     window.openImageModal = function(nickname, imgData) {
         if(!imgData) return;
         document.getElementById('modal-user-title').innerText = `👑 ${nickname}님의 그림`;
@@ -388,7 +428,7 @@
                     showScreen('game-liar-screen');
                     const rd = document.getElementById('role-display');
                     if(data.liarId === myId) { rd.innerText = "🕵️‍♂️ 당신은 라이어입니다!"; rd.className = "role-box liar"; }
-                    else { rd.innerHTML = `제시어 [${data.category}]<br>🍕 ${data.word}`; rd.className = "role-box citizen"; }
+                    else { rd.innerHTML = `제시어 카테고리 [${data.category}]<br>🍕 정답 단어: ${data.word}`; rd.className = "role-box citizen"; }
                 } 
                 else if (data.selectedGame === 'draw') {
                     showScreen('game-draw-screen');
@@ -412,8 +452,6 @@
                     } else {
                         sorted.forEach(s => {
                             const row = document.createElement('div'); row.className = 'score-row';
-                            
-                            // 🔍 썸네일에 onclick 속성을 부여하여 확대 함수 연동
                             const imgTag = s.img ? `<img src="${s.img}" class="user-drawing-thumbnail" onclick="openImageModal('${s.nickname}', '${s.img}')">` : `<div class="user-drawing-thumbnail"></div>`;
                             row.innerHTML = `<div class="score-info"><span>👤 ${s.nickname}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`;
                             scoreBoardEl.appendChild(row);
@@ -504,7 +542,6 @@
         });
     });
 
-    // ⚡ 초성 대결 정답 판정 및 제출 연동 로직
     document.getElementById('btn-submit-speed').addEventListener('click', () => {
         const userAns = document.getElementById('speed-answer-input').value.trim().replace(/\s+/g, "");
         if(!userAns) return alert("단어를 입력하세요!");
@@ -520,10 +557,9 @@
                 up[`rooms/${currentRoomCode}/speedAnswer`] = userAns;
                 update(ref(db), up).then(() => {
                     document.getElementById('speed-answer-input').value = '';
-                    alert("🎉 정답입니다! 첫 번째로 맞추셨습니다.");
                 });
             } else {
-                alert("❌ 오답이거나 유효하지 않은 단어입니다.");
+                alert("❌ 등록되지 않았거나 유효하지 않은 단어입니다!");
             }
         });
     });
@@ -595,7 +631,7 @@
                 });
             } else if (selectedGame === 'speed') {
                 const randIdx = Math.floor(Math.random() * chosungPool.length);
-                update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedWinner: null, speedAnswer: null });
+                update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung.split(' ').pop(), speedWinner: null, speedAnswer: null });
             }
         });
     });
