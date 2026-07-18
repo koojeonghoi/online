@@ -19,7 +19,8 @@
             --input-bg: #252529;
             --secondary-btn: #4E5561;
             --accent-color: #FFD25C;
-            --success-color: #4EFA87;
+            --success-color: #38E5A6; /* 촌스러운 형광 연두에서 세련된 모던 민트로 변경 */
+            --success-bg: #1A2E26;
         }
 
         body {
@@ -180,11 +181,12 @@
         
         .role-box { padding: 20px; border-radius: 12px; font-size: 22px; font-weight: bold; margin: 20px 0; border: 2px solid transparent; }
         .role-box.liar { background-color: #3d1d1d; border-color: var(--danger-color); color: #ff8b8b; }
-        .role-box.citizen { background-color: #1d3322; border-color: #5cff86; color: #aeffc3; line-height: 1.6; }
+        .role-box.citizen { background-color: var(--success-bg); border-color: var(--success-color); color: #aeffc3; line-height: 1.6; }
 
         .status-badge { font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: bold; }
         .status-badge.waiting { background-color: #3A3A42; color: #B3B3B9; }
-        .status-badge.success { background-color: #1D3322; color: var(--success-color); border: 1px solid var(--success-color); }
+        .status-badge.success { background-color: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); }
+        .status-badge.peeking { background-color: #2A2438; color: #B388FF; border: 1px solid #B388FF; }
 
         .balance-box { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
         .balance-option-btn { background-color: #252529; color: white; border: 2px solid #3A3A42; padding: 16px; font-size: 16px; border-radius: 12px; transition: all 0.2s; text-align: left; position: relative; overflow: hidden; }
@@ -202,16 +204,15 @@
         .custom-amount-row input { padding: 8px 35px 8px 8px; font-size: 14px; }
         
         /* 참여자용 심플 가로 버튼 셋 */
-        .dutch-user-panel { background: #1e1e24; border: 2px dashed var(--accent-color); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .dutch-user-panel { background: #1E1E24; border: 2px dashed var(--accent-color); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
         .dutch-row-layout { display: flex; align-items: center; justify-content: space-between; background: #151518; padding: 10px 14px; border-radius: 8px; border: 1px solid #3A3A42; }
-        .dutch-user-info { display: flex; flex-direction: column; text-align: left; gap: 2px; }
+        .dutch-user-info { display: flex; flex-direction: column; text-align: left; gap: 2px; flex: 1; }
         .dutch-user-name { font-size: 14px; color: #8E9AA8; font-weight: bold; }
         .dutch-user-price { font-size: 18px; color: var(--accent-color); font-weight: 700; }
         .mini-action-btn { width: auto; padding: 8px 14px; font-size: 13px; font-weight: bold; border-radius: 6px; margin-bottom: 0; background-color: #FEE500; color: #121214; }
         
-        /* 관리용 미니 스위치 버튼 구조 */
         .mgmt-btn-group { display: flex; gap: 4px; }
-        .btn-mgmt-mini { width: auto; padding: 5px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; margin-bottom: 0; }
+        .btn-mgmt-mini { width: auto; padding: 5px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; margin-bottom: 0; border: none; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -336,7 +337,7 @@
     <!-- ⏱️ Up & Down 타이밍 게임 스크린 -->
     <div id="game-timing-screen" class="screen">
         <h2>⏱️ Up & Down 타이밍</h2>
-        <div class="quiz-container" style="border-color: var(--success-color); background: #16221a; padding: 12px; margin-bottom: 10px;">
+        <div class="quiz-container" style="border-color: var(--success-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px;">
             <div style="font-size: 13px; color: #8E9AA8;">🎯 목표 타이밍 숫자</div>
             <div id="timing-target-display" style="font-size: 38px; font-weight: bold; color: var(--success-color);">00.00</div>
         </div>
@@ -377,14 +378,16 @@
             </div>
         </div>
 
-        <!-- 📱 일반 참여자용 콤팩트 가로 배정판 (본인 전용 버튼) -->
+        <!-- 📱 일반 참여자용 콤팩트 가로 배정판 (본인 전용 쪼는맛 스위치형 버튼) -->
         <div id="dutch-user-board" class="dutch-user-panel" style="display: none;">
             <div class="dutch-row-layout">
-                <div class="dutch-user-info">
+                <div class="dutch-user-info" id="dutch-my-info-area">
                     <span class="dutch-user-name" id="dutch-my-name-display">내 정산 정보</span>
-                    <span class="dutch-user-price" id="dutch-my-price-display">0원</span>
+                    <!-- 초기 상태에는 금액 감추기 -->
+                    <span class="dutch-user-price" id="dutch-my-price-display">❓ 탭해서 확인</span>
                 </div>
-                <button class="mini-action-btn" id="btn-dutch-kakaotalk">💬 정산하기</button>
+                <!-- 쪼는 맛 유지를 위한 최초 확인용 스위치 액션 버튼 -->
+                <button class="mini-action-btn" id="btn-dutch-action" style="background-color: var(--primary-color); color: #fff;">👀 금액 열기</button>
             </div>
         </div>
 
@@ -396,7 +399,7 @@
             </div>
         </div>
 
-        <!-- 📊 실시간 현황 리스트 (총무/참여자 공통 뷰어 및 총무용 미니 스위치 연동) -->
+        <!-- 📊 실시간 현황 리스트 -->
         <div class="score-board" id="dutch-status-board">
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 실시간 술값 정산 현황</div>
             <div id="dutch-status-list">대기 중...</div>
@@ -514,10 +517,6 @@
     const ctx = canvas.getContext('2d');
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
     let currentAnswer = 0, isPenaltyActive = false, localBombActive = false;
-
-    const timingCanvas = document.getElementById('timing-canvas');
-    const tCtx = timingCanvas.getContext('2d');
-    let timingAnimationId = null, timingValue = 0, timingDirection = 1, isTimingLocalActive = false;
 
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('join-mode-box').style.display = 'block';
@@ -724,27 +723,44 @@
                     const totalAmount = data.dutchTotal || 0;
                     const distributedBills = data.dutchDistributedBills || [];
                     const confirmedUsers = data.dutchConfirmedUsers || {};
+                    const peekedUsers = data.dutchPeekedUsers || {}; // 쪼는맛 오픈 상태 감지용 객체 추가
                     
                     document.getElementById('dutch-total-display').innerText = totalAmount.toLocaleString();
                     
-                    // 1. 참여자용 개인 가로 한 줄 뷰 구성
+                    // 1. 참여자용 가로 보드 로직 수정 (쪼는 맛 처리)
                     if (distributedBills && distributedBills.length > 0) {
                         const myIdx = playerIds.indexOf(myId);
                         const myBill = distributedBills[myIdx] || 0;
+                        const hasPeeked = peekedUsers[myId] === true;
                         
                         document.getElementById('dutch-user-board').style.display = 'block';
-                        document.getElementById('dutch-my-name-display').innerText = `${myNickname}님의 정산금액`;
-                        document.getElementById('dutch-my-price-display').innerText = `${myBill.toLocaleString()}원`;
+                        document.getElementById('dutch-my-name-display').innerText = `${myNickname}님의 정산 정보`;
                         
-                        // 카카오톡 딥링크 바인딩
-                        document.getElementById('btn-dutch-kakaotalk').onclick = () => {
-                            window.location.href = "kakaotalk://";
-                        };
+                        const actionBtn = document.getElementById('btn-dutch-action');
+                        
+                        if (!hasPeeked) {
+                            // 아직 안 깠을 때
+                            document.getElementById('dutch-my-price-display').innerText = `❓ 탭해서 확인`;
+                            actionBtn.innerText = `👀 금액 열기`;
+                            actionBtn.style.backgroundColor = `var(--primary-color)`;
+                            actionBtn.onclick = () => {
+                                update(ref(db, `rooms/${currentRoomCode}/dutchPeekedUsers`), { [myId]: true });
+                            };
+                        } else {
+                            // 금액을 확인했을 때 -> 바로 카카오톡 송금 연동 버튼으로 진화
+                            document.getElementById('dutch-my-price-display').innerText = `${myBill.toLocaleString()}원`;
+                            actionBtn.innerText = `💬 정산하기`;
+                            actionBtn.style.backgroundColor = `#FEE500`;
+                            actionBtn.style.color = `#121214`;
+                            actionBtn.onclick = () => {
+                                window.location.href = "kakaotalk://";
+                            };
+                        }
                     } else {
                         document.getElementById('dutch-user-board').style.display = 'none';
                     }
 
-                    // 2. 가로형 실시간 리스트 렌더링 (총무 전용 확인/취소 기능 통합)
+                    // 2. 가로형 실시간 현황 리스트 (금액 오픈 상태 실시간 마스킹 반영)
                     const statusListEl = document.getElementById('dutch-status-list');
                     statusListEl.innerHTML = '';
                     
@@ -756,15 +772,25 @@
                         
                         const userBill = distributedBills[idx] || 0;
                         const isConfirmed = confirmedUsers[id] === true;
+                        const isPeeked = peekedUsers[id] === true;
+                        
                         if(isConfirmed) allocatedSum += userBill;
                         
-                        // 정보 영역 (이름 + 금액)
+                        // 정보 필드
                         const infoDiv = document.createElement('div');
                         infoDiv.className = 'score-info';
-                        infoDiv.innerHTML = `<span>👤 ${players[id].nickname} ${isConfirmed ? '✅' : '⏳'}</span><span style="color:var(--accent-color);">${userBill.toLocaleString()}원</span>`;
+                        
+                        // 남이 열어봤는지 여부에 따라 금액 마스킹 ("???" 처리하여 실시간 긴장감 유지)
+                        const displayPriceText = isPeeked ? `${userBill.toLocaleString()}원` : `🙈 확인 중...`;
+                        
+                        let userStatusIcon = '⏳';
+                        if (isConfirmed) userStatusIcon = '✅';
+                        else if (isPeeked) userStatusIcon = '👀';
+
+                        infoDiv.innerHTML = `<span>👤 ${players[id].nickname} ${userStatusIcon}</span><span style="color:var(--accent-color);">${displayPriceText}</span>`;
                         row.appendChild(infoDiv);
                         
-                        // 액션 영역 (총무용 미니 스위치 버튼 또는 일반유저 상태 배지)
+                        // 스위치 관리 버튼 컴포넌트
                         const actionDiv = document.createElement('div');
                         if (isHost) {
                             actionDiv.className = 'mgmt-btn-group';
@@ -773,7 +799,12 @@
                                 <button class="btn-mgmt-mini" style="background-color:var(--danger-color); color:white;" onclick="changeDutchStatus('${id}', false)">취소</button>
                             `;
                         } else {
-                            actionDiv.innerHTML = `<span class="status-badge ${isConfirmed ? 'success' : 'waiting'}">${isConfirmed ? '완료' : '대기'}</span>`;
+                            let badgeClass = 'waiting';
+                            let badgeText = '대기';
+                            if (isConfirmed) { badgeClass = 'success'; badgeText = '완료'; }
+                            else if (isPeeked) { badgeClass = 'peeking'; badgeText = '오픈'; }
+                            
+                            actionDiv.innerHTML = `<span class="status-badge ${badgeClass}">${badgeText}</span>`;
                         }
                         row.appendChild(actionDiv);
                         statusListEl.appendChild(row);
@@ -791,14 +822,10 @@
         });
     }
 
-    // 총무용 개별 완납 스위치 함수 임포트
     window.changeDutchStatus = function(targetPlayerId, statusBoolean) {
-        update(ref(db, `rooms/${currentRoomCode}/dutchConfirmedUsers`), {
-            [targetPlayerId]: statusBoolean
-        });
+        update(ref(db, `rooms/${currentRoomCode}/dutchConfirmedUsers`), { [targetPlayerId]: statusBoolean });
     };
 
-    // --- 탭 토글 구현 ---
     document.getElementById('btn-tab-random').addEventListener('click', () => {
         document.getElementById('btn-tab-random').classList.add('active');
         document.getElementById('btn-tab-custom').classList.remove('active');
@@ -860,7 +887,13 @@
                 finalResults.push(amount); remaining -= amount;
             }
             finalResults.push(remaining); finalResults.sort(() => Math.random() - 0.5);
-            update(ref(db, `rooms/${currentRoomCode}`), { dutchTotal: total, dutchDistributedBills: finalResults, dutchConfirmedUsers: null });
+            // 분배 시점에는 peekedUsers(오픈여부)와 confirmedUsers(완납여부)를 모두 밀어버림
+            update(ref(db, `rooms/${currentRoomCode}`), { 
+                dutchTotal: total, 
+                dutchDistributedBills: finalResults, 
+                dutchConfirmedUsers: null, 
+                dutchPeekedUsers: null 
+            });
         });
     });
 
@@ -870,7 +903,12 @@
         let finalResults = [];
         document.querySelectorAll('.dutch-custom-input').forEach(input => { finalResults.push(getCleanNumber(input.value)); });
         finalResults.sort(() => Math.random() - 0.5);
-        update(ref(db, `rooms/${currentRoomCode}`), { dutchTotal: total, dutchDistributedBills: finalResults, dutchConfirmedUsers: null });
+        update(ref(db, `rooms/${currentRoomCode}`), { 
+            dutchTotal: total, 
+            dutchDistributedBills: finalResults, 
+            dutchConfirmedUsers: null, 
+            dutchPeekedUsers: null 
+        });
     });
 
     function getCanvasCoordinates(e) {
@@ -879,7 +917,7 @@
     }
     function clearCanvas() { ctx.fillStyle = '#151518'; ctx.fillRect(0, 0, canvas.width, canvas.height); userDrawingPoints = []; }
     canvas.addEventListener('mousedown', (e) => { isDrawing = true; ctx.beginPath(); const c = getCanvasCoordinates(e); ctx.moveTo(c.x, c.y); ctx.strokeStyle = '#5C9EFF'; ctx.lineWidth = 5; userDrawingPoints.push(c); });
-    canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); });
+    canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); stroke(); userDrawingPoints.push(c); });
     canvas.addEventListener('mouseup', () => isDrawing = false);
 
     document.getElementById('btn-submit-score').addEventListener('click', () => {
@@ -962,7 +1000,7 @@
             } else if (selectedGame === 'balance') {
                 update(rRef, { status: 'playing', balanceIndex: 0, balanceVotes: null, balanceRevealed: false });
             } else if (selectedGame === 'dutch') {
-                update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null });
+                update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
             }
         });
     });
@@ -971,7 +1009,7 @@
         btn.addEventListener('click', () => {
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 status: 'waiting', word: '', drawScores: null, drawImages: null, bombExploded: false, speedAnswers: null, speedLoserId: null, balanceVotes: null, balanceRevealed: false,
-                dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null
+                dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null
             });
         });
     });
