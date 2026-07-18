@@ -169,6 +169,15 @@
         .balance-option-btn.selected { border-color: var(--primary-color); background-color: #1B2433; }
         .balance-gauge { position: absolute; top: 0; left: 0; height: 100%; background-color: rgba(92,159,255,0.15); width: 0%; transition: width 0.5s ease-out; z-index: 1; }
         .balance-text { position: relative; z-index: 2; display: flex; justify-content: space-between; width: 100%; font-weight: bold; }
+
+        /* 술값 몰아주기 신규 UI 스타일 */
+        .custom-amount-row { display: flex; align-items: center; margin-bottom: 8px; gap: 8px; }
+        .custom-amount-row label { font-size: 14px; font-weight: bold; color: var(--text-color); width: 70px; text-align: left; }
+        .custom-amount-row input { margin-bottom: 0; padding: 8px; font-size: 14px; }
+        .dutch-box-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .dutch-gift-box { background: var(--danger-color); color: #121214; padding: 20px 10px; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 18px; box-shadow: 0 4px 0 #b33939; transition: all 0.1s; }
+        .dutch-gift-box.opened { background: var(--success-color); box-shadow: 0 4px 0 #27ae60; font-size: 13px; font-weight: bold; }
+        .total-check-link { margin-top: 15px; font-size: 13px; color: var(--primary-color); text-decoration: underline; cursor: pointer; display: inline-block; }
     </style>
 </head>
 <body>
@@ -323,30 +332,39 @@
         
         <!-- 방장 전용 술값 설정 구역 -->
         <div id="dutch-host-panel" class="quiz-container" style="border-color: var(--accent-color); background: #1e1e24; display: none;">
-            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 8px;">👑 총무 방장 전용: 총 술값 입력</div>
-            <input type="number" id="dutch-total-input" placeholder="총 술값을 입력하세요 (예: 120000)">
-            <button id="btn-dutch-distribute" style="background-color: var(--accent-color); color: #121214; margin-bottom: 0;">🎲 복불복 금액 랜덤 분배</button>
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 8px;">👑 총무 방장 전용: 술값 세팅 파트</div>
+            <input type="number" id="dutch-total-input" placeholder="총 술값을 입력하세요 (예: 120000)" value="120000">
+            
+            <button id="btn-dutch-distribute" style="background-color: var(--primary-color); color: #121214;">🎲 복불복 금액 랜덤 분배</button>
+            <button id="btn-toggle-custom-dutch" class="secondary" style="margin-bottom: 0;">✏️ 금액 직접 지정하기</button>
+
+            <!-- 온라인 참여 인원수에 맞춰 자동 생성될 지정 금액 칸 -->
+            <div id="dutch-custom-section" style="display: none; margin-top: 15px; background: #151518; padding: 12px; border-radius: 8px; border: 1px dashed #3A3A42;">
+                <h4 style="margin: 0 0 10px 0; color: var(--accent-color); font-size: 14px;">순위별 금액 지정</h4>
+                <div id="dutch-custom-inputs-container"></div>
+                <div id="dutch-custom-warning" style="font-size: 12px; color: var(--danger-color); margin-top: 8px;"></div>
+                <button id="btn-dutch-submit-custom" style="background-color: var(--success-color); color: #121214; margin-top: 10px; margin-bottom: 0;">🎯 지정 금액으로 분배 시작</button>
+            </div>
+        </div>
+
+        <!-- 📱 결과 확인용 뽑기 보드판 (비공개 처리) -->
+        <div id="dutch-game-board" class="quiz-container" style="border-color: var(--success-color); background: #1a241e; display: none; padding: 15px;">
+            <h3 style="margin-top: 0; color: var(--success-color); font-size: 16px;">📱 각자 터치해서 확인하세요!</h3>
+            <p style="color: #8E9AA8; font-size: 12px; margin-bottom: 10px;">본인의 상자를 누르면 얼마를 내야 하는지 오픈됩니다.</p>
+            <div class="dutch-box-container" id="dutch-boxes-grid"></div>
+            <div class="total-check-link" id="dutch-all-reveal-link" style="display: none;">총무 전용: 전체 결과 한번에 보기</div>
         </div>
 
         <!-- 공통 요약 알림 판 -->
         <div class="quiz-container" style="border-color: var(--primary-color); background: #161c24; padding: 12px; margin-bottom: 12px;">
-            <div style="font-size: 13px; color: #8E9AA8;">💵 남은 정산 필요 금액 / 총 술값</div>
+            <div style="font-size: 13px; color: #8E9AA8;">💵 분배 완료 금액 / 총 술값</div>
             <div style="font-size: 26px; font-weight: bold; color: var(--primary-color);">
-                <span id="dutch-remaining-display">0</span>원 / <span id="dutch-total-display">0</span>원
-            </div>
-        </div>
-
-        <!-- 직접 입력 선점 구역 -->
-        <div class="quiz-container" style="border-color: #3A3A42; background: #252529; padding: 12px; margin-bottom: 15px;">
-            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px;">✍️ 내가 낼 금액 직접 지정하기</div>
-            <div style="display: flex; gap: 8px;">
-                <input type="number" id="dutch-my-input" placeholder="금액 입력" style="margin-bottom: 0; flex: 1;">
-                <button id="btn-dutch-submit-my" style="width: auto; padding: 0 20px; margin-bottom: 0; background-color: var(--success-color); color: #121214;">확정</button>
+                <span id="dutch-allocated-display">0</span>원 / <span id="dutch-total-display">0</span>원
             </div>
         </div>
 
         <!-- 실시간 정산 현황판 -->
-        <div class="score-board">
+        <div class="score-board" id="dutch-status-board">
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 실시간 술값 분배 현황</div>
             <div id="dutch-status-list">대기 중...</div>
         </div>
@@ -467,6 +485,10 @@
     const timingCanvas = document.getElementById('timing-canvas');
     const tCtx = timingCanvas.getContext('2d');
     let timingAnimationId = null, timingValue = 0, timingDirection = 1, isTimingLocalActive = false;
+
+    // 술값 게임 연동 로컬 상태 관리 변수
+    let localDutchBills = []; 
+    let localOpenedBoxes = {};
 
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('join-mode-box').style.display = 'block';
@@ -682,77 +704,88 @@
                     }
                     document.getElementById('btn-reveal-balance').style.display = (isHost && !data.balanceRevealed) ? 'block' : 'none';
                 }
-                else if (data.selectedGame === 'timing') {
-                    showScreen('game-timing-screen');
-                    const targetNum = data.timingTarget || 0;
-                    document.getElementById('timing-target-display').innerText = targetNum.toFixed(2);
-
-                    const timingScores = data.timingScores || {};
-                    const tScoreListEl = document.getElementById('timing-score-list');
-                    tScoreListEl.innerHTML = '';
-
-                    const sortedTiming = Object.keys(timingScores).map(id => {
-                        const val = timingScores[id];
-                        const diff = Math.abs(targetNum - val);
-                        return { nickname: players[id]?.nickname || '참가자', value: val, diff: diff, id: id };
-                    }).sort((a,b) => a.diff - b.diff);
-
-                    if (sortedTiming.length === 0) {
-                        tScoreListEl.innerHTML = '<div style="color:#8E9AA8;">아래 버튼을 눌러 정확한 타이밍에 멈추세요!</div>';
-                    } else {
-                        sortedTiming.forEach((s, idx) => {
-                            const row = document.createElement('div');
-                            row.className = 'score-row';
-                            let rankPrefix = idx === 0 ? '👑 ' : `${idx + 1}등 `;
-                            row.innerHTML = `<span>${rankPrefix} ${s.nickname}</span><span style="color:var(--success-color);">${s.value.toFixed(2)} (오차: ${s.diff.toFixed(2)})</span>`;
-                            tScoreListEl.appendChild(row);
-                        });
-                    }
-
-                    if (!timingScores[myId]) {
-                        document.getElementById('btn-stop-timing').disabled = false;
-                        if (!isTimingLocalActive) {
-                            isTimingLocalActive = true;
-                            startTimingAnimationLoop();
-                        }
-                    } else {
-                        document.getElementById('btn-stop-timing').disabled = true;
-                        isTimingLocalActive = false;
-                        if (timingAnimationId) cancelAnimationFrame(timingAnimationId);
-                        drawStaticTimingGauge(timingScores[myId]);
-                    }
-                }
                 else if (data.selectedGame === 'dutch') {
                     showScreen('game-dutch-screen');
                     document.getElementById('dutch-host-panel').style.display = isHost ? 'block' : 'none';
                     
                     const totalAmount = data.dutchTotal || 0;
-                    const currentBills = data.dutchBills || {};
-                    
-                    let allocatedSum = 0;
-                    Object.values(currentBills).forEach(val => allocatedSum += val);
-                    const remaining = Math.max(0, totalAmount - allocatedSum);
+                    const distributedBills = data.dutchDistributedBills || [];
+                    const openedBoxes = data.dutchOpenedBoxes || {};
+                    const confirmedUsers = data.dutchConfirmedUsers || {};
                     
                     document.getElementById('dutch-total-display').innerText = totalAmount.toLocaleString();
-                    document.getElementById('dutch-remaining-display').innerText = remaining.toLocaleString();
+                    
+                    // 분배가 작동하여 리스트가 넘어온 시점 처리
+                    if (distributedBills && distributedBills.length > 0) {
+                        localDutchBills = distributedBills;
+                        localOpenedBoxes = openedBoxes;
+                        
+                        document.getElementById('dutch-game-board').style.display = 'block';
+                        document.getElementById('dutch-status-board').style.display = 'block';
+                        document.getElementById('dutch-all-reveal-link').style.display = isHost ? 'inline-block' : 'none';
+                        
+                        // 각자 터치하기 위해 숨겨놓은 "?" 박스 동적 빌드
+                        const gridEl = document.getElementById('dutch-boxes-grid');
+                        gridEl.innerHTML = '';
+                        
+                        let allocatedSum = 0;
+                        
+                        for(let i = 0; i < distributedBills.length; i++) {
+                            const box = document.createElement('div');
+                            box.className = 'dutch-gift-box';
+                            
+                            // 이미 누군가가 이 슬롯의 박스를 열어 본인의 금액으로 확정 지었는지 판정
+                            let isSlotOpened = false;
+                            let openedUserNick = '';
+                            
+                            Object.keys(openedBoxes).forEach(uid => {
+                                if(openedBoxes[uid] === i) {
+                                    isSlotOpened = true;
+                                    openedUserNick = players[uid]?.nickname || '참가자';
+                                }
+                            });
+                            
+                            if (isSlotOpened) {
+                                box.classList.add('opened');
+                                box.innerText = `${openedUserNick}\n${distributedBills[i].toLocaleString()}원`;
+                                allocatedSum += distributedBills[i];
+                            } else {
+                                box.innerText = '?';
+                                // 아직 본인의 정산금을 안 연 유저가 클릭했을 때의 이벤트 바인딩
+                                box.onclick = () => {
+                                    if(openedBoxes[myId] !== undefined) return alert('이미 본인의 정산 금액 상자를 뽑으셨습니다!');
+                                    
+                                    // Firebase 트랜잭션 수동 구현: 선택 슬롯 선점 업데이트
+                                    update(ref(db, `rooms/${currentRoomCode}/dutchOpenedBoxes`), { [myId]: i });
+                                    update(ref(db, `rooms/${currentRoomCode}/dutchConfirmedUsers`), { [myId]: distributedBills[i] });
+                                };
+                            }
+                            gridEl.appendChild(box);
+                        }
+                        
+                        document.getElementById('dutch-allocated-display').innerText = allocatedSum.toLocaleString();
+                    } else {
+                        // 방장 세팅 전 대기 UI 상태
+                        document.getElementById('dutch-game-board').style.display = 'none';
+                        document.getElementById('dutch-allocated-display').innerText = '0';
+                    }
 
+                    // 실시간 술값 확정 정산 상황판 동적 노출
                     const statusListEl = document.getElementById('dutch-status-list');
                     statusListEl.innerHTML = '';
                     
                     playerIds.forEach(id => {
                         const row = document.createElement('div');
                         row.className = 'score-row';
-                        const amt = currentBills[id];
-                        const isAssigned = amt !== undefined;
+                        const confirmedAmt = confirmedUsers[id];
+                        const isAssigned = confirmedAmt !== undefined;
                         
                         const badgeClass = isAssigned ? 'success' : 'waiting';
-                        const badgeText = isAssigned ? `${amt.toLocaleString()}원 확정 💳` : '금액 책정 중.. 🎲';
+                        const badgeText = isAssigned ? `${confirmedAmt.toLocaleString()}원 확정 💳` : '상자 오픈 대기 중.. 🎲';
                         
                         row.innerHTML = `<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`;
                         statusListEl.appendChild(row);
                     });
-
-                    document.getElementById('btn-dutch-submit-my').disabled = (currentBills[myId] !== undefined || remaining <= 0);
                 }
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => btn.style.display = isHost ? 'block' : 'none');
             }
@@ -760,9 +793,146 @@
                 showScreen('lobby-screen'); 
                 clearCanvas(); 
                 isTimingLocalActive = false;
+                
+                // 술값 관련 로컬 컴포넌트 정리
+                document.getElementById('dutch-game-board').style.display = 'none';
+                document.getElementById('dutch-custom-section').style.display = 'none';
             }
         });
     }
+
+    // --- 금액 직접 지정 토글 및 실시간 Input 세팅 ---
+    document.getElementById('btn-toggle-custom-dutch').addEventListener('click', () => {
+        const section = document.getElementById('dutch-custom-section');
+        if(section.style.display === 'block') {
+            section.style.display = 'none';
+        } else {
+            section.style.display = 'block';
+            generateDutchCustomFields();
+        }
+    });
+
+    function generateDutchCustomFields() {
+        get(ref(db, `rooms/${currentRoomCode}/players`)).then((snap) => {
+            const players = snap.val() || {};
+            const count = Object.keys(players).length || 2;
+            const container = document.getElementById('dutch-custom-inputs-container');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= count; i++) {
+                const row = document.createElement('div');
+                row.className = 'custom-amount-row';
+                row.innerHTML = `
+                    <label>${i}등 금액:</label>
+                    <input type="number" class="dutch-custom-input" placeholder="원 단위 입력" oninput="validateDutchTotalSum()">
+                `;
+                container.appendChild(row);
+            }
+            validateDutchTotalSum();
+        });
+    }
+
+    // 전역 스코프 바인딩 처리
+    window.validateDutchTotalSum = function() {
+        const totalTarget = parseInt(document.getElementById('dutch-total-input').value) || 0;
+        const inputs = document.querySelectorAll('.dutch-custom-input');
+        let currentSum = 0;
+
+        inputs.forEach(input => {
+            currentSum += parseInt(input.value) || 0;
+        });
+
+        const warningDiv = document.getElementById('dutch-custom-warning');
+        if (currentSum !== totalTarget) {
+            warningDiv.style.color = 'var(--danger-color)';
+            warningDiv.innerText = `현재 입력 합계: ${currentSum.toLocaleString()}원\n(총 술값 ${totalTarget.toLocaleString()}원과 정확히 일치해야 합니다)`;
+            return false;
+        } else {
+            warningDiv.style.color = 'var(--success-color)';
+            warningDiv.innerText = '✅ 설정 금액 총합이 전체 술값과 일치합니다!';
+            return true;
+        }
+    }
+
+    // --- 1. 복불복 금액 랜덤 분배 알고리즘 처리 ---
+    document.getElementById('btn-dutch-distribute').addEventListener('click', () => {
+        const total = parseInt(document.getElementById('dutch-total-input').value.trim());
+        if (!total || total <= 0) return alert('올바른 총 금액을 입력하세요!');
+
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const rData = snap.val(); if (!rData) return;
+            const count = Object.keys(rData.players || {}).length;
+            
+            let remaining = total;
+            let finalResults = [];
+
+            for (let i = 0; i < count - 1; i++) {
+                let max = Math.floor(remaining / (count - i)) * 1.5;
+                let amount = Math.floor(Math.random() * max);
+                amount = Math.floor(amount / 10) * 10; // 10원 단위 절사
+                finalResults.push(amount);
+                remaining -= amount;
+            }
+            finalResults.push(remaining); // 잔여금 전부 막주자 배치
+            
+            // 셔플을 통해 등수 무작위성 확보
+            finalResults.sort(() => Math.random() - 0.5);
+
+            update(ref(db, `rooms/${currentRoomCode}`), {
+                dutchTotal: total,
+                dutchDistributedBills: finalResults,
+                dutchOpenedBoxes: null,
+                dutchConfirmedUsers: null
+            });
+        });
+    });
+
+    // --- 2. 지정 금액 분배 알고리즘 처리 ---
+    document.getElementById('btn-dutch-submit-custom').addEventListener('click', () => {
+        if (!window.validateDutchTotalSum()) {
+            return alert('지정하신 금액들의 총합이 설정한 총 술값과 일치하지 않습니다.');
+        }
+
+        const total = parseInt(document.getElementById('dutch-total-input').value.trim());
+        const inputs = document.querySelectorAll('.dutch-custom-input');
+        let finalResults = [];
+
+        inputs.forEach(input => {
+            finalResults.push(parseInt(input.value) || 0);
+        });
+
+        // 누가 걸릴지 모르게 순서를 한 번 섞어서 연동 시킵니다.
+        finalResults.sort(() => Math.random() - 0.5);
+
+        update(ref(db, `rooms/${currentRoomCode}`), {
+            dutchTotal: total,
+            dutchDistributedBills: finalResults,
+            dutchOpenedBoxes: null,
+            dutchConfirmedUsers: null
+        });
+    });
+
+    // --- 총무용 마스터 패널 한 번에 결과 강제 스포일러 확인 링크 ---
+    document.getElementById('dutch-all-reveal-link').addEventListener('click', () => {
+        get(ref(db, `rooms/${currentRoomCode}/players`)).then((snap) => {
+            const players = snap.val() || {};
+            const pIds = Object.keys(players);
+            
+            let baseOpened = {};
+            let baseConfirmed = {};
+            
+            // 아직 확인 안 한 인원들을 남아있는 빈 슬롯에 강제 매핑
+            pIds.forEach((id, idx) => {
+                baseOpened[id] = idx;
+                baseConfirmed[id] = localDutchBills[idx] || 0;
+            });
+
+            update(ref(db, `rooms/${currentRoomCode}`), {
+                dutchOpenedBoxes: baseOpened,
+                dutchConfirmedUsers: baseConfirmed
+            });
+        });
+    });
 
     function startTimingAnimationLoop() {
         function render() {
@@ -890,57 +1060,6 @@
         update(ref(db, `rooms/${currentRoomCode}`), { balanceRevealed: true });
     });
 
-    document.getElementById('btn-dutch-distribute').addEventListener('click', () => {
-        const total = parseInt(document.getElementById('dutch-total-input').value.trim());
-        if (!total || total <= 0) return alert('올바른 총 금액을 입력하세요!');
-
-        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
-            const rData = snap.val(); if (!rData) return;
-            const pIds = Object.keys(rData.players || {});
-            const count = pIds.length;
-            
-            let remaining = total;
-            const allocatedBills = {};
-
-            for (let i = 0; i < count - 1; i++) {
-                const randAmt = Math.floor(Math.random() * (remaining / (count - i) * 2));
-                allocatedBills[pIds[i]] = randAmt;
-                remaining -= randAmt;
-            }
-            allocatedBills[pIds[count - 1]] = remaining;
-
-            update(ref(db, `rooms/${currentRoomCode}`), {
-                dutchTotal: total,
-                dutchBills: allocatedBills
-            });
-        });
-    });
-
-    document.getElementById('btn-dutch-submit-my').addEventListener('click', () => {
-        const myAmt = parseInt(document.getElementById('dutch-my-input').value.trim());
-        if (isNaN(myAmt) || myAmt < 0) return alert('정확한 금액을 입력해주세요!');
-
-        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
-            const rData = snap.val(); if (!rData) return;
-            const total = rData.dutchTotal || 0;
-            const currentBills = rData.dutchBills || {};
-            
-            let allocatedSum = 0;
-            Object.values(currentBills).forEach(val => allocatedSum += val);
-            const remaining = total - allocatedSum;
-
-            if (myAmt > remaining) {
-                return alert(`남은 정산 필요 금액(${remaining}원) 이하로 입력해 주세요!`);
-            }
-
-            update(ref(db, `rooms/${currentRoomCode}/dutchBills`), {
-                [myId]: myAmt
-            }).then(() => {
-                document.getElementById('dutch-my-input').value = '';
-            });
-        });
-    });
-
     function generateQuiz() {
         if (isPenaltyActive) return;
         let q = '', a = 0; const type = Math.floor(Math.random() * 3);
@@ -1014,7 +1133,7 @@
                 const randTarget = 50 + Math.random() * 45;
                 update(rRef, { status: 'playing', timingTarget: randTarget, timingScores: null });
             } else if (selectedGame === 'dutch') {
-                update(rRef, { status: 'playing', dutchTotal: 0, dutchBills: null });
+                update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchOpenedBoxes: null, dutchConfirmedUsers: null });
             }
         });
     });
@@ -1025,7 +1144,7 @@
                 status: 'waiting', word: '', category: '', liarId: '', targetShapeIndex: '', drawScores: null, drawImages: null, 
                 bombHolderId: '', bombExploded: false, speedChosungIndex: '', speedChosung: '', speedAnswers: null, speedLoserId: null,
                 balanceIndex: '', balanceVotes: null, balanceRevealed: false, timingTarget: null, timingScores: null,
-                dutchTotal: null, dutchBills: null
+                dutchTotal: null, dutchDistributedBills: null, dutchOpenedBoxes: null, dutchConfirmedUsers: null
             });
         });
     });
