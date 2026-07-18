@@ -524,7 +524,7 @@
     let timingAnimId = null, timingActiveRoundKey = null, timingLastData = null;
 
     function timingValueAt(elapsedMs) {
-        const half = 3000; // 3초 동안 0→10, 3초 동안 10→0 (총 6초 왕복)
+        const half = 1000; // 1초 동안 0→10, 1초 동안 10→0 (총 2초 왕복)
         const t = elapsedMs % (half * 2);
         return t <= half ? (t / half) * 10 : 10 - ((t - half) / half) * 10;
     }
@@ -1171,7 +1171,7 @@
                 const randIdx = Math.floor(Math.random() * chosungPool.length);
                 update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedAnswers: null, speedLoserId: null });
             } else if (selectedGame === 'balance') {
-                update(rRef, { status: 'playing', balanceIndex: 0, balanceVotes: null, balanceRevealed: false });
+                update(rRef, { status: 'playing', balanceIndex: Math.floor(Math.random() * balancePool.length), balanceVotes: null, balanceRevealed: false });
             } else if (selectedGame === 'dutch') {
                 update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
             } else if (selectedGame === 'timing') {
