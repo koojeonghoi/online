@@ -213,6 +213,20 @@
         
         .mgmt-btn-group { display: flex; gap: 4px; }
         .btn-mgmt-mini { width: auto; padding: 5px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; margin-bottom: 0; border: none; cursor: pointer; }
+        /* 🔫 러시안룰렛 슬롯 */
+        .roulette-slots { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 15px 0; }
+        .roulette-slot { width: 44px; height: 44px; border-radius: 50%; background: #252529; border: 2px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; }
+        .roulette-slot.passed { background: var(--success-bg); border-color: var(--success-color); }
+        .roulette-slot.current { background: var(--danger-color); border-color: #fff; box-shadow: 0 0 12px var(--danger-color); animation: pulseSlot 0.8s infinite; }
+        @keyframes pulseSlot { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+        #rouletteResultText { display: none; font-size: 16px; font-weight: bold; color: var(--danger-color); background: #3d1d1d; border: 2px solid var(--danger-color); border-radius: 10px; padding: 10px; margin: 10px 0; }
+
+        /* 👆 스피드 손가락 */
+        .speed-light { width: 140px; height: 140px; border-radius: 50%; margin: 20px auto; display: flex; align-items: center; justify-content: center; font-size: 44px; transition: background-color 0.15s; border: 4px solid #3a3a40; }
+        .speed-light.off { background: #252529; }
+        .speed-light.on { background: var(--success-color); box-shadow: 0 0 30px var(--success-color); }
+        #speedFingerStatus { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+        #speedFingerFinalMsg { font-size: 15px; font-weight: bold; color: var(--danger-color); margin-top: 8px; min-height: 20px; }
     </style>
 </head>
 <body>
@@ -245,6 +259,8 @@
             <button class="tab-btn" id="tab-speed" onclick="selectGameMode('speed')">⚡ 초성대결</button>
             <button class="tab-btn" id="tab-balance" onclick="selectGameMode('balance')">⚖️ 밸런스</button>
             <button class="tab-btn" id="tab-timing" onclick="selectGameMode('timing')">⏱️ 타이밍</button>
+            <button class="tab-btn" id="tab-roulette" onclick="selectGameMode('roulette')">🔫 러시안룰렛</button>
+            <button class="tab-btn" id="tab-speedfinger" onclick="selectGameMode('speedfinger')">👆 스피드 손가락</button>
             <button class="tab-btn" id="tab-dutch" onclick="selectGameMode('dutch')">🍺 몰아주기</button>
         </div>
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
@@ -350,6 +366,28 @@
             <div id="timing-score-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-timing" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <div id="game-roulette-screen" class="screen">
+        <h2>🔫 러시안룰렛 슬롯</h2>
+        <p id="rouletteTurnText" style="font-size: 14px; color: #8E9AA8; margin-bottom: 8px;">대기 중...</p>
+        <div class="roulette-slots" id="rouletteSlots"></div>
+        <div id="rouletteResultText"></div>
+        <button id="btn-roulette-pull" style="background-color: var(--danger-color); color: white; font-size: 18px; padding: 16px;" disabled>🔫 방아쇠 당기기</button>
+        <button id="btn-back-lobby-roulette" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <div id="game-speedfinger-screen" class="screen">
+        <h2>👆 스피드 손가락</h2>
+        <p id="speedFingerStatus" style="color: #8E9AA8;">곧 불이 켜집니다... 준비하세요!</p>
+        <div class="speed-light off" id="speedFingerLight">✋</div>
+        <button id="btn-speed-finger-tap" style="background-color: var(--primary-color); color: #121214; font-size: 20px; padding: 16px; margin-bottom: 10px;">👆 터치!</button>
+        <div class="score-board">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 반응속도 실시간 랭킹</div>
+            <div id="speedFingerResultList">대기 중...</div>
+        </div>
+        <div id="speedFingerFinalMsg"></div>
+        <button id="btn-back-lobby-speedfinger" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <!-- 🍺 술값 아찔하게 몰아주기 게임 스크린 -->
@@ -522,6 +560,7 @@
     const timingCanvas = document.getElementById('timing-canvas');
     const timingCtx = timingCanvas.getContext('2d');
     let timingAnimId = null, timingActiveRoundKey = null, timingLastData = null;
+    let speedFingerRoundKey = null, speedFingerSignalTimer = null;
 
     function timingValueAt(elapsedMs) {
         const half = 1000; // 1초 동안 0→10, 1초 동안 10→0 (총 2초 왕복)
@@ -564,6 +603,52 @@
             const value = Math.round(timingValueAt(elapsed) * 100) / 100;
             const error = Math.round(Math.abs(value - timingLastData.target) * 100) / 100;
             update(ref(db, path), { value, error });
+        });
+    });
+
+    document.getElementById('btn-roulette-pull').addEventListener('click', () => {
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const rData = snap.val(); if (!rData || !rData.rouletteTurnOrder) return;
+            const currentPid = rData.rouletteTurnOrder[rData.rouletteTurnIdx];
+            if (currentPid !== myId) return;
+            const slotCount = rData.rouletteSlotCount || 6;
+            const chamberPos = rData.rouletteChamberPos || 0;
+            const isHit = (chamberPos === rData.rouletteBulletChamber);
+            const nextTurnIdx = (rData.rouletteTurnIdx + 1) % rData.rouletteTurnOrder.length;
+            const updates = {};
+            if (isHit) {
+                const consecutive = (rData.rouletteLastHitId === myId) ? (rData.rouletteConsecutiveHits || 1) + 1 : 1;
+                const myNickname = players[myId]?.nickname || '나';
+                updates[`rooms/${currentRoomCode}/rouletteLastHitId`] = myId;
+                updates[`rooms/${currentRoomCode}/rouletteConsecutiveHits`] = consecutive;
+                updates[`rooms/${currentRoomCode}/rouletteResultText`] = consecutive > 1
+                    ? `💥 ${myNickname}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺`
+                    : `💥 ${myNickname}님 총알 명중! 한 잔 마시기 🍺`;
+                updates[`rooms/${currentRoomCode}/rouletteBulletChamber`] = Math.floor(Math.random() * slotCount);
+                updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = 0;
+                updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
+            } else {
+                updates[`rooms/${currentRoomCode}/rouletteResultText`] = null;
+                updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = chamberPos + 1;
+                updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
+            }
+            if (navigator.vibrate) navigator.vibrate(isHit ? [200, 80, 200] : 40);
+            update(ref(db), updates);
+        });
+    });
+
+    document.getElementById('btn-speed-finger-tap').addEventListener('click', () => {
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const rData = snap.val(); if (!rData || !rData.speedSignalTime) return;
+            const already = (rData.speedFingerResults && rData.speedFingerResults[myId] !== undefined) || (rData.speedFalseStarts && rData.speedFalseStarts[myId]);
+            if (already) return;
+            const now = Date.now();
+            if (now < rData.speedSignalTime) {
+                set(ref(db, `rooms/${currentRoomCode}/speedFalseStarts/${myId}`), true);
+            } else {
+                const reaction = now - rData.speedSignalTime;
+                set(ref(db, `rooms/${currentRoomCode}/speedFingerResults/${myId}`), reaction);
+            }
         });
     });
 
@@ -795,6 +880,88 @@
                     stopBtn.disabled = !!myResult;
                     stopBtn.innerText = myResult ? '✅ 제출 완료!' : '🛑 STOP!';
                 }
+                else if (data.selectedGame === 'roulette') {
+                    showScreen('game-roulette-screen');
+                    const slotCount = data.rouletteSlotCount || 6;
+                    const chamberPos = data.rouletteChamberPos || 0;
+                    const turnOrder = data.rouletteTurnOrder || [];
+                    const turnIdx = data.rouletteTurnIdx || 0;
+                    const currentPid = turnOrder[turnIdx];
+                    const isMyTurn = currentPid === myId;
+
+                    const slotsEl = document.getElementById('rouletteSlots');
+                    slotsEl.innerHTML = '';
+                    for (let i = 0; i < slotCount; i++) {
+                        const s = document.createElement('div');
+                        s.className = 'roulette-slot' + (i < chamberPos ? ' passed' : (i === chamberPos ? ' current' : ''));
+                        s.textContent = i < chamberPos ? '✅' : (i === chamberPos ? '🔫' : '❓');
+                        slotsEl.appendChild(s);
+                    }
+
+                    document.getElementById('rouletteTurnText').innerHTML = isMyTurn
+                        ? '🎯 당신의 차례입니다! 방아쇠를 당기세요!'
+                        : `⏳ <strong>${players[currentPid]?.nickname || '참가자'}</strong>님의 차례를 기다려주세요...`;
+
+                    document.getElementById('btn-roulette-pull').disabled = !isMyTurn;
+
+                    const rResultEl = document.getElementById('rouletteResultText');
+                    if (data.rouletteResultText) { rResultEl.textContent = data.rouletteResultText; rResultEl.style.display = 'block'; }
+                    else { rResultEl.style.display = 'none'; }
+                }
+                else if (data.selectedGame === 'speedfinger') {
+                    showScreen('game-speedfinger-screen');
+                    const signalTime = data.speedSignalTime;
+                    const results = data.speedFingerResults || {};
+                    const falseStarts = data.speedFalseStarts || {};
+                    const myFalse = falseStarts[myId];
+                    const myResult = results[myId];
+                    const now = Date.now();
+
+                    if (speedFingerRoundKey !== signalTime) {
+                        speedFingerRoundKey = signalTime;
+                        clearTimeout(speedFingerSignalTimer);
+                        const lightEl = document.getElementById('speedFingerLight');
+                        const delayLeft = signalTime - now;
+                        if (delayLeft > 0) {
+                            lightEl.className = 'speed-light off'; lightEl.textContent = '✋';
+                            document.getElementById('speedFingerStatus').textContent = '곧 불이 켜집니다... 준비하세요!';
+                            speedFingerSignalTimer = setTimeout(() => {
+                                document.getElementById('speedFingerLight').className = 'speed-light on';
+                                document.getElementById('speedFingerLight').textContent = '👆';
+                                document.getElementById('speedFingerStatus').textContent = '지금 터치하세요!!';
+                            }, delayLeft);
+                        } else {
+                            lightEl.className = 'speed-light on'; lightEl.textContent = '👆';
+                            document.getElementById('speedFingerStatus').textContent = '지금 터치하세요!!';
+                        }
+                    }
+
+                    document.getElementById('btn-speed-finger-tap').disabled = !!myFalse || myResult !== undefined;
+
+                    const allIds = Object.keys(players);
+                    const rows = allIds.map(id => {
+                        const nickname = players[id]?.nickname || '참가자';
+                        if (falseStarts[id]) return { id, nickname, label: '🚫 실격 (너무 빠름)', sortVal: -1 };
+                        if (results[id] !== undefined) return { id, nickname, label: `${results[id]}ms`, sortVal: results[id] };
+                        return { id, nickname, label: '⏳ 대기중', sortVal: Infinity };
+                    });
+                    const allResponded = allIds.length > 0 && allIds.every(id => falseStarts[id] || results[id] !== undefined);
+                    const hasFalseStart = allIds.some(id => falseStarts[id]);
+                    let loserRow = null;
+                    if (hasFalseStart) loserRow = rows.find(r => r.sortVal === -1);
+                    else if (allResponded) loserRow = rows.reduce((a,b) => (b.sortVal > a.sortVal ? b : a));
+
+                    rows.sort((a,b) => { if(a.sortVal===-1) return -1; if(b.sortVal===-1) return 1; return a.sortVal-b.sortVal; });
+                    const sfListEl = document.getElementById('speedFingerResultList');
+                    sfListEl.innerHTML = rows.length === 0 ? '대기 중...' : '';
+                    rows.forEach(r => {
+                        const row = document.createElement('div'); row.className = 'score-row';
+                        const isLoser = loserRow && r.id === loserRow.id;
+                        row.innerHTML = `<span>${isLoser?'🍺':'👤'} ${r.nickname}</span><span style="color:${isLoser?'var(--danger-color)':'var(--success-color)'};">${r.label}</span>`;
+                        sfListEl.appendChild(row);
+                    });
+                    document.getElementById('speedFingerFinalMsg').textContent = loserRow ? `🍺 ${loserRow.nickname}님 마시기!` : '';
+                }
                 else if (data.selectedGame === 'dutch') {
                     showScreen('game-dutch-screen');
                     document.getElementById('dutch-host-panel').style.display = isHost ? 'block' : 'none';
@@ -896,6 +1063,7 @@
             if(data.status === 'waiting') { 
                 showScreen('lobby-screen'); clearCanvas(); 
                 stopTimingLoop(); timingActiveRoundKey = null;
+                clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
             }
@@ -1172,11 +1340,22 @@
                 update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedAnswers: null, speedLoserId: null });
             } else if (selectedGame === 'balance') {
                 update(rRef, { status: 'playing', balanceIndex: Math.floor(Math.random() * balancePool.length), balanceVotes: null, balanceRevealed: false });
-            } else if (selectedGame === 'dutch') {
-                update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
             } else if (selectedGame === 'timing') {
                 const target = Math.round(Math.random() * 1000) / 100; // 0.00 ~ 10.00
                 update(rRef, { status: 'playing', timingTarget: target, timingStartTime: Date.now(), timingResults: null });
+            } else if (selectedGame === 'roulette') {
+                const slotCount = 6;
+                update(rRef, {
+                    status: 'playing', rouletteSlotCount: slotCount, rouletteTurnOrder: pIds, rouletteTurnIdx: 0,
+                    rouletteChamberPos: 0, rouletteBulletChamber: Math.floor(Math.random() * slotCount),
+                    rouletteLastHitId: null, rouletteConsecutiveHits: 0, rouletteResultText: null
+                });
+            } else if (selectedGame === 'speedfinger') {
+                const delay = 2000 + Math.floor(Math.random() * 3000); // 2~5초 랜덤 대기 (부정 출발 방지)
+                const signalTime = Date.now() + delay;
+                update(rRef, { status: 'playing', speedSignalTime: signalTime, speedFingerResults: null, speedFalseStarts: null });
+            } else if (selectedGame === 'dutch') {
+                update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
             }
         });
     });
@@ -1186,7 +1365,9 @@
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 status: 'waiting', word: '', drawScores: null, drawImages: null, bombExploded: false, speedAnswers: null, speedLoserId: null, balanceVotes: null, balanceRevealed: false,
                 dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null,
-                timingTarget: null, timingStartTime: null, timingResults: null
+                timingTarget: null, timingStartTime: null, timingResults: null,
+                rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
+                speedSignalTime: null, speedFingerResults: null, speedFalseStarts: null
             });
         });
     });
