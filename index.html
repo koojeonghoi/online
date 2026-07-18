@@ -201,6 +201,7 @@
             <button class="tab-btn" id="tab-speed" onclick="selectGameMode('speed')">⚡ 초성대결</button>
             <button class="tab-btn" id="tab-balance" onclick="selectGameMode('balance')">⚖️ 밸런스</button>
             <button class="tab-btn" id="tab-timing" onclick="selectGameMode('timing')">⏱️ 타이밍</button>
+            <button class="tab-btn" id="tab-dutch" onclick="selectGameMode('dutch')">🍺 술값몰아주기</button>
         </div>
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
         <ul id="player-list" class="player-list"></ul>
@@ -303,21 +304,54 @@
             <div id="timing-target-display" style="font-size: 38px; font-weight: bold; color: var(--success-color);">00.00</div>
         </div>
         
-        <!-- 타이밍 캔버스 애니메이션 구동 구역 -->
         <div style="background-color: #151518; border-radius: 12px; margin: 15px auto; width: 280px; height: 140px; border: 3px solid var(--success-color); position: relative;">
             <canvas id="timing-canvas" width="280" height="140" style="position: absolute; top:0; left:0;"></canvas>
         </div>
 
         <button id="btn-stop-timing" style="background-color: var(--danger-color); color: white; font-size: 20px; padding: 16px; margin-bottom: 15px;">🛑 STOP!</button>
 
-        <!-- 🚨 꼴찌 정보 노출 영역 -->
-        <div id="timing-loser-box" class="role-box liar" style="display: none; font-size: 18px; margin-bottom: 15px;"></div>
-
         <div class="score-board">
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 목표 근접도 실시간 랭킹 (오차 최소 순)</div>
             <div id="timing-score-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-timing" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 🍺 술값 아찔하게 몰아주기 게임 스크린 -->
+    <div id="game-dutch-screen" class="screen">
+        <h2>🍺 술값 아찔하게 몰아주기</h2>
+        
+        <!-- 방장 전용 술값 설정 구역 -->
+        <div id="dutch-host-panel" class="quiz-container" style="border-color: var(--accent-color); background: #1e1e24; display: none;">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 8px;">👑 총무 방장 전용: 총 술값 입력</div>
+            <input type="number" id="dutch-total-input" placeholder="총 술값을 입력하세요 (예: 120000)">
+            <button id="btn-dutch-distribute" style="background-color: var(--accent-color); color: #121214; margin-bottom: 0;">🎲 복불복 금액 랜덤 분배</button>
+        </div>
+
+        <!-- 공통 요약 알림 판 -->
+        <div class="quiz-container" style="border-color: var(--primary-color); background: #161c24; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 13px; color: #8E9AA8;">💵 남은 정산 필요 금액 / 총 술값</div>
+            <div style="font-size: 26px; font-weight: bold; color: var(--primary-color);">
+                <span id="dutch-remaining-display">0</span>원 / <span id="dutch-total-display">0</span>원
+            </div>
+        </div>
+
+        <!-- 직접 입력 선점 구역 -->
+        <div class="quiz-container" style="border-color: #3A3A42; background: #252529; padding: 12px; margin-bottom: 15px;">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px;">✍️ 내가 낼 금액 직접 지정하기</div>
+            <div style="display: flex; gap: 8px;">
+                <input type="number" id="dutch-my-input" placeholder="금액 입력" style="margin-bottom: 0; flex: 1;">
+                <button id="btn-dutch-submit-my" style="width: auto; padding: 0 20px; margin-bottom: 0; background-color: var(--success-color); color: #121214;">확정</button>
+            </div>
+        </div>
+
+        <!-- 실시간 정산 현황판 -->
+        <div class="score-board">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 실시간 술값 분배 현황</div>
+            <div id="dutch-status-list">대기 중...</div>
+        </div>
+        
+        <button id="btn-back-lobby-dutch" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 </div>
 
@@ -337,7 +371,21 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // 📐 도형 리스트 13개 완비 유지
+    const wordList = {
+        "연예/콘텐츠 📺": [
+            "유재석", "아이유", "BTS", "뉴진스", "에스파", "아이브", "르세라핌", "세븐틴", "임영웅", "침착맨", "피식대학", "흑백요리사", "오징어게임"
+        ],
+        "요즘 먹거리 🍗": [
+            "마라탕", "탕후루", "두바이 초콜릿", "삼겹살", "치킨", "피자", "초밥", "햄버거", "요아정", "크루키", "로제떡볶이", "불닭볶음면", "소금빵"
+        ],
+        "일상/라이프 🏠": [
+            "스마트폰", "노트북", "텀블러", "제로콜라", "다이슨 에어랩", "당근마켓", "무선 이어폰", "스타벅스", "유튜브 쇼츠", "인스타그램", "애플워치", "보조배터리"
+        ],
+        "핫플레이스 📍": [
+            "성수동", "홍대", "다이소", "올리브영", "인생네컷", "한강공원", "스타필드", "제주도", "편의점", "코인노래방", "더현대", "팝업스토어"
+        ]
+    };
+
     const shapes = [
         { name: "세모 🔺", points: [{x:140, y:40}, {x:40, y:230}, {x:240, y:230}, {x:140, y:40}], svg: '<polygon points="140,40 40,230 240,230" />' },
         { name: "네모 🔲", points: [{x:50, y:50}, {x:230, y:50}, {x:230, y:230}, {x:50, y:230}, {x:50, y:50}], svg: '<rect x="50" y="50" width="180" height="180" />' },
@@ -354,7 +402,6 @@
         { name: "번개 ⚡", points: [{x:160, y:30}, {x:60, y:150}, {x:130, y:150}, {x:100, y:250}, {x:210, y:120}, {x:140, y:120}, {x:160, y:30}], svg: '<polygon points="160,30 60,150 130,150 100,250 210,120 140,120" />' }
     ];
 
-    // ⚡ 초성대결 Pool 20개 (오류 항목 2개 완벽 수정 완료)
     const chosungPool = [
         { chosung: "ㄱㅂ", answers: ["가방", "김밥", "갈비", "고부", "국밥", "가볍", "기부", "거부", "골방", "건배", "공반", "경비", "구방", "공방", "기반", "간부", "강변", "계반", "구비"] },
         { chosung: "ㄷㄹ", answers: ["다리", "도로", "도리", "드론", "대리", "도락", "두루", "대란", "단련", "달력", "도련", "동료", "달래", "다락", "동굴", "동래", "대량", "두목", "달빛"] },
@@ -378,7 +425,6 @@
         { chosung: "ㅍㄷ", answers: ["포도", "파도", "판다", "푸딩", "폭탄", "풍두", "포두", "패도", "편도", "팔도", "풍도", "폭도", "피도", "포동", "평도", "포데", "파동", "폐단", "풍덕", "포덕"] }
     ];
 
-    // ⚖️ 밸런스 게임 질문 Pool 30개 대량 구축 완료
     const balancePool = [
         { q: "평생 동안 먹어야 한다면?", a: "매일 삼겹살만 먹기", b: "매일 라면만 먹기" },
         { q: "더 끔찍한 출퇴근 상황은?", a: "왕복 4시간 편하게 앉아서 가기", b: "왕복 1시간 지옥철 서서 낑겨 가기" },
@@ -412,14 +458,12 @@
         { q: "인생의 중대한 선택!", a: "타임머신 타고 20년 전 과거의 나 만나기", b: "타임머신 타고 20년 후 미래의 나 만나기" }
     ];
 
-
     let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
     const canvas = document.getElementById('drawing-canvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
     let currentAnswer = 0, isPenaltyActive = false, localBombActive = false;
 
-    // ⏱️ 타이밍 게임 로컬 변수
     const timingCanvas = document.getElementById('timing-canvas');
     const tCtx = timingCanvas.getContext('2d');
     let timingAnimationId = null, timingValue = 0, timingDirection = 1, isTimingLocalActive = false;
@@ -442,7 +486,6 @@
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
         
-        // 타이밍 스크린 아닐 때 루프 종료 처리
         if (screenId !== 'game-timing-screen' && timingAnimationId) {
             cancelAnimationFrame(timingAnimationId);
             timingAnimationId = null;
@@ -648,7 +691,6 @@
                     const tScoreListEl = document.getElementById('timing-score-list');
                     tScoreListEl.innerHTML = '';
 
-                    // 오차(절대값)가 가장 적은 사람 순서대로 소팅
                     const sortedTiming = Object.keys(timingScores).map(id => {
                         const val = timingScores[id];
                         const diff = Math.abs(targetNum - val);
@@ -667,34 +709,7 @@
                         });
                     }
 
-                    // 🚨 실시간 꼴찌 추정 및 최종 낙점 로직 바인딩
-                    const tLoserBox = document.getElementById('timing-loser-box');
-                    if (data.timingLoserId) {
-                        const loserNick = players[data.timingLoserId]?.nickname || "참가자";
-                        tLoserBox.innerHTML = `💥 타이밍 대결 탈락 완료! 💥<br><span style="color:var(--accent-color); font-size:22px;">🚨 ${loserNick} 꼴찌 낙점! 벌칙 당첨! 🚨</span>`;
-                        tLoserBox.style.display = 'block';
-                        document.getElementById('btn-stop-timing').disabled = true;
-                        
-                        // 내가 꼴찌인 경우 기기 폭발 이펙트 적용
-                        if(data.timingLoserId === myId) { triggerExplosionEffect(); }
-                    } else {
-                        // 모든 멤버가 게이지를 제출 완료했다면 방장 주도로 꼴찌 확정 처리 실행
-                        if (sortedTiming.length > 0) {
-                            const currentWorst = sortedTiming[sortedTiming.length - 1];
-                            tLoserBox.innerHTML = `⚠️ 실시간 현재 꼴찌: <span style="color:var(--danger-color); font-weight:bold;">${currentWorst.nickname}</span> (오차: ${currentWorst.diff.toFixed(2)})`;
-                            tLoserBox.style.display = 'block';
-
-                            // 방장이 실시간 데이터 비교 후 전원 제출 시 DB에 꼴찌(LoserId) 기록
-                            if (isHost && sortedTiming.length === playerIds.length) {
-                                update(ref(db, `rooms/${currentRoomCode}`), { timingLoserId: currentWorst.id });
-                            }
-                        } else {
-                            tLoserBox.style.display = 'none';
-                        }
-                    }
-
-                    // 로컬 게이지 루프 핸들링
-                    if (!timingScores[myId] && !data.timingLoserId) {
+                    if (!timingScores[myId]) {
                         document.getElementById('btn-stop-timing').disabled = false;
                         if (!isTimingLocalActive) {
                             isTimingLocalActive = true;
@@ -704,11 +719,40 @@
                         document.getElementById('btn-stop-timing').disabled = true;
                         isTimingLocalActive = false;
                         if (timingAnimationId) cancelAnimationFrame(timingAnimationId);
-                        
-                        // 이미 멈춘 값 혹은 꼴찌 상태 표시
-                        const mySavedVal = timingScores[myId] || 0;
-                        drawStaticTimingGauge(mySavedVal);
+                        drawStaticTimingGauge(timingScores[myId]);
                     }
+                }
+                else if (data.selectedGame === 'dutch') {
+                    showScreen('game-dutch-screen');
+                    document.getElementById('dutch-host-panel').style.display = isHost ? 'block' : 'none';
+                    
+                    const totalAmount = data.dutchTotal || 0;
+                    const currentBills = data.dutchBills || {};
+                    
+                    let allocatedSum = 0;
+                    Object.values(currentBills).forEach(val => allocatedSum += val);
+                    const remaining = Math.max(0, totalAmount - allocatedSum);
+                    
+                    document.getElementById('dutch-total-display').innerText = totalAmount.toLocaleString();
+                    document.getElementById('dutch-remaining-display').innerText = remaining.toLocaleString();
+
+                    const statusListEl = document.getElementById('dutch-status-list');
+                    statusListEl.innerHTML = '';
+                    
+                    playerIds.forEach(id => {
+                        const row = document.createElement('div');
+                        row.className = 'score-row';
+                        const amt = currentBills[id];
+                        const isAssigned = amt !== undefined;
+                        
+                        const badgeClass = isAssigned ? 'success' : 'waiting';
+                        const badgeText = isAssigned ? `${amt.toLocaleString()}원 확정 💳` : '금액 책정 중.. 🎲';
+                        
+                        row.innerHTML = `<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`;
+                        statusListEl.appendChild(row);
+                    });
+
+                    document.getElementById('btn-dutch-submit-my').disabled = (currentBills[myId] !== undefined || remaining <= 0);
                 }
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => btn.style.display = isHost ? 'block' : 'none');
             }
@@ -720,27 +764,21 @@
         });
     }
 
-    // ⏱️ 타이밍 게임 실시간 로컬 루프 엔진
     function startTimingAnimationLoop() {
         function render() {
             if (!isTimingLocalActive) return;
-            // 게이지 증감 속도 조절
             timingValue += timingDirection * 2.4; 
             if (timingValue >= 100) { timingValue = 100; timingDirection = -1; }
             if (timingValue <= 0) { timingValue = 0; timingDirection = 1; }
 
             tCtx.clearRect(0, 0, timingCanvas.width, timingCanvas.height);
-            
-            // 배경 가이드선 그리기
             tCtx.fillStyle = '#1E1E22';
             tCtx.fillRect(10, 50, 260, 40);
 
-            // 실시간 게이지 바 바인딩
             const fillWidth = (timingValue / 100) * 260;
             tCtx.fillStyle = 'rgba(78, 250, 135, 0.8)';
             tCtx.fillRect(10, 50, fillWidth, 40);
 
-            // 가운뎃선 텍스트 스캔
             tCtx.fillStyle = '#FFFFFF';
             tCtx.font = 'bold 16px Noto Sans KR';
             tCtx.textAlign = 'center';
@@ -779,7 +817,6 @@
         });
     });
 
-    // Canvas 좌표 헬퍼
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
         const cx = e.touches ? e.touches[0].clientX : e.clientX;
@@ -853,6 +890,57 @@
         update(ref(db, `rooms/${currentRoomCode}`), { balanceRevealed: true });
     });
 
+    document.getElementById('btn-dutch-distribute').addEventListener('click', () => {
+        const total = parseInt(document.getElementById('dutch-total-input').value.trim());
+        if (!total || total <= 0) return alert('올바른 총 금액을 입력하세요!');
+
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const rData = snap.val(); if (!rData) return;
+            const pIds = Object.keys(rData.players || {});
+            const count = pIds.length;
+            
+            let remaining = total;
+            const allocatedBills = {};
+
+            for (let i = 0; i < count - 1; i++) {
+                const randAmt = Math.floor(Math.random() * (remaining / (count - i) * 2));
+                allocatedBills[pIds[i]] = randAmt;
+                remaining -= randAmt;
+            }
+            allocatedBills[pIds[count - 1]] = remaining;
+
+            update(ref(db, `rooms/${currentRoomCode}`), {
+                dutchTotal: total,
+                dutchBills: allocatedBills
+            });
+        });
+    });
+
+    document.getElementById('btn-dutch-submit-my').addEventListener('click', () => {
+        const myAmt = parseInt(document.getElementById('dutch-my-input').value.trim());
+        if (isNaN(myAmt) || myAmt < 0) return alert('정확한 금액을 입력해주세요!');
+
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const rData = snap.val(); if (!rData) return;
+            const total = rData.dutchTotal || 0;
+            const currentBills = rData.dutchBills || {};
+            
+            let allocatedSum = 0;
+            Object.values(currentBills).forEach(val => allocatedSum += val);
+            const remaining = total - allocatedSum;
+
+            if (myAmt > remaining) {
+                return alert(`남은 정산 필요 금액(${remaining}원) 이하로 입력해 주세요!`);
+            }
+
+            update(ref(db, `rooms/${currentRoomCode}/dutchBills`), {
+                [myId]: myAmt
+            }).then(() => {
+                document.getElementById('dutch-my-input').value = '';
+            });
+        });
+    });
+
     function generateQuiz() {
         if (isPenaltyActive) return;
         let q = '', a = 0; const type = Math.floor(Math.random() * 3);
@@ -923,9 +1011,10 @@
                 const randB = Math.floor(Math.random() * balancePool.length);
                 update(rRef, { status: 'playing', balanceIndex: randB, balanceVotes: null, balanceRevealed: false });
             } else if (selectedGame === 'timing') {
-                // 50.00 ~ 95.00 사이의 타깃 난수 지정
                 const randTarget = 50 + Math.random() * 45;
-                update(rRef, { status: 'playing', timingTarget: randTarget, timingScores: null, timingLoserId: null });
+                update(rRef, { status: 'playing', timingTarget: randTarget, timingScores: null });
+            } else if (selectedGame === 'dutch') {
+                update(rRef, { status: 'playing', dutchTotal: 0, dutchBills: null });
             }
         });
     });
@@ -935,7 +1024,8 @@
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 status: 'waiting', word: '', category: '', liarId: '', targetShapeIndex: '', drawScores: null, drawImages: null, 
                 bombHolderId: '', bombExploded: false, speedChosungIndex: '', speedChosung: '', speedAnswers: null, speedLoserId: null,
-                balanceIndex: '', balanceVotes: null, balanceRevealed: false, timingTarget: null, timingScores: null, timingLoserId: null
+                balanceIndex: '', balanceVotes: null, balanceRevealed: false, timingTarget: null, timingScores: null,
+                dutchTotal: null, dutchBills: null
             });
         });
     });
