@@ -518,6 +518,56 @@
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
     let currentAnswer = 0, isPenaltyActive = false, localBombActive = false;
 
+    // ===== ⏱️ Up & Down 타이밍 게임 =====
+    const timingCanvas = document.getElementById('timing-canvas');
+    const timingCtx = timingCanvas.getContext('2d');
+    let timingAnimId = null, timingActiveRoundKey = null, timingLastData = null;
+
+    function timingValueAt(elapsedMs) {
+        const half = 3000; // 3초 동안 0→10, 3초 동안 10→0 (총 6초 왕복)
+        const t = elapsedMs % (half * 2);
+        return t <= half ? (t / half) * 10 : 10 - ((t - half) / half) * 10;
+    }
+
+    function drawTimingBar(value, target, frozen) {
+        const w = timingCanvas.width, h = timingCanvas.height;
+        timingCtx.fillStyle = '#151518'; timingCtx.fillRect(0, 0, w, h);
+        const barX = Math.max(0, Math.min(w, (value / 10) * w));
+        timingCtx.fillStyle = frozen ? '#38E5A6' : '#5C9EFF';
+        timingCtx.fillRect(0, 0, barX, h);
+        const targetX = Math.max(0, Math.min(w, (target / 10) * w));
+        timingCtx.strokeStyle = '#FFD25C'; timingCtx.lineWidth = 3;
+        timingCtx.beginPath(); timingCtx.moveTo(targetX, 0); timingCtx.lineTo(targetX, h); timingCtx.stroke();
+        timingCtx.strokeStyle = '#ffffff'; timingCtx.lineWidth = 2;
+        timingCtx.beginPath(); timingCtx.moveTo(barX, 0); timingCtx.lineTo(barX, h); timingCtx.stroke();
+    }
+
+    function startTimingLoop(startTime, target) {
+        function loop() {
+            const elapsed = Date.now() - startTime;
+            drawTimingBar(timingValueAt(elapsed), target, false);
+            timingAnimId = requestAnimationFrame(loop);
+        }
+        loop();
+    }
+
+    function stopTimingLoop() {
+        if (timingAnimId) { cancelAnimationFrame(timingAnimId); timingAnimId = null; }
+    }
+
+    document.getElementById('btn-stop-timing').addEventListener('click', () => {
+        if (!timingLastData || !timingLastData.startTime) return;
+        const path = `rooms/${currentRoomCode}/timingResults/${myId}`;
+        get(ref(db, path)).then((snap) => {
+            if (snap.exists()) return;
+            const elapsed = Date.now() - timingLastData.startTime;
+            const value = Math.round(timingValueAt(elapsed) * 100) / 100;
+            const error = Math.round(Math.abs(value - timingLastData.target) * 100) / 100;
+            update(ref(db, path), { value, error });
+        });
+    });
+
+
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('join-mode-box').style.display = 'block';
         clearCanvas();
@@ -631,7 +681,7 @@
                 if(data.selectedGame === 'liar') {
                     showScreen('game-liar-screen');
                     const rd = document.getElementById('role-display');
-                    if(data.liarId === myId) { rd.innerText = "🕵️‍♂️ 당신은 라이어입니다!"; rd.className = "role-box liar"; }
+                    if(data.liarId === myId) { rd.innerHTML = `🕵️‍♂️ 당신은 라이어입니다!<br>제시어 카테고리 [${data.category}]`; rd.className = "role-box liar"; }
                     else { rd.innerHTML = `제시어 카테고리 [${data.category}]<br>🍕 정답 단어: ${data.word}`; rd.className = "role-box citizen"; }
                 } 
                 else if (data.selectedGame === 'draw') {
@@ -715,6 +765,35 @@
                         document.getElementById('balance-result-box').style.display = 'none';
                     }
                     document.getElementById('btn-reveal-balance').style.display = (isHost && !data.balanceRevealed) ? 'block' : 'none';
+                }
+                else if (data.selectedGame === 'timing') {
+                    showScreen('game-timing-screen');
+                    const target = data.timingTarget || 0;
+                    document.getElementById('timing-target-display').innerText = target.toFixed(2);
+                    timingLastData = { startTime: data.timingStartTime, target: target };
+
+                    const results = data.timingResults || {};
+                    const myResult = results[myId];
+
+                    if (timingActiveRoundKey !== data.timingStartTime) {
+                        timingActiveRoundKey = data.timingStartTime;
+                        stopTimingLoop();
+                        if (!myResult) startTimingLoop(data.timingStartTime, target);
+                    }
+                    if (myResult) { stopTimingLoop(); drawTimingBar(myResult.value, target, true); }
+
+                    const listEl = document.getElementById('timing-score-list');
+                    const sorted = Object.keys(results).map(id => ({ nickname: players[id]?.nickname || '참가자', value: results[id].value, error: results[id].error })).sort((a,b) => a.error - b.error);
+                    listEl.innerHTML = sorted.length === 0 ? '대기 중...' : '';
+                    sorted.forEach((s, idx) => {
+                        const row = document.createElement('div'); row.className = 'score-row';
+                        row.innerHTML = `<span>${idx===0?'🥇':'👤'} ${s.nickname}</span><span style="color:var(--success-color);">${s.value.toFixed(2)} (오차 ${s.error.toFixed(2)})</span>`;
+                        listEl.appendChild(row);
+                    });
+
+                    const stopBtn = document.getElementById('btn-stop-timing');
+                    stopBtn.disabled = !!myResult;
+                    stopBtn.innerText = myResult ? '✅ 제출 완료!' : '🛑 STOP!';
                 }
                 else if (data.selectedGame === 'dutch') {
                     showScreen('game-dutch-screen');
@@ -816,6 +895,7 @@
             }
             if(data.status === 'waiting') { 
                 showScreen('lobby-screen'); clearCanvas(); 
+                stopTimingLoop(); timingActiveRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
             }
@@ -1007,10 +1087,24 @@
         update(ref(db), { [`rooms/${currentRoomCode}/drawScores/${myId}`]: finalScore, [`rooms/${currentRoomCode}/drawImages/${myId}`]: thumb.toDataURL('image/jpeg', 0.5) });
     });
 
+    // 입력된 문자열에서 초성만 추출 (예: "가방" -> "ㄱㅂ")
+    function getChosung(str) {
+        const CHO = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+        let result = '';
+        for (const ch of str) {
+            const code = ch.charCodeAt(0) - 0xAC00;
+            if (code >= 0 && code <= 11171) result += CHO[Math.floor(code / 588)];
+            else result += ch;
+        }
+        return result;
+    }
+
     document.getElementById('btn-submit-speed').addEventListener('click', () => {
         const userAns = document.getElementById('speed-answer-input').value.trim().replace(/\s+/g, "");
+        if (!userAns) return;
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
-            const rData = snap.val(); if(!rData || rData.speedLoserId || !chosungPool[rData.speedChosungIndex].answers.includes(userAns)) return alert("틀렸거나 미등록 단어입니다!");
+            const rData = snap.val(); if(!rData || rData.speedLoserId) return;
+            if (getChosung(userAns) !== rData.speedChosung) return alert(`초성이 일치하지 않습니다! (목표: ${rData.speedChosung})`);
             const currentAnswers = rData.speedAnswers || {}; if (currentAnswers[myId]) return;
             const updates = {}; updates[`rooms/${currentRoomCode}/speedAnswers/${myId}`] = userAns;
             if (Object.keys(currentAnswers).length + 1 === Object.keys(rData.players).length - 1) {
@@ -1062,7 +1156,11 @@
             const pIds = Object.keys(snap.val()); if(pIds.length < 2) return alert('최소 2명 필요합니다!');
             const rRef = ref(db, `rooms/${currentRoomCode}`);
             if (selectedGame === 'liar') {
-                update(rRef, { status: 'playing', category: "음식", word: "치킨", liarId: pIds[Math.floor(Math.random()*pIds.length)] });
+                const categories = Object.keys(wordList);
+                const pickedCategory = categories[Math.floor(Math.random()*categories.length)];
+                const wordsInCategory = wordList[pickedCategory];
+                const pickedWord = wordsInCategory[Math.floor(Math.random()*wordsInCategory.length)];
+                update(rRef, { status: 'playing', category: pickedCategory, word: pickedWord, liarId: pIds[Math.floor(Math.random()*pIds.length)] });
             } else if (selectedGame === 'draw') {
                 update(rRef, { status: 'playing', targetShapeIndex: Math.floor(Math.random()*shapes.length), drawScores: null, drawImages: null });
             } else if (selectedGame === 'bomb') {
@@ -1070,11 +1168,15 @@
                     setTimeout(() => { get(rRef).then((s) => { if(s.val()?.status === 'playing') update(rRef, { bombExploded: true }); }); }, 15000);
                 });
             } else if (selectedGame === 'speed') {
-                update(rRef, { status: 'playing', speedChosungIndex: 0, speedChosung: "ㄱㅂ", speedAnswers: null, speedLoserId: null });
+                const randIdx = Math.floor(Math.random() * chosungPool.length);
+                update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedAnswers: null, speedLoserId: null });
             } else if (selectedGame === 'balance') {
                 update(rRef, { status: 'playing', balanceIndex: 0, balanceVotes: null, balanceRevealed: false });
             } else if (selectedGame === 'dutch') {
                 update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
+            } else if (selectedGame === 'timing') {
+                const target = Math.round(Math.random() * 1000) / 100; // 0.00 ~ 10.00
+                update(rRef, { status: 'playing', timingTarget: target, timingStartTime: Date.now(), timingResults: null });
             }
         });
     });
@@ -1083,7 +1185,8 @@
         btn.addEventListener('click', () => {
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 status: 'waiting', word: '', drawScores: null, drawImages: null, bombExploded: false, speedAnswers: null, speedLoserId: null, balanceVotes: null, balanceRevealed: false,
-                dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null
+                dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null,
+                timingTarget: null, timingStartTime: null, timingResults: null
             });
         });
     });
