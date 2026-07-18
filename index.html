@@ -19,8 +19,8 @@
             --input-bg: #252529;
             --secondary-btn: #4E5561;
             --accent-color: #FFD25C;
-            --success-color: #38E5A6; /* 촌스러운 형광 연두에서 세련된 모던 민트로 변경 */
-            --success-bg: #1A2E26;
+            --success-color: #5C9EFF; /* 완전히 깔끔한 스카이 블루로 통일 */
+            --success-bg: #1A2433;
         }
 
         body {
@@ -181,11 +181,11 @@
         
         .role-box { padding: 20px; border-radius: 12px; font-size: 22px; font-weight: bold; margin: 20px 0; border: 2px solid transparent; }
         .role-box.liar { background-color: #3d1d1d; border-color: var(--danger-color); color: #ff8b8b; }
-        .role-box.citizen { background-color: var(--success-bg); border-color: var(--success-color); color: #aeffc3; line-height: 1.6; }
+        .role-box.citizen { background-color: var(--success-bg); border-color: var(--success-color); color: #fff; line-height: 1.6; }
 
         .status-badge { font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: bold; }
         .status-badge.waiting { background-color: #3A3A42; color: #B3B3B9; }
-        .status-badge.success { background-color: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); }
+        .status-badge.success { background-color: var(--success-bg); color: var(--primary-color); border: 1px solid var(--primary-color); }
         .status-badge.peeking { background-color: #2A2438; color: #B388FF; border: 1px solid #B388FF; }
 
         .balance-box { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
@@ -327,21 +327,21 @@
             </button>
         </div>
         <div id="balance-result-box" class="score-board" style="display: none; margin-bottom: 15px;">
-            <div style="font-size: 13px; color: var(--success-color); font-weight: bold; margin-bottom: 6px;">🎉 소수결 생존자 (적게 고른 사람)</div>
+            <div style="font-size: 13px; color: var(--primary-color); font-weight: bold; margin-bottom: 6px;">🎉 소수결 생존자 (적게 고른 사람)</div>
             <div id="balance-winners-list" style="font-weight: bold; font-size: 15px; color: #fff;"></div>
         </div>
-        <button id="btn-reveal-balance" style="background-color: var(--success-color); color:#121214; display:none;">📊 투표 종료 및 결과 공개 (방장용)</button>
+        <button id="btn-reveal-balance" style="background-color: var(--primary-color); color:#121214; display:none;">📊 투표 종료 및 결과 공개 (방장용)</button>
         <button id="btn-back-lobby-balance" class="secondary btn-back-lobby" style="margin-top: 10px;">대기실로 돌아가기</button>
     </div>
 
     <!-- ⏱️ Up & Down 타이밍 게임 스크린 -->
     <div id="game-timing-screen" class="screen">
         <h2>⏱️ Up & Down 타이밍</h2>
-        <div class="quiz-container" style="border-color: var(--success-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px;">
+        <div class="quiz-container" style="border-color: var(--primary-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px;">
             <div style="font-size: 13px; color: #8E9AA8;">🎯 목표 타이밍 숫자</div>
-            <div id="timing-target-display" style="font-size: 38px; font-weight: bold; color: var(--success-color);">00.00</div>
+            <div id="timing-target-display" style="font-size: 38px; font-weight: bold; color: var(--primary-color);">00.00</div>
         </div>
-        <div style="background-color: #151518; border-radius: 12px; margin: 15px auto; width: 280px; height: 140px; border: 3px solid var(--success-color); position: relative;">
+        <div style="background-color: #151518; border-radius: 12px; margin: 15px auto; width: 280px; height: 140px; border: 3px solid var(--primary-color); position: relative;">
             <canvas id="timing-canvas" width="280" height="140" style="position: absolute; top:0; left:0;"></canvas>
         </div>
         <button id="btn-stop-timing" style="background-color: var(--danger-color); color: white; font-size: 20px; padding: 16px; margin-bottom: 15px;">🛑 STOP!</button>
@@ -374,7 +374,8 @@
                 <h4 style="margin: 0 0 10px 0; color: var(--accent-color); font-size: 14px;">순위별 금액 지정</h4>
                 <div id="dutch-custom-inputs-container"></div>
                 <div id="dutch-custom-warning" style="font-size: 12px; color: var(--danger-color); margin-top: 8px; font-weight: bold; white-space: pre-line;"></div>
-                <button id="btn-dutch-submit-custom" style="background-color: var(--success-color); color: #121214; margin-top: 10px; margin-bottom: 0;">🎯 지정 금액으로 분배 시작</button>
+                <!-- 버튼 내 녹색 배경 제거 및 스카이 블루 처리 -->
+                <button id="btn-dutch-submit-custom" style="background-color: var(--primary-color); color: #121214; margin-top: 10px; margin-bottom: 0;">🎯 지정 금액으로 분배 시작</button>
             </div>
         </div>
 
@@ -383,10 +384,8 @@
             <div class="dutch-row-layout">
                 <div class="dutch-user-info" id="dutch-my-info-area">
                     <span class="dutch-user-name" id="dutch-my-name-display">내 정산 정보</span>
-                    <!-- 초기 상태에는 금액 감추기 -->
                     <span class="dutch-user-price" id="dutch-my-price-display">❓ 탭해서 확인</span>
                 </div>
-                <!-- 쪼는 맛 유지를 위한 최초 확인용 스위치 액션 버튼 -->
                 <button class="mini-action-btn" id="btn-dutch-action" style="background-color: var(--primary-color); color: #fff;">👀 금액 열기</button>
             </div>
         </div>
@@ -723,11 +722,10 @@
                     const totalAmount = data.dutchTotal || 0;
                     const distributedBills = data.dutchDistributedBills || [];
                     const confirmedUsers = data.dutchConfirmedUsers || {};
-                    const peekedUsers = data.dutchPeekedUsers || {}; // 쪼는맛 오픈 상태 감지용 객체 추가
+                    const peekedUsers = data.dutchPeekedUsers || {};
                     
                     document.getElementById('dutch-total-display').innerText = totalAmount.toLocaleString();
                     
-                    // 1. 참여자용 가로 보드 로직 수정 (쪼는 맛 처리)
                     if (distributedBills && distributedBills.length > 0) {
                         const myIdx = playerIds.indexOf(myId);
                         const myBill = distributedBills[myIdx] || 0;
@@ -739,7 +737,6 @@
                         const actionBtn = document.getElementById('btn-dutch-action');
                         
                         if (!hasPeeked) {
-                            // 아직 안 깠을 때
                             document.getElementById('dutch-my-price-display').innerText = `❓ 탭해서 확인`;
                             actionBtn.innerText = `👀 금액 열기`;
                             actionBtn.style.backgroundColor = `var(--primary-color)`;
@@ -747,7 +744,6 @@
                                 update(ref(db, `rooms/${currentRoomCode}/dutchPeekedUsers`), { [myId]: true });
                             };
                         } else {
-                            // 금액을 확인했을 때 -> 바로 카카오톡 송금 연동 버튼으로 진화
                             document.getElementById('dutch-my-price-display').innerText = `${myBill.toLocaleString()}원`;
                             actionBtn.innerText = `💬 정산하기`;
                             actionBtn.style.backgroundColor = `#FEE500`;
@@ -760,7 +756,6 @@
                         document.getElementById('dutch-user-board').style.display = 'none';
                     }
 
-                    // 2. 가로형 실시간 현황 리스트 (금액 오픈 상태 실시간 마스킹 반영)
                     const statusListEl = document.getElementById('dutch-status-list');
                     statusListEl.innerHTML = '';
                     
@@ -776,11 +771,9 @@
                         
                         if(isConfirmed) allocatedSum += userBill;
                         
-                        // 정보 필드
                         const infoDiv = document.createElement('div');
                         infoDiv.className = 'score-info';
                         
-                        // 남이 열어봤는지 여부에 따라 금액 마스킹 ("???" 처리하여 실시간 긴장감 유지)
                         const displayPriceText = isPeeked ? `${userBill.toLocaleString()}원` : `🙈 확인 중...`;
                         
                         let userStatusIcon = '⏳';
@@ -790,13 +783,13 @@
                         infoDiv.innerHTML = `<span>👤 ${players[id].nickname} ${userStatusIcon}</span><span style="color:var(--accent-color);">${displayPriceText}</span>`;
                         row.appendChild(infoDiv);
                         
-                        // 스위치 관리 버튼 컴포넌트
                         const actionDiv = document.createElement('div');
                         if (isHost) {
                             actionDiv.className = 'mgmt-btn-group';
+                            // 인라인 색상을 차분한 딥네이비(#3A4A66)와 붉은 톤(#4E5561) 조합으로 매끄럽게 교체
                             actionDiv.innerHTML = `
-                                <button class="btn-mgmt-mini" style="background-color:var(--success-color); color:#121214;" onclick="changeDutchStatus('${id}', true)">확인</button>
-                                <button class="btn-mgmt-mini" style="background-color:var(--danger-color); color:white;" onclick="changeDutchStatus('${id}', false)">취소</button>
+                                <button class="btn-mgmt-mini" style="background-color:#3A4A66; color:white;" onclick="changeDutchStatus('${id}', true)">확인</button>
+                                <button class="btn-mgmt-mini" style="background-color:#4E5561; color:white;" onclick="changeDutchStatus('${id}', false)">취소</button>
                             `;
                         } else {
                             let badgeClass = 'waiting';
@@ -870,7 +863,8 @@
             warningDiv.innerText = `⚠️ 입력 합계: ${currentSum.toLocaleString()}원\n(총 술값 ${totalTarget.toLocaleString()}원과 일치해야 합니다)`;
             return false;
         } else {
-            warningDiv.style.color = 'var(--success-color)'; warningDiv.innerText = '✅ 금액 총합이 전체 술값과 일치합니다!';
+            // 안내 텍스트 컬러 스카이 블루로 전면 통일
+            warningDiv.style.color = 'var(--primary-color)'; warningDiv.innerText = '🔹 금액 총합이 전체 술값과 일치합니다!';
             return true;
         }
     }
@@ -887,7 +881,6 @@
                 finalResults.push(amount); remaining -= amount;
             }
             finalResults.push(remaining); finalResults.sort(() => Math.random() - 0.5);
-            // 분배 시점에는 peekedUsers(오픈여부)와 confirmedUsers(완납여부)를 모두 밀어버림
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 dutchTotal: total, 
                 dutchDistributedBills: finalResults, 
@@ -917,7 +910,7 @@
     }
     function clearCanvas() { ctx.fillStyle = '#151518'; ctx.fillRect(0, 0, canvas.width, canvas.height); userDrawingPoints = []; }
     canvas.addEventListener('mousedown', (e) => { isDrawing = true; ctx.beginPath(); const c = getCanvasCoordinates(e); ctx.moveTo(c.x, c.y); ctx.strokeStyle = '#5C9EFF'; ctx.lineWidth = 5; userDrawingPoints.push(c); });
-    canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); stroke(); userDrawingPoints.push(c); });
+    canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); });
     canvas.addEventListener('mouseup', () => isDrawing = false);
 
     document.getElementById('btn-submit-score').addEventListener('click', () => {
