@@ -211,7 +211,7 @@
         
         .mgmt-btn-group { display: flex; gap: 4px; }
         .btn-mgmt-mini { width: auto; padding: 5px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; margin-bottom: 0; border: none; cursor: pointer; }
-
+        
         .roulette-slots { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 15px 0; }
         .roulette-slot { width: 44px; height: 44px; border-radius: 50%; background: #252529; border: 2px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; }
         .roulette-slot.passed { background: var(--success-bg); border-color: var(--success-color); }
@@ -258,7 +258,7 @@
             <button class="tab-btn" id="tab-balance" onclick="selectGameMode('balance')">⚖️ 밸런스</button>
             <button class="tab-btn" id="tab-timing" onclick="selectGameMode('timing')">⏱️ 타이밍</button>
             <button class="tab-btn" id="tab-roulette" onclick="selectGameMode('roulette')">🔫 러시안룰렛</button>
-            <button class="tab-btn" id="tab-speedfinger" onclick="selectGameMode('speedfinger')">👆 스피드 손가락</button>
+            <button class="tab-btn" id="tab-speedfinger" onclick="selectGameMode('speedfinger')">👆 빠른손가락</button>
             <button class="tab-btn" id="tab-dutch" onclick="selectGameMode('dutch')">🍺 몰아주기</button>
         </div>
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
@@ -267,7 +267,6 @@
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
     </div>
 
-    <!-- 🤫 라이어 게임 스크린 -->
     <div id="game-liar-screen" class="screen">
         <h2>🤫 라이어 게임</h2>
         <h3>당신의 정체는?</h3>
@@ -275,7 +274,6 @@
         <button id="btn-back-lobby-liar" class="secondary btn-back-lobby">대기실로 돌아가기</button>
     </div>
 
-    <!-- 📐 도형그리기 게임 스크린 -->
     <div id="game-draw-screen" class="screen">
         <h2>📐 도형 정확히 그리기</h2>
         <p id="target-shape-text" style="color: var(--accent-color); font-weight: bold; font-size: 18px;">목표 도형: 불러오는 중...</p>
@@ -293,7 +291,6 @@
         <button id="btn-back-lobby-draw" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
-    <!-- 💣 폭탄돌리기 게임 스크린 -->
     <div id="game-bomb-screen" class="screen">
         <h2>💣 폭탄 돌리기</h2>
         <div id="bomb-icon" class="bomb-display">💣</div>
@@ -305,7 +302,6 @@
         <button id="btn-back-lobby-bomb" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
-    <!-- ⚡ 초성대결 게임 스크린 -->
     <div id="game-speed-screen" class="screen">
         <h2>⚡ 실시간 초성 대결</h2>
         <div class="quiz-container" style="border-color: var(--primary-color); background: #1a1a1e;">
@@ -322,7 +318,6 @@
         <button id="btn-back-lobby-speed" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
-    <!-- ⚖️ 밸런스 게임 스크린 -->
     <div id="game-balance-screen" class="screen">
         <h2>⚖️ 밸런스 게임 (소수결)</h2>
         <div class="quiz-container" style="border-color: var(--accent-color); background: #1e1e24; margin-bottom: 10px;">
@@ -348,7 +343,6 @@
         <button id="btn-back-lobby-balance" class="secondary btn-back-lobby" style="margin-top: 10px;">대기실로 돌아가기</button>
     </div>
 
-    <!-- ⏱️ Up & Down 타이밍 게임 스크린 -->
     <div id="game-timing-screen" class="screen">
         <h2>⏱️ Up & Down 타이밍</h2>
         <div class="quiz-container" style="border-color: var(--success-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px;">
@@ -387,11 +381,9 @@
         <button id="btn-back-lobby-speedfinger" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
-    <!-- 🍺 술값 아찔하게 몰아주기 게임 스크린 -->
     <div id="game-dutch-screen" class="screen">
         <h2>🍺 술값 아찔하게 몰아주기</h2>
         
-        <!-- 총무 세팅 패널 카드 -->
         <div id="dutch-host-panel" class="quiz-container" style="border-color: var(--accent-color); background: #1e1e24; display: none; text-align: left;">
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 10px; font-weight: bold;">👑 총무 방장 전용: 술값 세팅 파트</div>
             <div class="input-wrapper">
@@ -413,7 +405,6 @@
             </div>
         </div>
 
-        <!-- 📱 일반 참여자용 콤팩트 가로 배정판 (본인 전용 쪼는맛 스위치형 버튼) -->
         <div id="dutch-user-board" class="dutch-user-panel" style="display: none;">
             <div class="dutch-row-layout">
                 <div class="dutch-user-info" id="dutch-my-info-area">
@@ -424,7 +415,6 @@
             </div>
         </div>
 
-        <!-- 공통 정산 요약 알림 판 -->
         <div class="quiz-container" style="border-color: var(--primary-color); background: #161c24; padding: 12px; margin-bottom: 12px;">
             <div style="font-size: 13px; color: #8E9AA8;">💵 분배 완료 금액 / 총 술값</div>
             <div style="font-size: 26px; font-weight: bold; color: var(--primary-color);">
@@ -432,7 +422,6 @@
             </div>
         </div>
 
-        <!-- 📊 실시간 현황 리스트 -->
         <div class="score-board" id="dutch-status-board">
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 실시간 술값 정산 현황</div>
             <div id="dutch-status-list">대기 중...</div>
@@ -551,11 +540,9 @@
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
     let currentAnswer = 0, isPenaltyActive = false, localBombActive = false;
 
-    // ===== ⏱️ 타이밍 게임 동기화 변수 추가 =====
     const timingCanvas = document.getElementById('timing-canvas');
     const timingCtx = timingCanvas.getContext('2d');
     let timingAnimId = null, timingActiveRoundKey = null, timingLastData = null;
-    let localTimingStartTime = null; 
     let speedFingerRoundKey = null, speedFingerSignalTimer = null;
     let rouletteLastData = null;
 
@@ -578,9 +565,9 @@
         timingCtx.beginPath(); timingCtx.moveTo(barX, 0); timingCtx.lineTo(barX, h); timingCtx.stroke();
     }
 
-    function startTimingLoop(localStartTime, target) {
+    function startTimingLoop(startTime, target) {
         function loop() {
-            const elapsed = Date.now() - localStartTime;
+            const elapsed = Date.now() - startTime;
             drawTimingBar(timingValueAt(elapsed), target, false);
             timingAnimId = requestAnimationFrame(loop);
         }
@@ -592,11 +579,17 @@
     }
 
     document.getElementById('btn-stop-timing').addEventListener('click', () => {
-        if (!timingLastData || !localTimingStartTime) return;
+        if (!timingLastData || !timingLastData.startTime) return;
+        
+        // [수정] 사용자가 STOP을 누른 즉시 시간을 동기적으로 먼저 캡처합니다 (네트워크 딜레이 제거)
+        const clickTime = Date.now(); 
+        
         const path = `rooms/${currentRoomCode}/timingResults/${myId}`;
         get(ref(db, path)).then((snap) => {
             if (snap.exists()) return;
-            const elapsed = Date.now() - localTimingStartTime;
+            
+            // [수정] 위에서 즉시 캡처해둔 clickTime을 적용하여 오차를 완벽하게 연산합니다.
+            const elapsed = clickTime - timingLastData.startTime;
             const value = Math.round(timingValueAt(elapsed) * 100) / 100;
             const error = Math.round(Math.abs(value - timingLastData.target) * 100) / 100;
             update(ref(db, path), { value, error });
@@ -608,19 +601,17 @@
         const rData = rouletteLastData;
         const slotCount = rData.slotCount;
         const chamberPos = rData.chamberPos;
-        
-        // 마지막 슬롯 안전장치 추가: 끝장 도달 시 무조건 당첨 처리
-        const isHit = (chamberPos === rData.bulletChamber) || (chamberPos >= slotCount - 1);
+        const isHit = (chamberPos === rData.bulletChamber);
         const nextTurnIdx = (rData.turnIdx + 1) % rData.turnOrder.length;
         const updates = {};
         if (isHit) {
             const consecutive = (rData.lastHitId === myId) ? (rData.consecutiveHits || 1) + 1 : 1;
-            const currentNickname = rouletteLastData.currentNickname || '나';
+            const myNickname = players[myId]?.nickname || '나';
             updates[`rooms/${currentRoomCode}/rouletteLastHitId`] = myId;
             updates[`rooms/${currentRoomCode}/rouletteConsecutiveHits`] = consecutive;
             updates[`rooms/${currentRoomCode}/rouletteResultText`] = consecutive > 1
-                ? `💥 ${currentNickname}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺`
-                : `💥 ${currentNickname}님 총알 명중! 한 잔 마시기 🍺`;
+                ? `💥 ${myNickname}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺`
+                : `💥 ${myNickname}님 총알 명중! 한 잔 마시기 🍺`;
             updates[`rooms/${currentRoomCode}/rouletteBulletChamber`] = Math.floor(Math.random() * slotCount);
             updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = 0;
             updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
@@ -756,12 +747,13 @@
         document.getElementById('display-room-code').innerText = roomCode;
         onValue(ref(db, `rooms/${roomCode}`), (snapshot) => {
             const data = snapshot.val(); if(!data) return;
-            
-            // 방장 상태 강제 동기화 (새로고침 및 실시간 갱신 누락 방지)
-            if (data.hostId) { isHost = (data.hostId === myId); }
-            
             const players = data.players || {}; const playerIds = Object.keys(players);
             document.getElementById('player-count').innerText = playerIds.length;
+
+            // [수정] 방이 로드되거나 새로고침될 때, Firebase 데이터를 기준으로 방장 권한을 실시간 동기화합니다.
+            if (players[myId]) {
+                isHost = players[myId].isHost || false;
+            }
 
             if (data.selectedGame) updateTabUI(data.selectedGame);
 
@@ -874,12 +866,10 @@
                     const results = data.timingResults || {};
                     const myResult = results[myId];
 
-                    // 네트워크 오차 제거를 위해 로컬 화면 인지 시점을 기준으로 타이머 시작
                     if (timingActiveRoundKey !== data.timingStartTime) {
                         timingActiveRoundKey = data.timingStartTime;
-                        localTimingStartTime = Date.now();
                         stopTimingLoop();
-                        if (!myResult) startTimingLoop(localTimingStartTime, target);
+                        if (!myResult) startTimingLoop(data.timingStartTime, target);
                     }
                     if (myResult) { stopTimingLoop(); drawTimingBar(myResult.value, target, true); }
 
@@ -904,9 +894,8 @@
                     const turnIdx = data.rouletteTurnIdx || 0;
                     const currentPid = turnOrder[turnIdx];
                     const isMyTurn = currentPid === myId;
-                    const currentNickname = players[currentPid]?.nickname || '참가자';
 
-                    rouletteLastData = { slotCount, turnOrder, turnIdx, chamberPos, bulletChamber: data.rouletteBulletChamber, lastHitId: data.rouletteLastHitId, consecutiveHits: data.rouletteConsecutiveHits, isMyTurn, currentNickname };
+                    rouletteLastData = { slotCount, turnOrder, turnIdx, chamberPos, bulletChamber: data.rouletteBulletChamber, lastHitId: data.rouletteLastHitId, consecutiveHits: data.rouletteConsecutiveHits, isMyTurn };
 
                     const slotsEl = document.getElementById('rouletteSlots');
                     slotsEl.innerHTML = '';
@@ -919,7 +908,7 @@
 
                     document.getElementById('rouletteTurnText').innerHTML = isMyTurn
                         ? '🎯 당신의 차례입니다! 방아쇠를 당기세요!'
-                        : `⏳ <strong>${currentNickname}</strong>님의 차례를 기다려주세요...`;
+                        : `⏳ <strong>${players[currentPid]?.nickname || '참가자'}</strong>님의 차례를 기다려주세요...`;
 
                     document.getElementById('btn-roulette-pull').disabled = !isMyTurn;
 
@@ -1083,7 +1072,7 @@
             }
             if(data.status === 'waiting') { 
                 showScreen('lobby-screen'); clearCanvas(); 
-                stopTimingLoop(); timingActiveRoundKey = null; localTimingStartTime = null;
+                stopTimingLoop(); timingActiveRoundKey = null;
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
@@ -1367,42 +1356,9 @@
                     rouletteChamberPos: 0, rouletteBulletChamber: Math.floor(Math.random() * slotCount),
                     rouletteLastHitId: null, rouletteConsecutiveHits: 0, rouletteResultText: null
                 });
-            } else if (selectedGame === 'speedfinger') {
-                const delay = 2000 + Math.floor(Math.random() * 3000); 
-                const signalTime = Date.now() + delay;
-                const targetSpot = Math.floor(Math.random() * 6); 
-                update(rRef, { status: 'playing', speedSignalTime: signalTime, speedTargetSpot: targetSpot, speedFingerResults: null, speedFalseStarts: null });
-            } else if (selectedGame === 'dutch') {
-                update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
             }
         });
     });
-
-    document.querySelectorAll('.btn-back-lobby').forEach(btn => {
-        btn.addEventListener('click', () => {
-            update(ref(db, `rooms/${currentRoomCode}`), { 
-                status: 'waiting', word: '', drawScores: null, drawImages: null, bombExploded: false, speedAnswers: null, speedLoserId: null, balanceVotes: null, balanceRevealed: false,
-                dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null,
-                timingTarget: null, timingStartTime: null, timingResults: null,
-                rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
-                speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null
-            });
-        });
-    });
-</script>
-
-<script>
-    document.addEventListener('contextmenu', (e) => e.preventDefault());
-    document.addEventListener('keydown', (e) => {
-        if (
-            e.key === 'F12' ||
-            (e.ctrlKey && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) ||
-            (e.ctrlKey && ['U', 'u', 'S', 's'].includes(e.key))
-        ) {
-            e.preventDefault();
-        }
-    });
-    document.addEventListener('selectstart', (e) => e.preventDefault());
 </script>
 </body>
 </html>
