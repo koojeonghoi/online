@@ -1375,33 +1375,34 @@
         revealBtn.disabled = true;
         try {
             await update(ref(db, `rooms/${currentRoomCode}`), { balanceRevealed: true });
-        } catch (e) {
-            console.error('balance reveal update failed:', e);
-            revealBtn.disabled = false;
-            return;
-        }
-        // Directly render the reveal result for the host to ensure immediate feedback,
-        // independent of onValue callback timing.
-        try {
+            // Directly render the reveal result for the host to ensure immediate feedback,
+            // independent of onValue callback timing.
             const snap = await get(ref(db, `rooms/${currentRoomCode}`));
-            const d = snap.val(); if (!d) return;
+            const d = snap.val();
+            if (!d) return;
             const votes = d.balanceVotes || {};
-            const pObj = d.players || {}; const pIds = Object.keys(pObj);
-            document.getElementById('btn-balance-a').disabled = true; document.getElementById('btn-balance-b').disabled = true;
-            document.getElementById('count-option-a').style.display = 'inline'; document.getElementById('count-option-b').style.display = 'inline';
+            const pObj = d.players || {};
+            const pIds = Object.keys(pObj);
+            document.getElementById('btn-balance-a').disabled = true;
+            document.getElementById('btn-balance-b').disabled = true;
+            document.getElementById('count-option-a').style.display = 'inline';
+            document.getElementById('count-option-b').style.display = 'inline';
             document.getElementById('balance-result-box').style.display = 'block';
             let cA = 0, cB = 0;
             Object.values(votes).forEach(v => { if (v === 'A') cA++; if (v === 'B') cB++; });
             const tot = Object.keys(votes).length || 1;
-            document.getElementById('gauge-a').style.width = `${(cA/tot)*100}%`; document.getElementById('gauge-b').style.width = `${(cB/tot)*100}%`;
-            document.getElementById('count-option-a').innerText = `${cA}명`; document.getElementById('count-option-b').innerText = `${cB}명`;
+            document.getElementById('gauge-a').style.width = `${(cA/tot)*100}%`;
+            document.getElementById('gauge-b').style.width = `${(cB/tot)*100}%`;
+            document.getElementById('count-option-a').innerText = `${cA}명`;
+            document.getElementById('count-option-b').innerText = `${cB}명`;
             const minor = cA < cB ? 'A' : (cB < cA ? 'B' : '');
             const wl = [];
             pIds.forEach(id => { if (minor && votes[id] === minor) wl.push(`🟢 ${(pObj[id] || {}).nickname || id}`); });
             document.getElementById('balance-winners-list').innerHTML = wl.length > 0 ? wl.join('<br>') : '동점! 생존자가 없습니다.';
             revealBtn.style.display = 'none';
-        } catch (e2) {
-            console.error('balance reveal render failed:', e2);
+        } catch (e) {
+            console.error('balance reveal failed:', e);
+            revealBtn.disabled = false;
         }
     });
 
