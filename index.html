@@ -554,7 +554,7 @@
     const canvas = document.getElementById('drawing-canvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
-    let currentAnswer = 0, isPenaltyActive = false, lastBombExplodeAt = null;
+    let currentAnswer = 0, isPenaltyActive = false, lastBombQuizKey = null;
     let serverTimeOffset = 0;
     let bombExplosionAttemptKey = null;
 
@@ -867,7 +867,7 @@
                         document.getElementById('quiz-box').style.display = 'none'; triggerExplosionEffect();
                     } else {
                         bombIcon.innerText = "💣";
-                        if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; if (lastBombExplodeAt !== data.bombExplodeAt) { lastBombExplodeAt = data.bombExplodeAt; generateQuiz(); } } 
+                        if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; const quizKey = `${data.bombHolderId}_${data.bombExplodeAt}`; if (lastBombQuizKey !== quizKey) { lastBombQuizKey = quizKey; generateQuiz(); } } 
                         else { statusTextEl.innerHTML = `👤 폭탄 소지자: ${holderNick}`; document.getElementById('quiz-box').style.display = 'none'; }
                     }
                 }
@@ -922,6 +922,7 @@
                         document.getElementById('balance-result-box').style.display = 'none';
                     }
                     document.getElementById('btn-reveal-balance').style.display = (isHost && !isBalanceRevealed) ? 'block' : 'none';
+                    if (!isBalanceRevealed) document.getElementById('btn-reveal-balance').disabled = false;
                 }
                 else if (data.selectedGame === 'timing') {
                     showScreen('game-timing-screen');
@@ -1419,9 +1420,7 @@
                     get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
                         const pIds = Object.keys(snap.val().players || {});
                         update(ref(db, `rooms/${currentRoomCode}/`), {
-                            bombHolderId: pIds[(pIds.indexOf(myId) + 1) % pIds.length],
-                            bombExplodeAt: getServerNow() + 15000,
-                            bombExploded: false
+                            bombHolderId: pIds[(pIds.indexOf(myId) + 1) % pIds.length]
                         });
                     });
                 } else {
@@ -1457,11 +1456,12 @@
                 const shapeIdx = pickRandomShapeIndex();
                 update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
             } else if (selectedGame === 'bomb') {
+                const randomFuseMs = 10000 + Math.floor(Math.random() * 10000); // 10~20초 랜덤
                 update(rRef, {
                     status: 'playing',
                     bombHolderId: pIds[Math.floor(Math.random()*pIds.length)],
                     bombExploded: false,
-                    bombExplodeAt: getServerNow() + 15000
+                    bombExplodeAt: getServerNow() + randomFuseMs
                 });
             } else if (selectedGame === 'speed') {
                 const randIdx = Math.floor(Math.random() * chosungPool.length);
