@@ -19,7 +19,7 @@
             --input-bg: #252529;
             --secondary-btn: #4E5561;
             --accent-color: #FFD25C;
-            --success-color: #38E5A6; /* 촌스러운 형광 연두에서 세련된 모던 민트로 변경 */
+            --success-color: #38E5A6; 
             --success-bg: #1A2E26;
         }
 
@@ -194,7 +194,6 @@
         .balance-gauge { position: absolute; top: 0; left: 0; height: 100%; background-color: rgba(92,159,255,0.15); width: 0%; transition: width 0.5s ease-out; z-index: 1; }
         .balance-text { position: relative; z-index: 2; display: flex; justify-content: space-between; width: 100%; font-weight: bold; }
 
-        /* 🍺 술값 몰아주기 전용 슬림 가로형 UI 스타일 */
         .dutch-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 16px; background: #151518; padding: 4px; border-radius: 8px; }
         .dutch-mode-btn { padding: 8px 5px; font-size: 13px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #8E9AA8; transition: all 0.2s; }
         .dutch-mode-btn.active { background-color: var(--secondary-btn); color: white; }
@@ -203,7 +202,6 @@
         .custom-amount-row .input-wrapper { margin-bottom: 0; flex: 1; }
         .custom-amount-row input { padding: 8px 35px 8px 8px; font-size: 14px; }
         
-        /* 참여자용 심플 가로 버튼 셋 */
         .dutch-user-panel { background: #1E1E24; border: 2px dashed var(--accent-color); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
         .dutch-row-layout { display: flex; align-items: center; justify-content: space-between; background: #151518; padding: 10px 14px; border-radius: 8px; border: 1px solid #3A3A42; }
         .dutch-user-info { display: flex; flex-direction: column; text-align: left; gap: 2px; flex: 1; }
@@ -213,7 +211,7 @@
         
         .mgmt-btn-group { display: flex; gap: 4px; }
         .btn-mgmt-mini { width: auto; padding: 5px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; margin-bottom: 0; border: none; cursor: pointer; }
-        /* 🔫 러시안룰렛 슬롯 */
+
         .roulette-slots { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 15px 0; }
         .roulette-slot { width: 44px; height: 44px; border-radius: 50%; background: #252529; border: 2px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; }
         .roulette-slot.passed { background: var(--success-bg); border-color: var(--success-color); }
@@ -221,7 +219,6 @@
         @keyframes pulseSlot { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
         #rouletteResultText { display: none; font-size: 16px; font-weight: bold; color: var(--danger-color); background: #3d1d1d; border: 2px solid var(--danger-color); border-radius: 10px; padding: 10px; margin: 10px 0; }
 
-        /* 👆 스피드 손가락 */
         .speed-target-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
         .speed-target { aspect-ratio: 1; border-radius: 14px; background: #252529; border: 3px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 30px; transition: all 0.1s; cursor: pointer; }
         .speed-target.active { background: var(--success-color); border-color: #fff; box-shadow: 0 0 20px var(--success-color); transform: scale(1.05); }
@@ -421,10 +418,8 @@
             <div class="dutch-row-layout">
                 <div class="dutch-user-info" id="dutch-my-info-area">
                     <span class="dutch-user-name" id="dutch-my-name-display">내 정산 정보</span>
-                    <!-- 초기 상태에는 금액 감추기 -->
                     <span class="dutch-user-price" id="dutch-my-price-display">❓ 탭해서 확인</span>
                 </div>
-                <!-- 쪼는 맛 유지를 위한 최초 확인용 스위치 액션 버튼 -->
                 <button class="mini-action-btn" id="btn-dutch-action" style="background-color: var(--primary-color); color: #fff;">👀 금액 열기</button>
             </div>
         </div>
@@ -556,15 +551,16 @@
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
     let currentAnswer = 0, isPenaltyActive = false, localBombActive = false;
 
-    // ===== ⏱️ Up & Down 타이밍 게임 =====
+    // ===== ⏱️ 타이밍 게임 동기화 변수 추가 =====
     const timingCanvas = document.getElementById('timing-canvas');
     const timingCtx = timingCanvas.getContext('2d');
     let timingAnimId = null, timingActiveRoundKey = null, timingLastData = null;
+    let localTimingStartTime = null; 
     let speedFingerRoundKey = null, speedFingerSignalTimer = null;
     let rouletteLastData = null;
 
     function timingValueAt(elapsedMs) {
-        const half = 1000; // 1초 동안 0→10, 1초 동안 10→0 (총 2초 왕복)
+        const half = 1000; 
         const t = elapsedMs % (half * 2);
         return t <= half ? (t / half) * 10 : 10 - ((t - half) / half) * 10;
     }
@@ -582,9 +578,9 @@
         timingCtx.beginPath(); timingCtx.moveTo(barX, 0); timingCtx.lineTo(barX, h); timingCtx.stroke();
     }
 
-    function startTimingLoop(startTime, target) {
+    function startTimingLoop(localStartTime, target) {
         function loop() {
-            const elapsed = Date.now() - startTime;
+            const elapsed = Date.now() - localStartTime;
             drawTimingBar(timingValueAt(elapsed), target, false);
             timingAnimId = requestAnimationFrame(loop);
         }
@@ -596,11 +592,11 @@
     }
 
     document.getElementById('btn-stop-timing').addEventListener('click', () => {
-        if (!timingLastData || !timingLastData.startTime) return;
+        if (!timingLastData || !localTimingStartTime) return;
         const path = `rooms/${currentRoomCode}/timingResults/${myId}`;
         get(ref(db, path)).then((snap) => {
             if (snap.exists()) return;
-            const elapsed = Date.now() - timingLastData.startTime;
+            const elapsed = Date.now() - localTimingStartTime;
             const value = Math.round(timingValueAt(elapsed) * 100) / 100;
             const error = Math.round(Math.abs(value - timingLastData.target) * 100) / 100;
             update(ref(db, path), { value, error });
@@ -612,17 +608,19 @@
         const rData = rouletteLastData;
         const slotCount = rData.slotCount;
         const chamberPos = rData.chamberPos;
-        const isHit = (chamberPos === rData.bulletChamber);
+        
+        // 마지막 슬롯 안전장치 추가: 끝장 도달 시 무조건 당첨 처리
+        const isHit = (chamberPos === rData.bulletChamber) || (chamberPos >= slotCount - 1);
         const nextTurnIdx = (rData.turnIdx + 1) % rData.turnOrder.length;
         const updates = {};
         if (isHit) {
             const consecutive = (rData.lastHitId === myId) ? (rData.consecutiveHits || 1) + 1 : 1;
-            const myNickname = players[myId]?.nickname || '나';
+            const currentNickname = rouletteLastData.currentNickname || '나';
             updates[`rooms/${currentRoomCode}/rouletteLastHitId`] = myId;
             updates[`rooms/${currentRoomCode}/rouletteConsecutiveHits`] = consecutive;
             updates[`rooms/${currentRoomCode}/rouletteResultText`] = consecutive > 1
-                ? `💥 ${myNickname}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺`
-                : `💥 ${myNickname}님 총알 명중! 한 잔 마시기 🍺`;
+                ? `💥 ${currentNickname}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺`
+                : `💥 ${currentNickname}님 총알 명중! 한 잔 마시기 🍺`;
             updates[`rooms/${currentRoomCode}/rouletteBulletChamber`] = Math.floor(Math.random() * slotCount);
             updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = 0;
             updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
@@ -631,7 +629,7 @@
             updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = chamberPos + 1;
             updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
         }
-        rouletteLastData.isMyTurn = false; // 응답 대기 중 중복 클릭 방지
+        rouletteLastData.isMyTurn = false; 
         document.getElementById('btn-roulette-pull').disabled = true;
         if (navigator.vibrate) navigator.vibrate(isHit ? [200, 80, 200] : 40);
         update(ref(db), updates);
@@ -648,7 +646,6 @@
                 return;
             }
             if (spotIndex !== rData.speedTargetSpot) {
-                // 틀린 곳을 눌렀을 때 - 잠깐 빨갛게 표시만 하고 제출은 안 함 (다시 시도 가능)
                 const gridEl = document.getElementById('speedFingerTargets');
                 const wrongEl = gridEl?.children[spotIndex];
                 if (wrongEl && !wrongEl.classList.contains('active')) {
@@ -661,7 +658,6 @@
             set(ref(db, `rooms/${currentRoomCode}/speedFingerResults/${myId}`), reaction);
         });
     }
-
 
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('join-mode-box').style.display = 'block';
@@ -760,6 +756,10 @@
         document.getElementById('display-room-code').innerText = roomCode;
         onValue(ref(db, `rooms/${roomCode}`), (snapshot) => {
             const data = snapshot.val(); if(!data) return;
+            
+            // 방장 상태 강제 동기화 (새로고침 및 실시간 갱신 누락 방지)
+            if (data.hostId) { isHost = (data.hostId === myId); }
+            
             const players = data.players || {}; const playerIds = Object.keys(players);
             document.getElementById('player-count').innerText = playerIds.length;
 
@@ -874,10 +874,12 @@
                     const results = data.timingResults || {};
                     const myResult = results[myId];
 
+                    // 네트워크 오차 제거를 위해 로컬 화면 인지 시점을 기준으로 타이머 시작
                     if (timingActiveRoundKey !== data.timingStartTime) {
                         timingActiveRoundKey = data.timingStartTime;
+                        localTimingStartTime = Date.now();
                         stopTimingLoop();
-                        if (!myResult) startTimingLoop(data.timingStartTime, target);
+                        if (!myResult) startTimingLoop(localTimingStartTime, target);
                     }
                     if (myResult) { stopTimingLoop(); drawTimingBar(myResult.value, target, true); }
 
@@ -902,8 +904,9 @@
                     const turnIdx = data.rouletteTurnIdx || 0;
                     const currentPid = turnOrder[turnIdx];
                     const isMyTurn = currentPid === myId;
+                    const currentNickname = players[currentPid]?.nickname || '참가자';
 
-                    rouletteLastData = { slotCount, turnOrder, turnIdx, chamberPos, bulletChamber: data.rouletteBulletChamber, lastHitId: data.rouletteLastHitId, consecutiveHits: data.rouletteConsecutiveHits, isMyTurn };
+                    rouletteLastData = { slotCount, turnOrder, turnIdx, chamberPos, bulletChamber: data.rouletteBulletChamber, lastHitId: data.rouletteLastHitId, consecutiveHits: data.rouletteConsecutiveHits, isMyTurn, currentNickname };
 
                     const slotsEl = document.getElementById('rouletteSlots');
                     slotsEl.innerHTML = '';
@@ -916,7 +919,7 @@
 
                     document.getElementById('rouletteTurnText').innerHTML = isMyTurn
                         ? '🎯 당신의 차례입니다! 방아쇠를 당기세요!'
-                        : `⏳ <strong>${players[currentPid]?.nickname || '참가자'}</strong>님의 차례를 기다려주세요...`;
+                        : `⏳ <strong>${currentNickname}</strong>님의 차례를 기다려주세요...`;
 
                     document.getElementById('btn-roulette-pull').disabled = !isMyTurn;
 
@@ -930,8 +933,6 @@
                     const targetSpot = data.speedTargetSpot ?? 0;
                     const results = data.speedFingerResults || {};
                     const falseStarts = data.speedFalseStarts || {};
-                    const myFalse = falseStarts[myId];
-                    const myResult = results[myId];
                     const now = Date.now();
                     const SPOT_COUNT = 6;
 
@@ -996,11 +997,10 @@
                     const totalAmount = data.dutchTotal || 0;
                     const distributedBills = data.dutchDistributedBills || [];
                     const confirmedUsers = data.dutchConfirmedUsers || {};
-                    const peekedUsers = data.dutchPeekedUsers || {}; // 쪼는맛 오픈 상태 감지용 객체 추가
+                    const peekedUsers = data.dutchPeekedUsers || {}; 
                     
                     document.getElementById('dutch-total-display').innerText = totalAmount.toLocaleString();
                     
-                    // 1. 참여자용 가로 보드 로직 수정 (쪼는 맛 처리)
                     if (distributedBills && distributedBills.length > 0) {
                         const myIdx = playerIds.indexOf(myId);
                         const myBill = distributedBills[myIdx] || 0;
@@ -1012,7 +1012,6 @@
                         const actionBtn = document.getElementById('btn-dutch-action');
                         
                         if (!hasPeeked) {
-                            // 아직 안 깠을 때
                             document.getElementById('dutch-my-price-display').innerText = `❓ 탭해서 확인`;
                             actionBtn.innerText = `👀 금액 열기`;
                             actionBtn.style.backgroundColor = `var(--primary-color)`;
@@ -1020,7 +1019,6 @@
                                 update(ref(db, `rooms/${currentRoomCode}/dutchPeekedUsers`), { [myId]: true });
                             };
                         } else {
-                            // 금액을 확인했을 때 -> 바로 카카오톡 송금 연동 버튼으로 진화
                             document.getElementById('dutch-my-price-display').innerText = `${myBill.toLocaleString()}원`;
                             actionBtn.innerText = `💬 정산하기`;
                             actionBtn.style.backgroundColor = `#FEE500`;
@@ -1033,7 +1031,6 @@
                         document.getElementById('dutch-user-board').style.display = 'none';
                     }
 
-                    // 2. 가로형 실시간 현황 리스트 (금액 오픈 상태 실시간 마스킹 반영)
                     const statusListEl = document.getElementById('dutch-status-list');
                     statusListEl.innerHTML = '';
                     
@@ -1049,11 +1046,9 @@
                         
                         if(isConfirmed) allocatedSum += userBill;
                         
-                        // 정보 필드
                         const infoDiv = document.createElement('div');
                         infoDiv.className = 'score-info';
                         
-                        // 남이 열어봤는지 여부에 따라 금액 마스킹 ("???" 처리하여 실시간 긴장감 유지)
                         const displayPriceText = isPeeked ? `${userBill.toLocaleString()}원` : `🙈 확인 중...`;
                         
                         let userStatusIcon = '⏳';
@@ -1063,7 +1058,6 @@
                         infoDiv.innerHTML = `<span>👤 ${players[id].nickname} ${userStatusIcon}</span><span style="color:var(--accent-color);">${displayPriceText}</span>`;
                         row.appendChild(infoDiv);
                         
-                        // 스위치 관리 버튼 컴포넌트
                         const actionDiv = document.createElement('div');
                         if (isHost) {
                             actionDiv.className = 'mgmt-btn-group';
@@ -1089,7 +1083,7 @@
             }
             if(data.status === 'waiting') { 
                 showScreen('lobby-screen'); clearCanvas(); 
-                stopTimingLoop(); timingActiveRoundKey = null;
+                stopTimingLoop(); timingActiveRoundKey = null; localTimingStartTime = null;
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
@@ -1162,7 +1156,6 @@
                 finalResults.push(amount); remaining -= amount;
             }
             finalResults.push(remaining); finalResults.sort(() => Math.random() - 0.5);
-            // 분배 시점에는 peekedUsers(오픈여부)와 confirmedUsers(완납여부)를 모두 밀어버림
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 dutchTotal: total, 
                 dutchDistributedBills: finalResults, 
@@ -1198,9 +1191,7 @@
     canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); }, { passive: false });
     canvas.addEventListener('touchend', (e) => { e.preventDefault(); isDrawing = false; });
 
-    // ===== 도형 채점 로직 (Chamfer Distance 기반 유사도 채점) =====
     function sampleEdgePoints(vertices, total) {
-        // 폐곡선 끝점이 시작점과 겹치면 제거 (중복 변 방지)
         let verts = vertices.slice();
         if (verts.length > 1) {
             const first = verts[0], last = verts[verts.length - 1];
@@ -1267,7 +1258,7 @@
 
         let finalScore;
         if (drawnSize < 15) {
-            finalScore = 5; // 너무 작게 그린 경우
+            finalScore = 5; 
         } else {
             const templatePoints = generateShapeTemplatePoints(currentShapeIndex);
             const densifiedUser = densifyUserPoints(userDrawingPoints, 3);
@@ -1282,7 +1273,6 @@
         update(ref(db), { [`rooms/${currentRoomCode}/drawScores/${myId}`]: finalScore, [`rooms/${currentRoomCode}/drawImages/${myId}`]: thumb.toDataURL('image/jpeg', 0.5) });
     });
 
-    // 입력된 문자열에서 초성만 추출 (예: "가방" -> "ㄱㅂ")
     function getChosung(str) {
         const CHO = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
         let result = '';
@@ -1368,7 +1358,7 @@
             } else if (selectedGame === 'balance') {
                 update(rRef, { status: 'playing', balanceIndex: Math.floor(Math.random() * balancePool.length), balanceVotes: null, balanceRevealed: false });
             } else if (selectedGame === 'timing') {
-                const target = Math.round(Math.random() * 1000) / 100; // 0.00 ~ 10.00
+                const target = Math.round(Math.random() * 1000) / 100; 
                 update(rRef, { status: 'playing', timingTarget: target, timingStartTime: Date.now(), timingResults: null });
             } else if (selectedGame === 'roulette') {
                 const slotCount = 6;
@@ -1378,9 +1368,9 @@
                     rouletteLastHitId: null, rouletteConsecutiveHits: 0, rouletteResultText: null
                 });
             } else if (selectedGame === 'speedfinger') {
-                const delay = 2000 + Math.floor(Math.random() * 3000); // 2~5초 랜덤 대기 (부정 출발 방지)
+                const delay = 2000 + Math.floor(Math.random() * 3000); 
                 const signalTime = Date.now() + delay;
-                const targetSpot = Math.floor(Math.random() * 6); // 6칸 중 랜덤 위치
+                const targetSpot = Math.floor(Math.random() * 6); 
                 update(rRef, { status: 'playing', speedSignalTime: signalTime, speedTargetSpot: targetSpot, speedFingerResults: null, speedFalseStarts: null });
             } else if (selectedGame === 'dutch') {
                 update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
@@ -1401,12 +1391,8 @@
     });
 </script>
 
-<!-- ===== 소스 접근 방지용 (완전 차단은 아니고 일반 사용자의 접근을 어렵게 만드는 수준) ===== -->
 <script>
-    // 우클릭 메뉴 차단
     document.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    // 주요 단축키 차단: F12, Ctrl+Shift+I/J/C, Ctrl+U(소스보기), Ctrl+S(저장)
     document.addEventListener('keydown', (e) => {
         if (
             e.key === 'F12' ||
@@ -1416,8 +1402,6 @@
             e.preventDefault();
         }
     });
-
-    // 텍스트 드래그 선택 방지 (원하지 않으면 이 블록은 지워도 됩니다)
     document.addEventListener('selectstart', (e) => e.preventDefault());
 </script>
 </body>
