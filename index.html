@@ -590,7 +590,8 @@
             if (!roomData.bombExplodeAt || getServerNow() < roomData.bombExplodeAt) return undefined;
             roomData.bombExploded = true;
             return roomData;
-        }).catch(() => {
+        }).catch((error) => {
+            console.error('bomb explosion transaction failed:', error);
             bombExplosionAttemptKey = null;
         });
     }
@@ -683,7 +684,8 @@
         const roulettePullBtn = document.getElementById('btn-roulette-pull');
         roulettePullBtn.disabled = true;
         if (navigator.vibrate) navigator.vibrate(isHit ? [200, 80, 200] : 40);
-        update(ref(db), updates).catch(() => {
+        update(ref(db), updates).catch((error) => {
+            console.error('roulette pull update failed:', error);
             if (wasMyTurn) {
                 rouletteLastData.isMyTurn = true;
                 roulettePullBtn.disabled = false;
@@ -1378,6 +1380,7 @@
         try {
             await update(ref(db, `rooms/${currentRoomCode}`), { balanceRevealed: true });
         } catch (e) {
+            console.error('balance reveal update failed:', e);
             balanceRevealPending = false;
         } finally {
             revealBtn.disabled = false;
