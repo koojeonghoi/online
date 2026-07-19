@@ -222,9 +222,10 @@
         #rouletteResultText { display: none; font-size: 16px; font-weight: bold; color: var(--danger-color); background: #3d1d1d; border: 2px solid var(--danger-color); border-radius: 10px; padding: 10px; margin: 10px 0; }
 
         /* 👆 스피드 손가락 */
-        .speed-light { width: 140px; height: 140px; border-radius: 50%; margin: 20px auto; display: flex; align-items: center; justify-content: center; font-size: 44px; transition: background-color 0.15s; border: 4px solid #3a3a40; }
-        .speed-light.off { background: #252529; }
-        .speed-light.on { background: var(--success-color); box-shadow: 0 0 30px var(--success-color); }
+        .speed-target-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
+        .speed-target { aspect-ratio: 1; border-radius: 14px; background: #252529; border: 3px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 30px; transition: all 0.1s; cursor: pointer; }
+        .speed-target.active { background: var(--success-color); border-color: #fff; box-shadow: 0 0 20px var(--success-color); transform: scale(1.05); }
+        .speed-target.wrong-tap { background: var(--danger-color) !important; }
         #speedFingerStatus { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
         #speedFingerFinalMsg { font-size: 15px; font-weight: bold; color: var(--danger-color); margin-top: 8px; min-height: 20px; }
     </style>
@@ -379,9 +380,8 @@
 
     <div id="game-speedfinger-screen" class="screen">
         <h2>👆 스피드 손가락</h2>
-        <p id="speedFingerStatus" style="color: #8E9AA8;">곧 불이 켜집니다... 준비하세요!</p>
-        <div class="speed-light off" id="speedFingerLight">✋</div>
-        <button id="btn-speed-finger-tap" style="background-color: var(--primary-color); color: #121214; font-size: 20px; padding: 16px; margin-bottom: 10px;">👆 터치!</button>
+        <p id="speedFingerStatus" style="color: #8E9AA8;">곧 하나가 불이 켜집니다... 준비하세요!</p>
+        <div class="speed-target-grid" id="speedFingerTargets"></div>
         <div class="score-board">
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 반응속도 실시간 랭킹</div>
             <div id="speedFingerResultList">대기 중...</div>
@@ -561,6 +561,7 @@
     const timingCtx = timingCanvas.getContext('2d');
     let timingAnimId = null, timingActiveRoundKey = null, timingLastData = null;
     let speedFingerRoundKey = null, speedFingerSignalTimer = null;
+    let rouletteLastData = null;
 
     function timingValueAt(elapsedMs) {
         const half = 1000; // 1초 동안 0→10, 1초 동안 10→0 (총 2초 왕복)
@@ -607,37 +608,36 @@
     });
 
     document.getElementById('btn-roulette-pull').addEventListener('click', () => {
-        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
-            const rData = snap.val(); if (!rData || !rData.rouletteTurnOrder) return;
-            const currentPid = rData.rouletteTurnOrder[rData.rouletteTurnIdx];
-            if (currentPid !== myId) return;
-            const slotCount = rData.rouletteSlotCount || 6;
-            const chamberPos = rData.rouletteChamberPos || 0;
-            const isHit = (chamberPos === rData.rouletteBulletChamber);
-            const nextTurnIdx = (rData.rouletteTurnIdx + 1) % rData.rouletteTurnOrder.length;
-            const updates = {};
-            if (isHit) {
-                const consecutive = (rData.rouletteLastHitId === myId) ? (rData.rouletteConsecutiveHits || 1) + 1 : 1;
-                const myNickname = players[myId]?.nickname || '나';
-                updates[`rooms/${currentRoomCode}/rouletteLastHitId`] = myId;
-                updates[`rooms/${currentRoomCode}/rouletteConsecutiveHits`] = consecutive;
-                updates[`rooms/${currentRoomCode}/rouletteResultText`] = consecutive > 1
-                    ? `💥 ${myNickname}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺`
-                    : `💥 ${myNickname}님 총알 명중! 한 잔 마시기 🍺`;
-                updates[`rooms/${currentRoomCode}/rouletteBulletChamber`] = Math.floor(Math.random() * slotCount);
-                updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = 0;
-                updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
-            } else {
-                updates[`rooms/${currentRoomCode}/rouletteResultText`] = null;
-                updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = chamberPos + 1;
-                updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
-            }
-            if (navigator.vibrate) navigator.vibrate(isHit ? [200, 80, 200] : 40);
-            update(ref(db), updates);
-        });
+        if (!rouletteLastData || !rouletteLastData.isMyTurn) return;
+        const rData = rouletteLastData;
+        const slotCount = rData.slotCount;
+        const chamberPos = rData.chamberPos;
+        const isHit = (chamberPos === rData.bulletChamber);
+        const nextTurnIdx = (rData.turnIdx + 1) % rData.turnOrder.length;
+        const updates = {};
+        if (isHit) {
+            const consecutive = (rData.lastHitId === myId) ? (rData.consecutiveHits || 1) + 1 : 1;
+            const myNickname = players[myId]?.nickname || '나';
+            updates[`rooms/${currentRoomCode}/rouletteLastHitId`] = myId;
+            updates[`rooms/${currentRoomCode}/rouletteConsecutiveHits`] = consecutive;
+            updates[`rooms/${currentRoomCode}/rouletteResultText`] = consecutive > 1
+                ? `💥 ${myNickname}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺`
+                : `💥 ${myNickname}님 총알 명중! 한 잔 마시기 🍺`;
+            updates[`rooms/${currentRoomCode}/rouletteBulletChamber`] = Math.floor(Math.random() * slotCount);
+            updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = 0;
+            updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
+        } else {
+            updates[`rooms/${currentRoomCode}/rouletteResultText`] = null;
+            updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = chamberPos + 1;
+            updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
+        }
+        rouletteLastData.isMyTurn = false; // 응답 대기 중 중복 클릭 방지
+        document.getElementById('btn-roulette-pull').disabled = true;
+        if (navigator.vibrate) navigator.vibrate(isHit ? [200, 80, 200] : 40);
+        update(ref(db), updates);
     });
 
-    document.getElementById('btn-speed-finger-tap').addEventListener('click', () => {
+    function handleSpeedFingerTap(spotIndex) {
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
             const rData = snap.val(); if (!rData || !rData.speedSignalTime) return;
             const already = (rData.speedFingerResults && rData.speedFingerResults[myId] !== undefined) || (rData.speedFalseStarts && rData.speedFalseStarts[myId]);
@@ -645,12 +645,22 @@
             const now = Date.now();
             if (now < rData.speedSignalTime) {
                 set(ref(db, `rooms/${currentRoomCode}/speedFalseStarts/${myId}`), true);
-            } else {
-                const reaction = now - rData.speedSignalTime;
-                set(ref(db, `rooms/${currentRoomCode}/speedFingerResults/${myId}`), reaction);
+                return;
             }
+            if (spotIndex !== rData.speedTargetSpot) {
+                // 틀린 곳을 눌렀을 때 - 잠깐 빨갛게 표시만 하고 제출은 안 함 (다시 시도 가능)
+                const gridEl = document.getElementById('speedFingerTargets');
+                const wrongEl = gridEl?.children[spotIndex];
+                if (wrongEl && !wrongEl.classList.contains('active')) {
+                    wrongEl.classList.add('wrong-tap');
+                    setTimeout(() => wrongEl.classList.remove('wrong-tap'), 200);
+                }
+                return;
+            }
+            const reaction = now - rData.speedSignalTime;
+            set(ref(db, `rooms/${currentRoomCode}/speedFingerResults/${myId}`), reaction);
         });
-    });
+    }
 
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -713,7 +723,9 @@
         const nickname = document.getElementById('nickname-input').value.trim();
         if(!nickname) return alert('닉네임을 입력해주세요!');
         myNickname = nickname; currentRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
-        myId = 'player_' + Math.random().toString(36).substr(2, 9); isHost = true;
+        myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
+        sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
+        isHost = true;
 
         set(ref(db, `rooms/${currentRoomCode}`), {
             status: 'waiting', hostId: myId, selectedGame: 'liar',
@@ -730,7 +742,9 @@
         const roomCode = document.getElementById('room-code-input').value.trim();
         if(!nickname || !roomCode) return alert('입력 값을 확인해주세요!');
         myNickname = nickname; currentRoomCode = roomCode;
-        myId = 'player_' + Math.random().toString(36).substr(2, 9); isHost = false;
+        myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
+        sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
+        isHost = false;
 
         get(ref(db, `rooms/${roomCode}`)).then((snapshot) => {
             if (!snapshot.exists()) return alert('존재하지 않는 방입니다.');
@@ -889,6 +903,8 @@
                     const currentPid = turnOrder[turnIdx];
                     const isMyTurn = currentPid === myId;
 
+                    rouletteLastData = { slotCount, turnOrder, turnIdx, chamberPos, bulletChamber: data.rouletteBulletChamber, lastHitId: data.rouletteLastHitId, consecutiveHits: data.rouletteConsecutiveHits, isMyTurn };
+
                     const slotsEl = document.getElementById('rouletteSlots');
                     slotsEl.innerHTML = '';
                     for (let i = 0; i < slotCount; i++) {
@@ -911,32 +927,43 @@
                 else if (data.selectedGame === 'speedfinger') {
                     showScreen('game-speedfinger-screen');
                     const signalTime = data.speedSignalTime;
+                    const targetSpot = data.speedTargetSpot ?? 0;
                     const results = data.speedFingerResults || {};
                     const falseStarts = data.speedFalseStarts || {};
                     const myFalse = falseStarts[myId];
                     const myResult = results[myId];
                     const now = Date.now();
+                    const SPOT_COUNT = 6;
+
+                    const gridEl = document.getElementById('speedFingerTargets');
+                    if (gridEl.childElementCount !== SPOT_COUNT) {
+                        gridEl.innerHTML = '';
+                        for (let i = 0; i < SPOT_COUNT; i++) {
+                            const spot = document.createElement('div');
+                            spot.className = 'speed-target'; spot.dataset.spotIndex = i; spot.textContent = '❓';
+                            spot.addEventListener('click', () => handleSpeedFingerTap(i));
+                            gridEl.appendChild(spot);
+                        }
+                    }
 
                     if (speedFingerRoundKey !== signalTime) {
                         speedFingerRoundKey = signalTime;
                         clearTimeout(speedFingerSignalTimer);
-                        const lightEl = document.getElementById('speedFingerLight');
                         const delayLeft = signalTime - now;
+                        Array.from(gridEl.children).forEach(el => { el.className = 'speed-target'; el.textContent = '❓'; });
                         if (delayLeft > 0) {
-                            lightEl.className = 'speed-light off'; lightEl.textContent = '✋';
-                            document.getElementById('speedFingerStatus').textContent = '곧 불이 켜집니다... 준비하세요!';
+                            document.getElementById('speedFingerStatus').textContent = '곧 하나가 불이 켜집니다... 준비하세요!';
                             speedFingerSignalTimer = setTimeout(() => {
-                                document.getElementById('speedFingerLight').className = 'speed-light on';
-                                document.getElementById('speedFingerLight').textContent = '👆';
-                                document.getElementById('speedFingerStatus').textContent = '지금 터치하세요!!';
+                                const spotEl = gridEl.children[targetSpot];
+                                if (spotEl) { spotEl.className = 'speed-target active'; spotEl.textContent = '👆'; }
+                                document.getElementById('speedFingerStatus').textContent = '지금 켜진 곳을 터치하세요!!';
                             }, delayLeft);
                         } else {
-                            lightEl.className = 'speed-light on'; lightEl.textContent = '👆';
-                            document.getElementById('speedFingerStatus').textContent = '지금 터치하세요!!';
+                            const spotEl = gridEl.children[targetSpot];
+                            if (spotEl) { spotEl.className = 'speed-target active'; spotEl.textContent = '👆'; }
+                            document.getElementById('speedFingerStatus').textContent = '지금 켜진 곳을 터치하세요!!';
                         }
                     }
-
-                    document.getElementById('btn-speed-finger-tap').disabled = !!myFalse || myResult !== undefined;
 
                     const allIds = Object.keys(players);
                     const rows = allIds.map(id => {
@@ -1353,7 +1380,8 @@
             } else if (selectedGame === 'speedfinger') {
                 const delay = 2000 + Math.floor(Math.random() * 3000); // 2~5초 랜덤 대기 (부정 출발 방지)
                 const signalTime = Date.now() + delay;
-                update(rRef, { status: 'playing', speedSignalTime: signalTime, speedFingerResults: null, speedFalseStarts: null });
+                const targetSpot = Math.floor(Math.random() * 6); // 6칸 중 랜덤 위치
+                update(rRef, { status: 'playing', speedSignalTime: signalTime, speedTargetSpot: targetSpot, speedFingerResults: null, speedFalseStarts: null });
             } else if (selectedGame === 'dutch') {
                 update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
             }
@@ -1367,7 +1395,7 @@
                 dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null,
                 timingTarget: null, timingStartTime: null, timingResults: null,
                 rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
-                speedSignalTime: null, speedFingerResults: null, speedFalseStarts: null
+                speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null
             });
         });
     });
