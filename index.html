@@ -554,10 +554,9 @@
     const canvas = document.getElementById('drawing-canvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
-    let currentAnswer = 0, isPenaltyActive = false, localBombActive = false;
+    let currentAnswer = 0, isPenaltyActive = false, lastBombExplodeAt = null;
     let serverTimeOffset = 0;
     let bombExplosionAttemptKey = null;
-    let balanceRevealPending = false;
 
     onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
         serverTimeOffset = Number(snap.val()) || 0;
@@ -833,7 +832,6 @@
             }
 
             if(data.status === 'playing') {
-                if (data.selectedGame !== 'balance') balanceRevealPending = false;
                 if(data.selectedGame === 'liar') {
                     showScreen('game-liar-screen');
                     const rd = document.getElementById('role-display');
@@ -869,8 +867,8 @@
                         document.getElementById('quiz-box').style.display = 'none'; triggerExplosionEffect();
                     } else {
                         bombIcon.innerText = "💣";
-                        if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; if (!localBombActive) { generateQuiz(); localBombActive = true; } } 
-                        else { statusTextEl.innerHTML = `👤 폭탄 소지자: ${holderNick}`; document.getElementById('quiz-box').style.display = 'none'; localBombActive = false; }
+                        if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; if (lastBombExplodeAt !== data.bombExplodeAt) { lastBombExplodeAt = data.bombExplodeAt; generateQuiz(); } } 
+                        else { statusTextEl.innerHTML = `👤 폭탄 소지자: ${holderNick}`; document.getElementById('quiz-box').style.display = 'none'; }
                     }
                 }
                 else if (data.selectedGame === 'speed') {
@@ -902,8 +900,7 @@
                     document.getElementById('text-option-a').innerText = `🅰️ ${balancePool[bIdx].a}`;
                     document.getElementById('text-option-b').innerText = `🅱️ ${balancePool[bIdx].b}`;
                     const votes = data.balanceVotes || {};
-                    const isBalanceRevealed = !!data.balanceRevealed || balanceRevealPending;
-                    if (data.balanceRevealed) balanceRevealPending = false;
+                    const isBalanceRevealed = !!data.balanceRevealed;
                     document.getElementById('btn-balance-a').className = `balance-option-btn ${votes[myId]==='A'?'selected':''}`;
                     document.getElementById('btn-balance-b').className = `balance-option-btn ${votes[myId]==='B'?'selected':''}`;
                     if (isBalanceRevealed) {
@@ -1375,14 +1372,36 @@
     document.getElementById('btn-reveal-balance').addEventListener('click', async () => {
         if (!currentRoomCode) return;
         const revealBtn = document.getElementById('btn-reveal-balance');
-        balanceRevealPending = true;
         revealBtn.disabled = true;
         try {
             await update(ref(db, `rooms/${currentRoomCode}`), { balanceRevealed: true });
+            // Directly render the reveal result for the host to ensure immediate feedback,
+            // independent of onValue callback timing.
+            const snap = await get(ref(db, `rooms/${currentRoomCode}`));
+            const d = snap.val();
+            if (!d) return;
+            const votes = d.balanceVotes || {};
+            const pObj = d.players || {};
+            const pIds = Object.keys(pObj);
+            document.getElementById('btn-balance-a').disabled = true;
+            document.getElementById('btn-balance-b').disabled = true;
+            document.getElementById('count-option-a').style.display = 'inline';
+            document.getElementById('count-option-b').style.display = 'inline';
+            document.getElementById('balance-result-box').style.display = 'block';
+            let cA = 0, cB = 0;
+            Object.values(votes).forEach(v => { if (v === 'A') cA++; if (v === 'B') cB++; });
+            const tot = Object.keys(votes).length || 1;
+            document.getElementById('gauge-a').style.width = `${(cA/tot)*100}%`;
+            document.getElementById('gauge-b').style.width = `${(cB/tot)*100}%`;
+            document.getElementById('count-option-a').innerText = `${cA}명`;
+            document.getElementById('count-option-b').innerText = `${cB}명`;
+            const minor = cA < cB ? 'A' : (cB < cA ? 'B' : '');
+            const wl = [];
+            pIds.forEach(id => { if (minor && votes[id] === minor) wl.push(`🟢 ${(pObj[id] || {}).nickname || id}`); });
+            document.getElementById('balance-winners-list').innerHTML = wl.length > 0 ? wl.join('<br>') : '동점! 생존자가 없습니다.';
+            revealBtn.style.display = 'none';
         } catch (e) {
-            console.error('balance reveal update failed:', e);
-            balanceRevealPending = false;
-        } finally {
+            console.error('balance reveal failed:', e);
             revealBtn.disabled = false;
         }
     });
@@ -1403,7 +1422,7 @@
                             bombHolderId: pIds[(pIds.indexOf(myId) + 1) % pIds.length],
                             bombExplodeAt: getServerNow() + 15000,
                             bombExploded: false
-                        }).then(() => localBombActive = false);
+                        });
                     });
                 } else {
                     isPenaltyActive = true; b.classList.add('wrong-animation');
