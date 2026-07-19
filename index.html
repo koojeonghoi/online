@@ -586,8 +586,8 @@
         if (getServerNow() < explodeAt) return;
         bombExplosionAttemptKey = explodeAt;
         runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
-            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'bomb' || roomData.bombExploded) return;
-            if (!roomData.bombExplodeAt || getServerNow() < roomData.bombExplodeAt) return;
+            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'bomb' || roomData.bombExploded) return undefined;
+            if (!roomData.bombExplodeAt || getServerNow() < roomData.bombExplodeAt) return undefined;
             roomData.bombExploded = true;
             return roomData;
         }).catch(() => {
@@ -644,7 +644,7 @@
         const error = Math.round(Math.abs(value - target) * 100) / 100;
         const path = `rooms/${currentRoomCode}/timingResults/${myId}`;
         runTransaction(ref(db, path), (existing) => {
-            if (existing) return;
+            if (existing) return undefined;
             return { value, error, clickedAt };
         });
     });
