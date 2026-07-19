@@ -457,7 +457,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, set, onValue, update, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = { databaseURL: "https://roulette-d9a12-default-rtdb.asia-southeast1.firebasedatabase.app/" };
     const app = initializeApp(firebaseConfig);
@@ -555,6 +555,45 @@
     const ctx = canvas.getContext('2d');
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
     let currentAnswer = 0, isPenaltyActive = false, localBombActive = false;
+    let serverTimeOffset = 0;
+    let bombExplosionAttemptKey = null;
+    let balanceRevealPending = false;
+
+    onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
+        serverTimeOffset = Number(snap.val()) || 0;
+    });
+
+    function getServerNow() {
+        return Date.now() + serverTimeOffset;
+    }
+
+    function normalizeShapeIndex(index) {
+        if (!shapes.length) return 0;
+        const parsed = Number(index);
+        if (!Number.isFinite(parsed)) return 0;
+        const normalized = Math.floor(parsed) % shapes.length;
+        return normalized >= 0 ? normalized : normalized + shapes.length;
+    }
+
+    function pickRandomShapeIndex() {
+        if (!shapes.length) return 0;
+        return Math.floor(Math.random() * shapes.length);
+    }
+
+    function tryExplodeBombIfDue(explodeAt) {
+        if (!currentRoomCode || !explodeAt) return;
+        if (bombExplosionAttemptKey === explodeAt) return;
+        if (getServerNow() < explodeAt) return;
+        bombExplosionAttemptKey = explodeAt;
+        runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
+            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'bomb' || roomData.bombExploded) return;
+            if (!roomData.bombExplodeAt || getServerNow() < roomData.bombExplodeAt) return;
+            roomData.bombExploded = true;
+            return roomData;
+        }).catch(() => {
+            bombExplosionAttemptKey = null;
+        });
+    }
 
     // ===== ⏱️ Up & Down 타이밍 게임 =====
     const timingCanvas = document.getElementById('timing-canvas');
@@ -597,13 +636,16 @@
 
     document.getElementById('btn-stop-timing').addEventListener('click', () => {
         if (!timingLastData || !timingLastData.startTime) return;
+        const clickedAt = Date.now();
+        const startTime = timingLastData.startTime;
+        const target = timingLastData.target;
+        const elapsed = clickedAt - startTime;
+        const value = Math.round(timingValueAt(elapsed) * 100) / 100;
+        const error = Math.round(Math.abs(value - target) * 100) / 100;
         const path = `rooms/${currentRoomCode}/timingResults/${myId}`;
-        get(ref(db, path)).then((snap) => {
-            if (snap.exists()) return;
-            const elapsed = Date.now() - timingLastData.startTime;
-            const value = Math.round(timingValueAt(elapsed) * 100) / 100;
-            const error = Math.round(Math.abs(value - timingLastData.target) * 100) / 100;
-            update(ref(db, path), { value, error });
+        runTransaction(ref(db, path), (existing) => {
+            if (existing) return;
+            return { value, error, clickedAt };
         });
     });
 
@@ -617,7 +659,6 @@
         const updates = {};
         if (isHit) {
             const consecutive = (rData.lastHitId === myId) ? (rData.consecutiveHits || 1) + 1 : 1;
-            const myNickname = players[myId]?.nickname || '나';
             updates[`rooms/${currentRoomCode}/rouletteLastHitId`] = myId;
             updates[`rooms/${currentRoomCode}/rouletteConsecutiveHits`] = consecutive;
             updates[`rooms/${currentRoomCode}/rouletteResultText`] = consecutive > 1
@@ -627,14 +668,27 @@
             updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = 0;
             updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
         } else {
+            const nextChamberPos = chamberPos + 1;
             updates[`rooms/${currentRoomCode}/rouletteResultText`] = null;
-            updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = chamberPos + 1;
+            if (nextChamberPos >= slotCount) {
+                updates[`rooms/${currentRoomCode}/rouletteBulletChamber`] = Math.floor(Math.random() * slotCount);
+                updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = 0;
+            } else {
+                updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = nextChamberPos;
+            }
             updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
         }
+        const wasMyTurn = rouletteLastData.isMyTurn;
         rouletteLastData.isMyTurn = false; // 응답 대기 중 중복 클릭 방지
-        document.getElementById('btn-roulette-pull').disabled = true;
+        const roulettePullBtn = document.getElementById('btn-roulette-pull');
+        roulettePullBtn.disabled = true;
         if (navigator.vibrate) navigator.vibrate(isHit ? [200, 80, 200] : 40);
-        update(ref(db), updates);
+        update(ref(db), updates).catch(() => {
+            if (wasMyTurn) {
+                rouletteLastData.isMyTurn = true;
+                roulettePullBtn.disabled = false;
+            }
+        });
     });
 
     function handleSpeedFingerTap(spotIndex) {
@@ -777,6 +831,7 @@
             }
 
             if(data.status === 'playing') {
+                if (data.selectedGame !== 'balance') balanceRevealPending = false;
                 if(data.selectedGame === 'liar') {
                     showScreen('game-liar-screen');
                     const rd = document.getElementById('role-display');
@@ -785,7 +840,7 @@
                 } 
                 else if (data.selectedGame === 'draw') {
                     showScreen('game-draw-screen');
-                    currentShapeIndex = data.targetShapeIndex || 0;
+                    currentShapeIndex = normalizeShapeIndex(data.targetShapeIndex);
                     document.getElementById('target-shape-text').innerText = `목표 도형: ${shapes[currentShapeIndex].name}`;
                     document.getElementById('preview-svg').innerHTML = shapes[currentShapeIndex].svg;
 
@@ -802,6 +857,8 @@
                 }
                 else if (data.selectedGame === 'bomb') {
                     showScreen('game-bomb-screen');
+                    if (bombExplosionAttemptKey !== data.bombExplodeAt) bombExplosionAttemptKey = null;
+                    if (!data.bombExploded) tryExplodeBombIfDue(data.bombExplodeAt);
                     const holderNick = players[data.bombHolderId]?.nickname || "대기중";
                     const statusTextEl = document.getElementById('bomb-status-text');
                     const bombIcon = document.getElementById('bomb-icon');
@@ -843,9 +900,11 @@
                     document.getElementById('text-option-a').innerText = `🅰️ ${balancePool[bIdx].a}`;
                     document.getElementById('text-option-b').innerText = `🅱️ ${balancePool[bIdx].b}`;
                     const votes = data.balanceVotes || {};
+                    const isBalanceRevealed = !!data.balanceRevealed || balanceRevealPending;
+                    if (data.balanceRevealed) balanceRevealPending = false;
                     document.getElementById('btn-balance-a').className = `balance-option-btn ${votes[myId]==='A'?'selected':''}`;
                     document.getElementById('btn-balance-b').className = `balance-option-btn ${votes[myId]==='B'?'selected':''}`;
-                    if (data.balanceRevealed) {
+                    if (isBalanceRevealed) {
                         document.getElementById('btn-balance-a').disabled = true; document.getElementById('btn-balance-b').disabled = true;
                         document.getElementById('count-option-a').style.display = 'inline'; document.getElementById('count-option-b').style.display = 'inline';
                         document.getElementById('balance-result-box').style.display = 'block';
@@ -863,7 +922,7 @@
                         document.getElementById('count-option-a').style.display = 'none'; document.getElementById('count-option-b').style.display = 'none';
                         document.getElementById('balance-result-box').style.display = 'none';
                     }
-                    document.getElementById('btn-reveal-balance').style.display = (isHost && !data.balanceRevealed) ? 'block' : 'none';
+                    document.getElementById('btn-reveal-balance').style.display = (isHost && !isBalanceRevealed) ? 'block' : 'none';
                 }
                 else if (data.selectedGame === 'timing') {
                     showScreen('game-timing-screen');
@@ -897,7 +956,7 @@
                 else if (data.selectedGame === 'roulette') {
                     showScreen('game-roulette-screen');
                     const slotCount = data.rouletteSlotCount || 6;
-                    const chamberPos = data.rouletteChamberPos || 0;
+                    const chamberPos = ((Number(data.rouletteChamberPos) || 0) % slotCount + slotCount) % slotCount;
                     const turnOrder = data.rouletteTurnOrder || [];
                     const turnIdx = data.rouletteTurnIdx || 0;
                     const currentPid = turnOrder[turnIdx];
@@ -1311,7 +1370,19 @@
     });
 
     window.submitBalanceVote = function(choice) { get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => { if(!snap.val()?.balanceRevealed) set(ref(db, `rooms/${currentRoomCode}/balanceVotes/${myId}`), choice); }); }
-    document.getElementById('btn-reveal-balance').addEventListener('click', () => { update(ref(db, `rooms/${currentRoomCode}`), { balanceRevealed: true }); });
+    document.getElementById('btn-reveal-balance').addEventListener('click', async () => {
+        if (!currentRoomCode) return;
+        const revealBtn = document.getElementById('btn-reveal-balance');
+        balanceRevealPending = true;
+        revealBtn.disabled = true;
+        try {
+            await update(ref(db, `rooms/${currentRoomCode}`), { balanceRevealed: true });
+        } catch (e) {
+            balanceRevealPending = false;
+        } finally {
+            revealBtn.disabled = false;
+        }
+    });
 
     function generateQuiz() {
         if (isPenaltyActive) return;
@@ -1325,7 +1396,11 @@
                 if (o === currentAnswer) {
                     get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
                         const pIds = Object.keys(snap.val().players || {});
-                        update(ref(db, `rooms/${currentRoomCode}/`), { bombHolderId: pIds[(pIds.indexOf(myId) + 1) % pIds.length] }).then(() => localBombActive = false);
+                        update(ref(db, `rooms/${currentRoomCode}/`), {
+                            bombHolderId: pIds[(pIds.indexOf(myId) + 1) % pIds.length],
+                            bombExplodeAt: getServerNow() + 15000,
+                            bombExploded: false
+                        }).then(() => localBombActive = false);
                     });
                 } else {
                     isPenaltyActive = true; b.classList.add('wrong-animation');
@@ -1357,10 +1432,14 @@
                 const pickedWord = wordsInCategory[Math.floor(Math.random()*wordsInCategory.length)];
                 update(rRef, { status: 'playing', category: pickedCategory, word: pickedWord, liarId: pIds[Math.floor(Math.random()*pIds.length)] });
             } else if (selectedGame === 'draw') {
-                update(rRef, { status: 'playing', targetShapeIndex: Math.floor(Math.random()*shapes.length), drawScores: null, drawImages: null });
+                const shapeIdx = pickRandomShapeIndex();
+                update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
             } else if (selectedGame === 'bomb') {
-                update(rRef, { status: 'playing', bombHolderId: pIds[Math.floor(Math.random()*pIds.length)], bombExploded: false }).then(() => {
-                    setTimeout(() => { get(rRef).then((s) => { if(s.val()?.status === 'playing') update(rRef, { bombExploded: true }); }); }, 15000);
+                update(rRef, {
+                    status: 'playing',
+                    bombHolderId: pIds[Math.floor(Math.random()*pIds.length)],
+                    bombExploded: false,
+                    bombExplodeAt: getServerNow() + 15000
                 });
             } else if (selectedGame === 'speed') {
                 const randIdx = Math.floor(Math.random() * chosungPool.length);
@@ -1392,6 +1471,7 @@
         btn.addEventListener('click', () => {
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 status: 'waiting', word: '', drawScores: null, drawImages: null, bombExploded: false, speedAnswers: null, speedLoserId: null, balanceVotes: null, balanceRevealed: false,
+                bombExplodeAt: null,
                 dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null,
                 timingTarget: null, timingStartTime: null, timingResults: null,
                 rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
