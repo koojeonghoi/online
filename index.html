@@ -334,17 +334,17 @@
         </div>
         <div id="balance-status-alert" style="font-size: 14px; font-weight: bold; color: #8E9AA8; margin-bottom: 15px;">원하는 선택지를 터치하세요!</div>
         <div class="balance-box">
-            <button class="balance-option-btn" id="btn-balance-a" onclick="submitBalanceVote('A')">
+            <button class="balance-option-btn" id="btn-balance-a" onclick="handleBalanceOptionClick('A')">
                 <div class="balance-gauge" id="gauge-a"></div>
                 <div class="balance-text"><span id="text-option-a">선택지 A</span><span id="count-option-a" style="display:none;">0명</span></div>
             </button>
-            <button class="balance-option-btn" id="btn-balance-b" onclick="submitBalanceVote('B')">
+            <button class="balance-option-btn" id="btn-balance-b" onclick="handleBalanceOptionClick('B')">
                 <div class="balance-gauge" id="gauge-b"></div>
                 <div class="balance-text"><span id="text-option-b">선택지 B</span><span id="count-option-b" style="display:none;">0명</span></div>
             </button>
         </div>
         <div id="balance-result-box" class="score-board" style="display: none; margin-bottom: 15px;">
-            <div style="font-size: 13px; color: var(--success-color); font-weight: bold; margin-bottom: 6px;">🎉 소수결 생존자 (적게 고른 사람)</div>
+            <div id="balance-result-hint" style="font-size: 13px; color: var(--success-color); font-weight: bold; margin-bottom: 6px;">📊 결과가 공개됐어요! 위 선택지를 터치하면 누가 골랐는지 볼 수 있어요.</div>
             <div id="balance-winners-list" style="font-weight: bold; font-size: 15px; color: #fff;"></div>
         </div>
         <button id="btn-reveal-balance" style="background-color: var(--success-color); color:#121214; display:none;">📊 투표 종료 및 결과 공개 (방장용)</button>
@@ -554,7 +554,7 @@
     const canvas = document.getElementById('drawing-canvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
-    let currentAnswer = 0, isPenaltyActive = false, lastBombQuizKey = null;
+    let currentAnswer = 0, isPenaltyActive = false, lastBombQuizKey = null, balanceOpenedRoundKey = null;
     let serverTimeOffset = 0;
     let bombExplosionAttemptKey = null;
 
@@ -903,8 +903,9 @@
                     const isBalanceRevealed = !!data.balanceRevealed;
                     document.getElementById('btn-balance-a').className = `balance-option-btn ${votes[myId]==='A'?'selected':''}`;
                     document.getElementById('btn-balance-b').className = `balance-option-btn ${votes[myId]==='B'?'selected':''}`;
+                    // 결과 공개 후에도 버튼은 계속 눌러야 하므로(결과 확인용) disabled 처리하지 않음
+                    document.getElementById('btn-balance-a').disabled = false; document.getElementById('btn-balance-b').disabled = false;
                     if (isBalanceRevealed) {
-                        document.getElementById('btn-balance-a').disabled = true; document.getElementById('btn-balance-b').disabled = true;
                         document.getElementById('count-option-a').style.display = 'inline'; document.getElementById('count-option-b').style.display = 'inline';
                         document.getElementById('balance-result-box').style.display = 'block';
                         let countA = 0, countB = 0;
@@ -912,14 +913,16 @@
                         const total = Object.keys(votes).length || 1;
                         document.getElementById('gauge-a').style.width = `${(countA/total)*100}%`; document.getElementById('gauge-b').style.width = `${(countB/total)*100}%`;
                         document.getElementById('count-option-a').innerText = `${countA}명`; document.getElementById('count-option-b').innerText = `${countB}명`;
-                        let minorSide = countA < countB ? 'A' : (countB < countA ? 'B' : '');
-                        const winList = []; playerIds.forEach(id => { if(minorSide !== '' && votes[id] === minorSide) winList.push(`🟢 ${players[id].nickname}`); });
-                        document.getElementById('balance-winners-list').innerHTML = winList.length > 0 ? winList.join('<br>') : "동점! 생존자가 없습니다.";
+                        if (balanceOpenedRoundKey !== bIdx + '_' + data.balanceRevealed) {
+                            balanceOpenedRoundKey = bIdx + '_' + data.balanceRevealed;
+                            document.getElementById('balance-result-hint').innerText = '📊 결과가 공개됐어요! 위 선택지를 터치하면 누가 골랐는지 볼 수 있어요.';
+                            document.getElementById('balance-winners-list').innerHTML = '';
+                        }
                     } else {
-                        document.getElementById('btn-balance-a').disabled = false; document.getElementById('btn-balance-b').disabled = false;
                         document.getElementById('gauge-a').style.width = '0%'; document.getElementById('gauge-b').style.width = '0%';
                         document.getElementById('count-option-a').style.display = 'none'; document.getElementById('count-option-b').style.display = 'none';
                         document.getElementById('balance-result-box').style.display = 'none';
+                        balanceOpenedRoundKey = null;
                     }
                     document.getElementById('btn-reveal-balance').style.display = (isHost && !isBalanceRevealed) ? 'block' : 'none';
                     if (!isBalanceRevealed) document.getElementById('btn-reveal-balance').disabled = false;
@@ -1369,38 +1372,28 @@
         });
     });
 
-    window.submitBalanceVote = function(choice) { get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => { if(!snap.val()?.balanceRevealed) set(ref(db, `rooms/${currentRoomCode}/balanceVotes/${myId}`), choice); }); }
+    window.handleBalanceOptionClick = function(choice) {
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d) return;
+            if (!d.balanceRevealed) {
+                set(ref(db, `rooms/${currentRoomCode}/balanceVotes/${myId}`), choice);
+            } else {
+                const votes = d.balanceVotes || {};
+                const pObj = d.players || {};
+                const names = Object.keys(votes).filter(id => votes[id] === choice).map(id => pObj[id]?.nickname || id);
+                const bIdx = d.balanceIndex || 0;
+                const label = choice === 'A' ? balancePool[bIdx].a : balancePool[bIdx].b;
+                document.getElementById('balance-result-hint').innerText = `🔎 [${label}] 선택자 (${names.length}명)`;
+                document.getElementById('balance-winners-list').innerHTML = names.length > 0 ? names.map(n => `👤 ${n}`).join('<br>') : '아무도 선택하지 않았어요.';
+            }
+        });
+    }
     document.getElementById('btn-reveal-balance').addEventListener('click', async () => {
         if (!currentRoomCode) return;
         const revealBtn = document.getElementById('btn-reveal-balance');
         revealBtn.disabled = true;
         try {
             await update(ref(db, `rooms/${currentRoomCode}`), { balanceRevealed: true });
-            // Directly render the reveal result for the host to ensure immediate feedback,
-            // independent of onValue callback timing.
-            const snap = await get(ref(db, `rooms/${currentRoomCode}`));
-            const d = snap.val();
-            if (!d) return;
-            const votes = d.balanceVotes || {};
-            const pObj = d.players || {};
-            const pIds = Object.keys(pObj);
-            document.getElementById('btn-balance-a').disabled = true;
-            document.getElementById('btn-balance-b').disabled = true;
-            document.getElementById('count-option-a').style.display = 'inline';
-            document.getElementById('count-option-b').style.display = 'inline';
-            document.getElementById('balance-result-box').style.display = 'block';
-            let cA = 0, cB = 0;
-            Object.values(votes).forEach(v => { if (v === 'A') cA++; if (v === 'B') cB++; });
-            const tot = Object.keys(votes).length || 1;
-            document.getElementById('gauge-a').style.width = `${(cA/tot)*100}%`;
-            document.getElementById('gauge-b').style.width = `${(cB/tot)*100}%`;
-            document.getElementById('count-option-a').innerText = `${cA}명`;
-            document.getElementById('count-option-b').innerText = `${cB}명`;
-            const minor = cA < cB ? 'A' : (cB < cA ? 'B' : '');
-            const wl = [];
-            pIds.forEach(id => { if (minor && votes[id] === minor) wl.push(`🟢 ${(pObj[id] || {}).nickname || id}`); });
-            document.getElementById('balance-winners-list').innerHTML = wl.length > 0 ? wl.join('<br>') : '동점! 생존자가 없습니다.';
-            revealBtn.style.display = 'none';
         } catch (e) {
             console.error('balance reveal failed:', e);
             revealBtn.disabled = false;
