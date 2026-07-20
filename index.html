@@ -648,12 +648,22 @@
 
     document.getElementById('btn-stop-timing').addEventListener('click', () => {
         if (!timingLastData || !timingLastData.startTime) return;
-        const clickedAt = Date.now();
+        const stopBtn = document.getElementById('btn-stop-timing');
+        if (stopBtn.disabled) return; // 중복 클릭 방지
+        const clickedAt = getServerNow();
         const startTime = timingLastData.startTime;
         const target = timingLastData.target;
         const elapsed = clickedAt - startTime;
         const value = Math.round(timingValueAt(elapsed) * 100) / 100;
         const error = Math.round(Math.abs(value - target) * 100) / 100;
+
+        // 서버 응답(Firebase round-trip)을 기다리지 않고, 누른 시점 값으로 즉시 바를 고정한다.
+        // 네트워크 지연이 있더라도 화면에는 클릭한 순간의 값이 바로 표시된다.
+        stopTimingLoop();
+        drawTimingBar(value, target, true);
+        stopBtn.disabled = true;
+        stopBtn.innerText = '✅ 제출 완료!';
+
         const path = `rooms/${currentRoomCode}/timingResults/${myId}`;
         runTransaction(ref(db, path), (existing) => {
             if (existing) return undefined;
@@ -709,7 +719,7 @@
             const rData = snap.val(); if (!rData || !rData.speedSignalTime) return;
             const already = (rData.speedFingerResults && rData.speedFingerResults[myId] !== undefined) || (rData.speedFalseStarts && rData.speedFalseStarts[myId]);
             if (already) return;
-            const now = Date.now();
+            const now = getServerNow();
             if (now < rData.speedSignalTime) {
                 set(ref(db, `rooms/${currentRoomCode}/speedFalseStarts/${myId}`), true);
                 return;
@@ -1011,7 +1021,7 @@
                     const falseStarts = data.speedFalseStarts || {};
                     const myFalse = falseStarts[myId];
                     const myResult = results[myId];
-                    const now = Date.now();
+                    const now = getServerNow();
                     const SPOT_COUNT = 6;
 
                     const gridEl = document.getElementById('speedFingerTargets');
@@ -1483,7 +1493,7 @@
                 update(rRef, { status: 'playing', balanceIndex: Math.floor(Math.random() * balancePool.length), balanceVotes: null, balanceRevealed: false });
             } else if (selectedGame === 'timing') {
                 const target = Math.round(Math.random() * 1000) / 100; // 0.00 ~ 10.00
-                update(rRef, { status: 'playing', timingTarget: target, timingStartTime: Date.now(), timingResults: null });
+                update(rRef, { status: 'playing', timingTarget: target, timingStartTime: getServerNow(), timingResults: null });
             } else if (selectedGame === 'roulette') {
                 const slotCount = 6;
                 update(rRef, {
@@ -1493,7 +1503,7 @@
                 });
             } else if (selectedGame === 'speedfinger') {
                 const delay = 2000 + Math.floor(Math.random() * 3000); // 2~5초 랜덤 대기 (부정 출발 방지)
-                const signalTime = Date.now() + delay;
+                const signalTime = getServerNow() + delay;
                 const targetSpot = Math.floor(Math.random() * 6); // 6칸 중 랜덤 위치
                 update(rRef, { status: 'playing', speedSignalTime: signalTime, speedTargetSpot: targetSpot, speedFingerResults: null, speedFalseStarts: null });
             } else if (selectedGame === 'dutch') {
