@@ -744,6 +744,8 @@
         document.getElementById('join-mode-box').style.display = 'block';
         clearCanvas();
         setupCurrencyFormatting();
+        const savedNickname = localStorage.getItem('partyGameNickname');
+        if (savedNickname) document.getElementById('nickname-input').value = savedNickname;
     });
 
     function setupCurrencyFormatting() {
@@ -799,6 +801,7 @@
     document.getElementById('btn-create-room').addEventListener('click', () => {
         const nickname = document.getElementById('nickname-input').value.trim();
         if(!nickname) return alert('닉네임을 입력해주세요!');
+        localStorage.setItem('partyGameNickname', nickname);
         myNickname = nickname; currentRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
         myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
         sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
@@ -818,6 +821,7 @@
         const nickname = document.getElementById('nickname-input').value.trim();
         const roomCode = document.getElementById('room-code-input').value.trim();
         if(!nickname || !roomCode) return alert('입력 값을 확인해주세요!');
+        localStorage.setItem('partyGameNickname', nickname);
         myNickname = nickname; currentRoomCode = roomCode;
         myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
         sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
@@ -1478,7 +1482,8 @@
                 const shapeIdx = pickRandomShapeIndex();
                 update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
             } else if (selectedGame === 'bomb') {
-                const randomFuseMs = 5000 + Math.floor(Math.random() * 5000); // 5~10초 랜덤
+                // 2명이면 10초 고정, 3명 이상이면 15~20초 랜덤 (인원이 많을수록 한 바퀴 도는 데 시간이 더 걸리므로)
+                const randomFuseMs = pIds.length <= 2 ? 10000 : (15000 + Math.floor(Math.random() * 5000));
                 update(rRef, {
                     status: 'playing',
                     bombHolderId: pIds[Math.floor(Math.random()*pIds.length)],
