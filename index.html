@@ -871,7 +871,7 @@
                         document.getElementById('quiz-box').style.display = 'none'; triggerExplosionEffect();
                     } else {
                         bombIcon.innerText = "💣";
-                        if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; const quizKey = `${data.bombHolderId}_${data.bombExplodeAt}`; if (lastBombQuizKey !== quizKey) { lastBombQuizKey = quizKey; generateQuiz(); } } 
+                        if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; const quizKey = `${data.bombHolderId}_${data.bombPassSeq || 0}`; if (lastBombQuizKey !== quizKey) { lastBombQuizKey = quizKey; generateQuiz(); } } 
                         else { statusTextEl.innerHTML = `👤 폭탄 소지자: ${holderNick}`; document.getElementById('quiz-box').style.display = 'none'; }
                     }
                 }
@@ -1415,9 +1415,11 @@
             b.onclick = () => {
                 if (o === currentAnswer) {
                     get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
-                        const pIds = Object.keys(snap.val().players || {});
+                        const roomVal = snap.val();
+                        const pIds = Object.keys(roomVal.players || {});
                         update(ref(db, `rooms/${currentRoomCode}/`), {
-                            bombHolderId: pIds[(pIds.indexOf(myId) + 1) % pIds.length]
+                            bombHolderId: pIds[(pIds.indexOf(myId) + 1) % pIds.length],
+                            bombPassSeq: (roomVal.bombPassSeq || 0) + 1
                         });
                     });
                 } else {
@@ -1458,7 +1460,8 @@
                     status: 'playing',
                     bombHolderId: pIds[Math.floor(Math.random()*pIds.length)],
                     bombExploded: false,
-                    bombExplodeAt: getServerNow() + randomFuseMs
+                    bombExplodeAt: getServerNow() + randomFuseMs,
+                    bombPassSeq: 0
                 });
             } else if (selectedGame === 'speed') {
                 const randIdx = Math.floor(Math.random() * chosungPool.length);
