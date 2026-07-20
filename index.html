@@ -561,6 +561,7 @@
     let currentAnswer = 0, isPenaltyActive = false, lastBombQuizKey = null, balanceOpenedRoundKey = null;
     let serverTimeOffset = 0;
     let bombExplosionAttemptKey = null;
+    let currentBombExplodeAt = null;
 
     onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
         serverTimeOffset = Number(snap.val()) || 0;
@@ -569,6 +570,13 @@
     function getServerNow() {
         return Date.now() + serverTimeOffset;
     }
+
+    // 폭탄 타이머는 Firebase에 새로운 변경사항(write)이 없으면 onValue가 다시 실행되지 않아
+    // 폭발 시점이 지나도 자동으로 터지지 않는 문제가 있었음.
+    // 그래서 0.3초마다 직접 폭발 시점을 체크하도록 별도 타이머를 둠.
+    setInterval(() => {
+        if (currentBombExplodeAt) tryExplodeBombIfDue(currentBombExplodeAt);
+    }, 300);
 
     function normalizeShapeIndex(index) {
         if (!shapes.length) return 0;
@@ -835,6 +843,10 @@
                 });
             }
 
+            if (data.status !== 'playing' || data.selectedGame !== 'bomb') {
+                currentBombExplodeAt = null;
+            }
+
             if(data.status === 'playing') {
                 if(data.selectedGame === 'liar') {
                     showScreen('game-liar-screen');
@@ -862,6 +874,7 @@
                 else if (data.selectedGame === 'bomb') {
                     showScreen('game-bomb-screen');
                     if (bombExplosionAttemptKey !== data.bombExplodeAt) bombExplosionAttemptKey = null;
+                    currentBombExplodeAt = data.bombExploded ? null : data.bombExplodeAt;
                     if (!data.bombExploded) tryExplodeBombIfDue(data.bombExplodeAt);
                     const holderNick = players[data.bombHolderId]?.nickname || "대기중";
                     const statusTextEl = document.getElementById('bomb-status-text');
@@ -1455,7 +1468,7 @@
                 const shapeIdx = pickRandomShapeIndex();
                 update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
             } else if (selectedGame === 'bomb') {
-                const randomFuseMs = 10000 + Math.floor(Math.random() * 10000); // 10~20초 랜덤
+                const randomFuseMs = 5000 + Math.floor(Math.random() * 5000); // 5~10초 랜덤
                 update(rRef, {
                     status: 'playing',
                     bombHolderId: pIds[Math.floor(Math.random()*pIds.length)],
