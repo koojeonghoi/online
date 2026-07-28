@@ -187,6 +187,15 @@
         .role-box.liar { background-color: #3d1d1d; border-color: var(--danger-color); color: #ff8b8b; }
         .role-box.citizen { background-color: var(--success-bg); border-color: var(--success-color); color: #aeffc3; line-height: 1.6; }
 
+        .boxfind-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 15px 0; }
+        .boxfind-tile { background: #334155; border: none; border-radius: 10px; height: 46px; font-size: 1.1rem; color: #fff; cursor: pointer; }
+        .boxfind-tile:disabled { cursor: not-allowed; opacity: 0.85; }
+        .boxfind-tile.safe { background: #0b0f19; font-size: 0.85rem; color: #475569; }
+        .boxfind-tile.bomb { background: var(--danger-color); animation: shake 0.15s infinite; }
+
+        .king-number-box { padding: 20px; border-radius: 14px; font-size: 44px; font-weight: 800; margin: 12px 0 20px; background: linear-gradient(135deg,#2a2410,#1e1e22); border: 2px solid var(--accent-color); color: var(--accent-color); }
+        .king-command-box { background: #252529; border-radius: 12px; padding: 18px; margin-bottom: 15px; border: 2px solid var(--primary-color); font-size: 17px; font-weight: 700; line-height: 1.6; }
+
         .status-badge { font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: bold; }
         .status-badge.waiting { background-color: #3A3A42; color: #B3B3B9; }
         .status-badge.success { background-color: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-color); }
@@ -268,6 +277,8 @@
             <button class="tab-btn" id="tab-roulette" onclick="selectGameMode('roulette')">🔫 러시안룰렛</button>
             <button class="tab-btn" id="tab-speedfinger" onclick="selectGameMode('speedfinger')">👆 빠른손가락</button>
             <button class="tab-btn" id="tab-dutch" onclick="selectGameMode('dutch')">🍺 몰아주기</button>
+            <button class="tab-btn" id="tab-boxfind" onclick="selectGameMode('boxfind')">📦 폭탄찾기</button>
+            <button class="tab-btn" id="tab-king" onclick="selectGameMode('king')">👑 왕게임</button>
         </div>
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
         <ul id="player-list" class="player-list"></ul>
@@ -311,6 +322,24 @@
             <div class="quiz-options" id="quiz-options-box"></div>
         </div>
         <button id="btn-back-lobby-bomb" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 📦 폭탄찾기 게임 스크린 -->
+    <div id="game-boxfind-screen" class="screen">
+        <h2>📦 다같이 폭탄찾기</h2>
+        <div class="bomb-status" id="boxfind-status-text">불러오는 중...</div>
+        <div class="boxfind-grid" id="boxfind-grid"></div>
+        <button id="btn-back-lobby-boxfind" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 👑 왕게임 스크린 -->
+    <div id="game-king-screen" class="screen">
+        <h2>👑 왕게임</h2>
+        <p style="color:#8E9AA8; font-size:13px;">당신의 번호</p>
+        <div class="king-number-box" id="king-my-number">-</div>
+        <div class="king-command-box" id="king-command-text">카드를 뽑는 중...</div>
+        <button id="btn-king-next" style="background-color: var(--accent-color); color:#121214; display:none;">🎴 다음 카드 뽑기 (방장용)</button>
+        <button id="btn-back-lobby-king" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <!-- ⚡ 초성대결 게임 스크린 -->
@@ -561,6 +590,7 @@
     const ctx = canvas.getContext('2d');
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
     let currentAnswer = 0, isPenaltyActive = false, lastBombQuizKey = null, balanceOpenedRoundKey = null;
+    let lastBombGameStartKey = null;
     let serverTimeOffset = 0;
     let bombExplosionAttemptKey = null;
     let currentBombExplodeAt = null;
@@ -915,6 +945,13 @@
                 }
                 else if (data.selectedGame === 'bomb') {
                     showScreen('game-bomb-screen');
+                    // 새 게임(새 bombExplodeAt)이 시작되면 이전 판에서 남아있던 lastBombQuizKey를 반드시 초기화.
+                    // 그렇지 않으면 새 판의 첫 소지자가 이전 판 마지막 소지자와 우연히 같을 때
+                    // quizKey가 겹쳐서 generateQuiz()가 호출되지 않아 문제 화면이 뜨지 않고 멈추는 버그가 있었음.
+                    if (lastBombGameStartKey !== data.bombExplodeAt) {
+                        lastBombGameStartKey = data.bombExplodeAt;
+                        lastBombQuizKey = null;
+                    }
                     if (bombExplosionAttemptKey !== data.bombExplodeAt) bombExplosionAttemptKey = null;
                     currentBombExplodeAt = data.bombExploded ? null : data.bombExplodeAt;
                     if (!data.bombExploded) tryExplodeBombIfDue(data.bombExplodeAt);
@@ -929,6 +966,43 @@
                         if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; const quizKey = `${data.bombHolderId}_${data.bombPassSeq || 0}`; if (lastBombQuizKey !== quizKey) { lastBombQuizKey = quizKey; generateQuiz(); } } 
                         else { statusTextEl.innerHTML = `👤 폭탄 소지자: ${holderNick}`; document.getElementById('quiz-box').style.display = 'none'; }
                     }
+                }
+                else if (data.selectedGame === 'boxfind') {
+                    showScreen('game-boxfind-screen');
+                    const total = data.boxFindTotal || BOXFIND_TOTAL;
+                    const opened = data.boxFindOpened || {};
+                    const turnOrder = data.boxFindTurnOrder || [];
+                    const turnIdx = data.boxFindTurnIndex || 0;
+                    const curPlayerId = turnOrder.length ? turnOrder[turnIdx % turnOrder.length] : null;
+                    const statusEl = document.getElementById('boxfind-status-text');
+                    if (data.boxFindExploded) {
+                        const loserNick = players[data.boxFindLoserId]?.nickname || '???';
+                        statusEl.innerHTML = `🚨 [${loserNick}] 폭탄 발견! 벌주 당첨!`;
+                        if (data.boxFindLoserId === myId) triggerExplosionEffect();
+                    } else if (curPlayerId === myId) {
+                        statusEl.innerHTML = `🔥 내 차례입니다! 상자를 골라 터치하세요!`;
+                    } else {
+                        statusEl.innerHTML = `👤 ${players[curPlayerId]?.nickname || '???'}님의 차례입니다`;
+                    }
+                    const grid = document.getElementById('boxfind-grid'); grid.innerHTML = '';
+                    for (let i = 0; i < total; i++) {
+                        const st = opened[i];
+                        const btn = document.createElement('button');
+                        btn.className = 'boxfind-tile' + (st === 'safe' ? ' safe' : st === 'bomb' ? ' bomb' : '');
+                        btn.textContent = st === 'safe' ? '🟢' : st === 'bomb' ? '💥' : '❓';
+                        const isDisabled = !!data.boxFindExploded || !!st || curPlayerId !== myId;
+                        btn.disabled = isDisabled;
+                        if (!isDisabled) btn.onclick = () => window.clickBoxFindTile(i);
+                        grid.appendChild(btn);
+                    }
+                }
+                else if (data.selectedGame === 'king') {
+                    showScreen('game-king-screen');
+                    const numbers = data.kingNumbers || {};
+                    const myNum = numbers[myId];
+                    document.getElementById('king-my-number').innerText = myNum ? `${myNum}번` : '-';
+                    document.getElementById('king-command-text').innerText = data.kingCommandText || '카드를 기다리는 중...';
+                    document.getElementById('btn-king-next').style.display = isHost ? 'block' : 'none';
                 }
                 else if (data.selectedGame === 'speed') {
                     showScreen('game-speed-screen');
@@ -1479,6 +1553,19 @@
         }
     });
 
+    document.getElementById('btn-king-next').addEventListener('click', () => {
+        if (!currentRoomCode || !isHost) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const roomVal = snap.val(); if (!roomVal) return;
+            const playerCount = roomVal.kingPlayerCount || Object.keys(roomVal.kingNumbers || {}).length;
+            if (!playerCount) return;
+            update(ref(db, `rooms/${currentRoomCode}`), {
+                kingCommandText: drawKingCommand(playerCount),
+                kingRound: (roomVal.kingRound || 0) + 1
+            });
+        });
+    });
+
     function generateQuiz() {
         if (isPenaltyActive) return;
         const a1=Math.floor(Math.random()*8)+4, b1=Math.floor(Math.random()*7)+3, c1=Math.floor(Math.random()*25)+5;
@@ -1516,6 +1603,72 @@
         setTimeout(() => document.body.classList.remove('explode-shake'), 600);
     }
 
+    // ===== 📦 폭탄찾기 (다같이 그리드 공유, 한명씩 순서대로 클릭) =====
+    const BOXFIND_TOTAL = 24; // 6열 x 4행
+
+    window.clickBoxFindTile = function(idx) {
+        if (!currentRoomCode) return;
+        runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
+            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'boxfind') return undefined;
+            if (roomData.boxFindExploded) return undefined;
+            const turnOrder = roomData.boxFindTurnOrder || [];
+            if (turnOrder.length === 0) return undefined;
+            const turnIdx = roomData.boxFindTurnIndex || 0;
+            const curPlayerId = turnOrder[turnIdx % turnOrder.length];
+            if (curPlayerId !== myId) return undefined; // 내 차례가 아니면 무시
+            const opened = roomData.boxFindOpened || {};
+            if (opened[idx]) return undefined; // 이미 열린 상자
+
+            if (idx === roomData.boxFindBombIndex) {
+                opened[idx] = 'bomb';
+                roomData.boxFindOpened = opened;
+                roomData.boxFindExploded = true;
+                roomData.boxFindLoserId = myId;
+            } else {
+                opened[idx] = 'safe';
+                roomData.boxFindOpened = opened;
+                roomData.boxFindTurnIndex = turnIdx + 1;
+            }
+            return roomData;
+        });
+    };
+
+    // ===== 👑 왕게임 (전원 랜덤 순서 뽑기 + 명령 카드 자동 생성) =====
+    const kingCommands = [
+        { text: "{A}번과 {B}번, 눈 마주치고 러브샷!", slots: 2 },
+        { text: "{A}번, 지금 이 순간 왕이 시키는 대로 원샷!", slots: 1 },
+        { text: "{A}번과 {B}번, 소원 들어주기 찬스 (뭐든 하나 들어주기)", slots: 2 },
+        { text: "전원 다같이 3초 안에 하이파이브!", slots: 0 },
+        { text: "{A}번, 최근 카톡 대화 하나 큰 소리로 읽기", slots: 1 },
+        { text: "{A}번과 {B}번, 가위바위보! 진 사람 원샷", slots: 2 },
+        { text: "{A}번, 왼쪽 사람에게 애교 부리기", slots: 1 },
+        { text: "전원 3초 안에 신발 벗기, 꼴찌 원샷", slots: 0 },
+        { text: "{A}번과 {B}번, 팔짱 끼고 사진 찍기", slots: 2 },
+        { text: "{A}번, 지금부터 3턴 동안 존댓말만 쓰기", slots: 1 },
+        { text: "{A}번과 {B}번, 술잔 바꿔서 마시기", slots: 2 },
+        { text: "전원 각자 핸드폰 배터리 공개, 가장 낮은 사람 원샷", slots: 0 },
+        { text: "{A}번, 옆 사람 어깨 안마 10초", slots: 1 },
+        { text: "{A}번과 {B}번, 등 돌리고 이름 맞히기 게임, 진 사람 원샷", slots: 2 },
+        { text: "{A}번, 오늘 있었던 일 중 자랑거리 하나 말하기", slots: 1 },
+        { text: "전원 건배사 한마디씩 릴레이로 외치기", slots: 0 },
+        { text: "{A}번과 {B}번, 만세 삼창 같이 외치기", slots: 2 },
+        { text: "{A}번, 지금 심정을 이모티콘으로 표현하기", slots: 1 }
+    ];
+
+    function drawKingCommand(playerCount) {
+        const eligible = kingCommands.filter(c => c.slots <= playerCount);
+        const tmpl = eligible[Math.floor(Math.random() * eligible.length)];
+        const nums = [];
+        while (nums.length < tmpl.slots) {
+            const n = Math.floor(Math.random() * playerCount) + 1;
+            if (!nums.includes(n)) nums.push(n);
+        }
+        let text = tmpl.text;
+        if (tmpl.slots >= 1) text = text.replace('{A}', nums[0]);
+        if (tmpl.slots >= 2) text = text.replace('{B}', nums[1]);
+        return text;
+    }
+
     document.getElementById('btn-start-game').addEventListener('click', () => {
         get(ref(db, `rooms/${currentRoomCode}/players`)).then((snap) => {
             const pIds = Object.keys(snap.val()); if(pIds.length < 2) return alert('최소 2명 필요합니다!');
@@ -1530,8 +1683,9 @@
                 const shapeIdx = pickRandomShapeIndex();
                 update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
             } else if (selectedGame === 'bomb') {
-                // 2명이면 10초 고정, 3명 이상이면 15~20초 랜덤 (인원이 많을수록 한 바퀴 도는 데 시간이 더 걸리므로)
-                const randomFuseMs = pIds.length <= 2 ? 10000 : (15000 + Math.floor(Math.random() * 5000));
+                // 2명이면 10초 고정(빠른 진행). 3명 이상부터는 인원수에 비례해 퓨즈 시간을 늘림
+                // (인원이 많을수록 한 바퀴 도는 데 시간이 더 걸리므로, 인당 약 4초 + 랜덤 여유 5초를 부여)
+                const randomFuseMs = pIds.length <= 2 ? 10000 : (pIds.length * 4000 + Math.floor(Math.random() * 5000));
                 update(rRef, {
                     status: 'playing',
                     bombHolderId: pIds[Math.floor(Math.random()*pIds.length)],
@@ -1542,6 +1696,30 @@
             } else if (selectedGame === 'speed') {
                 const randIdx = Math.floor(Math.random() * chosungPool.length);
                 update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedAnswers: null, speedLoserId: null });
+            } else if (selectedGame === 'boxfind') {
+                const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
+                const bombIdx = Math.floor(Math.random() * BOXFIND_TOTAL);
+                update(rRef, {
+                    status: 'playing',
+                    boxFindTotal: BOXFIND_TOTAL,
+                    boxFindBombIndex: bombIdx,
+                    boxFindOpened: {},
+                    boxFindTurnOrder: shuffledOrder,
+                    boxFindTurnIndex: 0,
+                    boxFindExploded: false,
+                    boxFindLoserId: null
+                });
+            } else if (selectedGame === 'king') {
+                const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
+                const numbers = {};
+                shuffledOrder.forEach((id, idx) => { numbers[id] = idx + 1; });
+                update(rRef, {
+                    status: 'playing',
+                    kingNumbers: numbers,
+                    kingPlayerCount: shuffledOrder.length,
+                    kingCommandText: drawKingCommand(shuffledOrder.length),
+                    kingRound: 1
+                });
             } else if (selectedGame === 'balance') {
                 update(rRef, { status: 'playing', balanceIndex: Math.floor(Math.random() * balancePool.length), balanceVotes: null, balanceRevealed: false });
             } else if (selectedGame === 'timing') {
