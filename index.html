@@ -153,6 +153,7 @@
         }
         .player-list li.me { border-left-color: var(--accent-color); background-color: #2e2e1f; }
         .host-badge { font-size: 12px; background-color: var(--primary-color); color: #121214; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+        .kick-btn { flex-shrink: 0; font-size: 12px; padding: 6px 10px; margin: 0; width: auto; background-color: var(--danger-color); color: #fff; border-radius: 4px; }
 
         #canvas-container {
             position: relative; background-color: #151518 !important; border-radius: 12px;
@@ -337,6 +338,7 @@
             <div id="balance-question-title" style="font-size: 18px; font-weight: bold; color: var(--accent-color);">질문을 가져오는 중..</div>
         </div>
         <div id="balance-status-alert" style="font-size: 14px; font-weight: bold; color: #8E9AA8; margin-bottom: 15px;">원하는 선택지를 터치하세요!</div>
+        <div id="balance-vote-progress" style="font-size: 13px; font-weight: bold; color: var(--accent-color); margin-top: -10px; margin-bottom: 15px;"></div>
         <div class="balance-box">
             <button class="balance-option-btn" id="btn-balance-a" onclick="handleBalanceOptionClick('A')">
                 <div class="balance-gauge" id="gauge-a"></div>
@@ -461,7 +463,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, update, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, set, onValue, update, get, runTransaction, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = { databaseURL: "https://roulette-d9a12-default-rtdb.asia-southeast1.firebasedatabase.app/" };
     const app = initializeApp(firebaseConfig);
@@ -562,6 +564,13 @@
     let serverTimeOffset = 0;
     let bombExplosionAttemptKey = null;
     let currentBombExplodeAt = null;
+    let hasSeenMyselfInRoom = false;
+
+    window.kickPlayer = function(id, nickname) {
+        if (!isHost) return;
+        if (!confirm(`${nickname}님을 강퇴하시겠습니까?`)) return;
+        remove(ref(db, `rooms/${currentRoomCode}/players/${id}`));
+    };
 
     onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
         serverTimeOffset = Number(snap.val()) || 0;
@@ -846,13 +855,32 @@
 
             if (data.selectedGame) updateTabUI(data.selectedGame);
 
+            // 강퇴당했는지 확인 (예전에는 방에 있었는데 지금 목록에 내가 없는 경우)
+            if (hasSeenMyselfInRoom && !players[myId]) {
+                alert('방장에 의해 강퇴되었습니다.');
+                sessionStorage.removeItem(`partyGameId_${roomCode}`);
+                window.location.reload();
+                return;
+            }
+            if (players[myId]) hasSeenMyselfInRoom = true;
+
             const playerListEl = document.getElementById('player-list');
             if(playerListEl) {
                 playerListEl.innerHTML = '';
                 playerIds.forEach(id => {
-                    const li = document.createElement('li'); li.innerText = players[id].nickname;
-                    if (id === myId) { li.classList.add('me'); li.innerText += " (나)"; }
-                    if (players[id].isHost) { li.innerHTML += ` <span class="host-badge">방장</span>`; }
+                    const li = document.createElement('li');
+                    const nameSpan = document.createElement('span');
+                    nameSpan.innerText = players[id].nickname;
+                    if (id === myId) { li.classList.add('me'); nameSpan.innerText += " (나)"; }
+                    if (players[id].isHost) { nameSpan.innerHTML += ` <span class="host-badge">방장</span>`; }
+                    li.appendChild(nameSpan);
+                    if (isHost && id !== myId) {
+                        const kickBtn = document.createElement('button');
+                        kickBtn.innerText = '강퇴';
+                        kickBtn.className = 'kick-btn';
+                        kickBtn.onclick = () => window.kickPlayer(id, players[id].nickname);
+                        li.appendChild(kickBtn);
+                    }
                     playerListEl.appendChild(li);
                 });
             }
@@ -954,6 +982,16 @@
                         document.getElementById('count-option-a').style.display = 'none'; document.getElementById('count-option-b').style.display = 'none';
                         document.getElementById('balance-result-box').style.display = 'none';
                         balanceOpenedRoundKey = null;
+                    }
+                    // 아직 공개 전이면 몇 명이 투표를 완료했는지 실시간으로 표시
+                    const voteProgressEl = document.getElementById('balance-vote-progress');
+                    if (voteProgressEl) {
+                        if (!isBalanceRevealed) {
+                            const votedCount = playerIds.filter(id => votes[id] !== undefined).length;
+                            voteProgressEl.innerText = `🗳️ 투표 완료 ${votedCount} / ${playerIds.length}명`;
+                        } else {
+                            voteProgressEl.innerText = '';
+                        }
                     }
                     document.getElementById('btn-reveal-balance').style.display = (isHost && !isBalanceRevealed) ? 'block' : 'none';
                     if (!isBalanceRevealed) document.getElementById('btn-reveal-balance').disabled = false;
@@ -1281,7 +1319,17 @@
 
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
-        return { x: (e.touches ? e.touches[0].clientX : e.clientX) - rect.left, y: (e.touches ? e.touches[0].clientY : e.clientY) - rect.top };
+        let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        // 화면이 핀치줌 등으로 확대된 상태에서는 clientX/Y가 visualViewport 기준으로 어긋날 수 있어 보정
+        if (window.visualViewport) {
+            clientX += window.visualViewport.offsetLeft;
+            clientY += window.visualViewport.offsetTop;
+        }
+        // 캔버스의 실제 해상도(width/height)와 화면에 표시되는 CSS 크기가 다를 수 있으므로 비율 보정
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
     }
     function clearCanvas() { ctx.fillStyle = '#151518'; ctx.fillRect(0, 0, canvas.width, canvas.height); userDrawingPoints = []; }
     canvas.addEventListener('mousedown', (e) => { isDrawing = true; ctx.beginPath(); const c = getCanvasCoordinates(e); ctx.moveTo(c.x, c.y); ctx.strokeStyle = '#5C9EFF'; ctx.lineWidth = 5; userDrawingPoints.push(c); });
