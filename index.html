@@ -296,10 +296,10 @@
     <div id="boom-overlay" class="boom-overlay" role="dialog" aria-modal="true" aria-live="assertive">
         <div id="boom-overlay-title" class="boom-overlay-title">💥 BOOM! 💥</div>
         <div id="boom-overlay-message" class="boom-overlay-message">폭탄 당첨!</div>
-        <div class="boom-overlay-guide">화면을 터치하면 닫힙니다</div>
+        <div class="boom-overlay-guide">화면을 터치할 때까지 표시됩니다 · 터치하여 닫기</div>
     </div>
     <h1>🎮 실시간 멀티 게임 패키지</h1>
-    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-07-29-v2</div>
+    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-07-29-v3</div>
 
     <div id="login-screen" class="screen active">
         <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
@@ -333,6 +333,19 @@
         </div>
         <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
         <ul id="player-list" class="player-list"></ul>
+        <div id="boxfind-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
+            <label for="boxfind-bomb-count" style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--accent-color); font-size:14px; font-weight:700;">
+                <span>💣 폭탄찾기 폭탄 개수</span>
+                <select id="boxfind-bomb-count" style="background:#252529; color:#fff; border:1px solid #3A3A42; border-radius:8px; padding:8px 12px; font-weight:700;">
+                    <option value="1" selected>1개</option>
+                    <option value="2">2개</option>
+                    <option value="3">3개</option>
+                    <option value="4">4개</option>
+                    <option value="5">5개</option>
+                </select>
+            </label>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">방장이 선택한 개수만큼 상자 안에 폭탄이 배치됩니다.</div>
+        </div>
         <button id="btn-start-game">게임 시작</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
     </div>
@@ -878,6 +891,8 @@
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         if(document.getElementById(`tab-${gameMode}`)) document.getElementById(`tab-${gameMode}`).classList.add('active');
         selectedGame = gameMode;
+        const boxfindSettings = document.getElementById('boxfind-settings');
+        if (boxfindSettings) boxfindSettings.style.display = (isHost && gameMode === 'boxfind') ? 'block' : 'none';
     }
 
     window.openImageModal = function(nickname, imgData) {
@@ -1029,6 +1044,7 @@
                     showScreen('game-boxfind-screen');
                     const total = data.boxFindTotal || BOXFIND_TOTAL;
                     const opened = data.boxFindOpened || {};
+                    const bombIndexes = data.boxFindBombIndexes || (Number.isInteger(data.boxFindBombIndex) ? [data.boxFindBombIndex] : []);
                     const turnOrder = data.boxFindTurnOrder || [];
                     const turnIdx = data.boxFindTurnIndex || 0;
                     const curPlayerId = turnOrder.length ? turnOrder[turnIdx % turnOrder.length] : null;
@@ -1036,13 +1052,12 @@
                     if (data.boxFindExploded) {
                         const loserNick = players[data.boxFindLoserId]?.nickname || '???';
                         statusEl.innerHTML = `🚨 [${loserNick}] 폭탄 발견! 벌주 당첨!`;
-                        if (data.boxFindLoserId === myId) {
-                            triggerExplosionEffect({
-                                key: `boxfind_${data.boxFindBombIndex}_${data.boxFindLoserId}`,
-                                title: '💥 BOOM! 💥',
-                                message: `${loserNick}님 폭탄 발견!`
-                            });
-                        }
+                        triggerExplosionEffect({
+                            key: `boxfind_${data.boxFindRoundKey || ''}_${data.boxFindLoserId}`,
+                            title: '💥 BOOM! 💥',
+                            message: `${loserNick}님이 폭탄에 걸렸습니다!`,
+                            duration: 0
+                        });
                     } else if (curPlayerId === myId) {
                         statusEl.innerHTML = `🔥 내 차례입니다! 상자를 골라 터치하세요!`;
                     } else {
@@ -1716,7 +1731,7 @@
 
         if (navigator.vibrate) navigator.vibrate(options.vibrate || [500, 100, 400]);
         clearTimeout(boomOverlayTimer);
-        boomOverlayTimer = setTimeout(hideBoomOverlay, options.duration || 1800);
+        if (options.duration !== 0) boomOverlayTimer = setTimeout(hideBoomOverlay, options.duration || 1800);
         setTimeout(() => document.body.classList.remove('explode-shake'), 700);
     }
 
@@ -1736,7 +1751,8 @@
             const opened = roomData.boxFindOpened || {};
             if (opened[idx]) return undefined; // 이미 열린 상자
 
-            if (idx === roomData.boxFindBombIndex) {
+            const bombIndexes = roomData.boxFindBombIndexes || (Number.isInteger(roomData.boxFindBombIndex) ? [roomData.boxFindBombIndex] : []);
+            if (bombIndexes.includes(idx)) {
                 opened[idx] = 'bomb';
                 roomData.boxFindOpened = opened;
                 roomData.boxFindExploded = true;
@@ -1818,11 +1834,21 @@
                 update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedAnswers: null, speedLoserId: null });
             } else if (selectedGame === 'boxfind') {
                 const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
-                const bombIdx = Math.floor(Math.random() * BOXFIND_TOTAL);
+                const bombCountEl = document.getElementById('boxfind-bomb-count');
+                const requestedBombCount = parseInt(bombCountEl?.value || '1', 10);
+                const bombCount = Math.max(1, Math.min(5, requestedBombCount, BOXFIND_TOTAL));
+                const bombIndexes = [];
+                while (bombIndexes.length < bombCount) {
+                    const candidate = Math.floor(Math.random() * BOXFIND_TOTAL);
+                    if (!bombIndexes.includes(candidate)) bombIndexes.push(candidate);
+                }
                 update(rRef, {
                     status: 'playing',
                     boxFindTotal: BOXFIND_TOTAL,
-                    boxFindBombIndex: bombIdx,
+                    boxFindBombCount: bombCount,
+                    boxFindBombIndexes: bombIndexes,
+                    boxFindBombIndex: null,
+                    boxFindRoundKey: getServerNow(),
                     boxFindOpened: {},
                     boxFindTurnOrder: shuffledOrder,
                     boxFindTurnIndex: 0,
@@ -1871,7 +1897,8 @@
                 dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null,
                 timingTarget: null, timingStartTime: null, timingResults: null,
                 rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
-                speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null
+                speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null,
+                boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null
             });
         });
     });
