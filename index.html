@@ -307,11 +307,6 @@
 
     <div id="login-screen" class="screen active">
         <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
-        <div style="display:flex; gap:8px; margin:10px 0;">
-            <button type="button" id="gender-btn-m" class="gender-btn" onclick="selectGender('M')" style="flex:1; padding:10px; border-radius:10px; border:2px solid #3A3A42; background:#151518; color:#fff; font-weight:600;">👨 남자</button>
-            <button type="button" id="gender-btn-f" class="gender-btn" onclick="selectGender('F')" style="flex:1; padding:10px; border-radius:10px; border:2px solid #3A3A42; background:#151518; color:#fff; font-weight:600;">👩 여자</button>
-        </div>
-        <div style="font-size:11px; color:#8E9AA8; margin:-4px 0 10px; text-align:center;">👑 왕게임에서 남녀 짝을 맞추는 데 쓰여요</div>
         <div id="join-mode-box">
             <input type="text" id="room-code-input" placeholder="방 코드 4자리 입력">
             <button id="btn-join-room">방 참여하기</button>
@@ -369,6 +364,9 @@
                 <input type="checkbox" id="king19-toggle" style="width:20px; height:20px;">
             </label>
             <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">켜면 다소 수위 있는 커맨드도 섞여요. 두 명이 지목되는 커맨드는 항상 남녀 한 명씩만 짝지어지고, 남자만 있거나 여자만 있으면 자동으로 제외돼요.</div>
+            <div style="font-size:13px; color:#fff; font-weight:700; margin-top:12px;">👑 참여자 성별 지정 (방장만 보여요)</div>
+            <div style="font-size:11px; color:#8E9AA8; margin:4px 0 8px;">남녀 짝짓기 커맨드에 쓸 사람만 지정하면 돼요. 지정 안 하면 그 사람은 짝짓기 대상에서 빠져요.</div>
+            <div id="king-gender-list"></div>
         </div>
         <button id="btn-start-game">게임 시작</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
@@ -588,6 +586,10 @@
 
     // 🔄 강제 새로고침: 서비스워커/캐시를 지우고 캐시버스팅 파라미터를 붙여 새로 불러온다
     async function forceHardRefresh() {
+        const toast = document.createElement('div');
+        toast.textContent = '🔄 최신 버전 확인 중...';
+        toast.style.cssText = 'position:fixed; top:56px; right:10px; z-index:601; background:rgba(0,0,0,0.85); color:#fff; padding:8px 12px; border-radius:8px; font-size:12px;';
+        document.body.appendChild(toast);
         try {
             if ('serviceWorker' in navigator) {
                 const regs = await navigator.serviceWorker.getRegistrations();
@@ -598,11 +600,17 @@
                 await Promise.all(keys.map(k => caches.delete(k)));
             }
         } catch (e) { /* 무시하고 진행 */ }
+        await new Promise(r => setTimeout(r, 350));
         const url = new URL(window.location.href);
         url.searchParams.set('_r', Date.now());
         window.location.replace(url.toString());
     }
     window.forceHardRefresh = forceHardRefresh;
+    // 모듈 스크립트 내부 함수는 window에 등록해야 HTML의 inline onclick에서 호출된다
+    window.setHostGender = (...args) => setHostGender(...args);
+    window.startOnlineCheatPress = (...args) => startOnlineCheatPress(...args);
+    window.cancelOnlineCheatPress = (...args) => cancelOnlineCheatPress(...args);
+    window.onOnlineCheatToggle = (...args) => onOnlineCheatToggle(...args);
 
     const wordList = {
         "연예/콘텐츠 📺": [
@@ -691,7 +699,9 @@
         { q: "인생의 중대한 선택!", a: "타임머신 타고 20년 전 과거의 나 만나기", b: "타임머신 타고 20년 후 미래의 나 만나기" }
     ];
 
-    let myId = '', myNickname = '', myGender = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
+    let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
+    let hostGenderMap = {}; // 방장이 왕게임용으로 지정한 참여자별 성별 (playerId -> 'M'/'F')
+    let latestPlayers = {}; // 현재 방의 참여자 목록 캐시 (성별 지정 UI 렌더링용)
 
     // 🕵️ 방장 전용 시크릿 모드 (라이어/폭탄 등 '걸리는' 역할 추첨용)
     let onlineCheatOn = false;
@@ -707,11 +717,39 @@
     function cancelOnlineCheatPress() {
         if (onlineCheatPressTimer) { clearTimeout(onlineCheatPressTimer); onlineCheatPressTimer = null; }
     }
-    function selectGender(g) {
-        myGender = g;
-        document.getElementById('gender-btn-m').style.borderColor = (g === 'M') ? 'var(--accent-color)' : '#3A3A42';
-        document.getElementById('gender-btn-f').style.borderColor = (g === 'F') ? 'var(--accent-color)' : '#3A3A42';
-        localStorage.setItem('partyGameGender', g);
+    function setHostGender(id, g) {
+        hostGenderMap[id] = (hostGenderMap[id] === g) ? null : g; // 같은 버튼 다시 누르면 지정 취소
+        renderKingGenderList();
+    }
+
+    function renderKingGenderList() {
+        const container = document.getElementById('king-gender-list');
+        if (!container || !isHost) return;
+        const ids = Object.keys(latestPlayers);
+        // 방을 나간 사람의 지정 정보는 정리
+        Object.keys(hostGenderMap).forEach(id => { if (!ids.includes(id)) delete hostGenderMap[id]; });
+        container.innerHTML = '';
+        ids.forEach(id => {
+            const g = hostGenderMap[id];
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px solid #2D2D34;';
+            const name = document.createElement('span');
+            name.style.cssText = 'font-size:13px; color:#fff;';
+            name.textContent = (latestPlayers[id]?.nickname || '?') + (id === myId ? ' (나)' : '');
+            const btnWrap = document.createElement('div');
+            btnWrap.style.cssText = 'display:flex; gap:6px;';
+            const mBtn = document.createElement('button');
+            mBtn.type = 'button'; mBtn.textContent = '👨';
+            mBtn.style.cssText = `padding:4px 10px; border-radius:8px; border:2px solid ${g === 'M' ? 'var(--accent-color)' : '#3A3A42'}; background:#1c1c20; color:#fff;`;
+            mBtn.onclick = () => window.setHostGender(id, 'M');
+            const fBtn = document.createElement('button');
+            fBtn.type = 'button'; fBtn.textContent = '👩';
+            fBtn.style.cssText = `padding:4px 10px; border-radius:8px; border:2px solid ${g === 'F' ? 'var(--accent-color)' : '#3A3A42'}; background:#1c1c20; color:#fff;`;
+            fBtn.onclick = () => window.setHostGender(id, 'F');
+            btnWrap.appendChild(mBtn); btnWrap.appendChild(fBtn);
+            row.appendChild(name); row.appendChild(btnWrap);
+            container.appendChild(row);
+        });
     }
 
     function onOnlineCheatToggle() {
@@ -927,8 +965,6 @@
         setupCurrencyFormatting();
         const savedNickname = localStorage.getItem('partyGameNickname');
         if (savedNickname) document.getElementById('nickname-input').value = savedNickname;
-        const savedGender = localStorage.getItem('partyGameGender');
-        if (savedGender) selectGender(savedGender);
     });
 
     function setupCurrencyFormatting() {
@@ -988,7 +1024,6 @@
     document.getElementById('btn-create-room').addEventListener('click', () => {
         const nickname = document.getElementById('nickname-input').value.trim();
         if(!nickname) return alert('닉네임을 입력해주세요!');
-        if(!myGender) return alert('성별을 선택해주세요! (왕게임 남녀 짝짓기에 사용돼요)');
         localStorage.setItem('partyGameNickname', nickname);
         myNickname = nickname; currentRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
         myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
@@ -997,7 +1032,7 @@
 
         set(ref(db, `rooms/${currentRoomCode}`), {
             status: 'waiting', hostId: myId, selectedGame: 'liar',
-            players: { [myId]: { nickname: nickname, isHost: true, gender: myGender } }
+            players: { [myId]: { nickname: nickname, isHost: true } }
         }).then(() => {
             initRoomListener(currentRoomCode); showScreen('lobby-screen');
             document.getElementById('btn-start-game').style.display = 'block';
@@ -1009,7 +1044,6 @@
         const nickname = document.getElementById('nickname-input').value.trim();
         const roomCode = document.getElementById('room-code-input').value.trim();
         if(!nickname || !roomCode) return alert('입력 값을 확인해주세요!');
-        if(!myGender) return alert('성별을 선택해주세요! (왕게임 남녀 짝짓기에 사용돼요)');
         localStorage.setItem('partyGameNickname', nickname);
         myNickname = nickname; currentRoomCode = roomCode;
         myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
@@ -1018,7 +1052,7 @@
 
         get(ref(db, `rooms/${roomCode}`)).then((snapshot) => {
             if (!snapshot.exists()) return alert('존재하지 않는 방입니다.');
-            set(ref(db, `rooms/${roomCode}/players/${myId}`), { nickname: nickname, isHost: false, gender: myGender }).then(() => {
+            set(ref(db, `rooms/${roomCode}/players/${myId}`), { nickname: nickname, isHost: false }).then(() => {
                 initRoomListener(roomCode); showScreen('lobby-screen');
                 document.getElementById('btn-start-game').style.display = 'none';
                 document.getElementById('wait-message').style.display = 'block';
@@ -1031,7 +1065,9 @@
         onValue(ref(db, `rooms/${roomCode}`), (snapshot) => {
             const data = snapshot.val(); if(!data) return;
             const players = data.players || {}; const playerIds = Object.keys(players);
+            latestPlayers = players;
             document.getElementById('player-count').innerText = playerIds.length;
+            renderKingGenderList();
 
             if (data.selectedGame) updateTabUI(data.selectedGame);
 
@@ -1980,13 +2016,12 @@
                 });
             } else if (selectedGame === 'king') {
                 const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
-                const playersVal = snap.val();
                 const numbers = {};
                 const genderMap = {};
                 shuffledOrder.forEach((id, idx) => {
                     const num = idx + 1;
                     numbers[id] = num;
-                    genderMap[num] = (playersVal[id] && playersVal[id].gender) || null;
+                    genderMap[num] = hostGenderMap[id] || null;
                 });
                 update(rRef, {
                     status: 'playing',
