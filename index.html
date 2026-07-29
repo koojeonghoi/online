@@ -187,8 +187,8 @@
         .role-box.liar { background-color: #3d1d1d; border-color: var(--danger-color); color: #ff8b8b; }
         .role-box.citizen { background-color: var(--success-bg); border-color: var(--success-color); color: #aeffc3; line-height: 1.6; }
 
-        .boxfind-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 15px 0; }
-        .boxfind-tile { background: #334155; border: none; border-radius: 10px; height: 46px; font-size: 1.1rem; color: #fff; cursor: pointer; }
+        .boxfind-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 15px 0; width: 100%; }
+        .boxfind-tile { background: #334155; border: none; border-radius: 10px; height: 58px; padding: 0; margin: 0; font-size: 1.25rem; color: #fff; cursor: pointer; }
         .boxfind-tile:disabled { cursor: not-allowed; opacity: 0.85; }
         .boxfind-tile.safe { background: #0b0f19; font-size: 0.85rem; color: #475569; }
         .boxfind-tile.bomb { background: var(--danger-color); animation: shake 0.15s infinite; }
@@ -248,7 +248,7 @@
 <div class="container" id="main-container">
     <div id="explosion-overlay"></div>
     <h1>🎮 실시간 멀티 게임 패키지</h1>
-    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-07-19-v2</div>
+    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-07-29-v1</div>
 
     <div id="login-screen" class="screen active">
         <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
@@ -1604,7 +1604,7 @@
     }
 
     // ===== 📦 폭탄찾기 (다같이 그리드 공유, 한명씩 순서대로 클릭) =====
-    const BOXFIND_TOTAL = 24; // 6열 x 4행
+    const BOXFIND_TOTAL = 25; // 5열 x 5행
 
     window.clickBoxFindTile = function(idx) {
         if (!currentRoomCode) return;
@@ -1683,9 +1683,12 @@
                 const shapeIdx = pickRandomShapeIndex();
                 update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
             } else if (selectedGame === 'bomb') {
-                // 2명이면 10초 고정(빠른 진행). 3명 이상부터는 인원수에 비례해 퓨즈 시간을 늘림
-                // (인원이 많을수록 한 바퀴 도는 데 시간이 더 걸리므로, 인당 약 4초 + 랜덤 여유 5초를 부여)
-                const randomFuseMs = pIds.length <= 2 ? 10000 : (pIds.length * 4000 + Math.floor(Math.random() * 5000));
+                // 참여자 한 명당 약 6초의 문제 풀이 시간을 반영하고,
+                // 첫 문제 확인 및 Firebase 통신을 위한 기본 여유 시간을 추가함
+                // 2명: 15~20초 / 3명: 23~28초 / 4명: 29~34초
+                const randomFuseMs = pIds.length <= 2
+                    ? 15000 + Math.floor(Math.random() * 5000)
+                    : (pIds.length * 6000 + 5000 + Math.floor(Math.random() * 6000));
                 update(rRef, {
                     status: 'playing',
                     bombHolderId: pIds[Math.floor(Math.random()*pIds.length)],
@@ -1778,3 +1781,4 @@
 </script>
 </body>
 </html>
+
