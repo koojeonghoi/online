@@ -331,7 +331,15 @@
             <button class="tab-btn" id="tab-boxfind" onclick="selectGameMode('boxfind')">📦 폭탄찾기</button>
             <button class="tab-btn" id="tab-king" onclick="selectGameMode('king')">👑 왕게임</button>
         </div>
-        <h3>참여자 목록 (<span id="player-count">0</span>명)</h3>
+        <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
+        <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
+            <div style="font-size:12px; color:#8E9AA8; margin-bottom:8px;">🕵️ 방장 전용 설정 (다른 사람에게 화면 보이지 않게 하세요)</div>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#fff;">
+                <input type="checkbox" id="onlineCheatToggle" onchange="onOnlineCheatToggle()"> 시크릿 모드 켜기
+            </label>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:6px;">1~6번째 대상자 추첨은 완전히 정상 랜덤이고, 7번째부터 조용히 적용됩니다. 라이어/폭탄 등 '걸리는' 역할에 방장(나)은 그 이후로 걸리지 않습니다.</div>
+            <button class="secondary" style="margin-top:8px; padding:6px 10px; font-size:12px;" onclick="document.getElementById('onlineCheatPanel').style.display='none'">닫기</button>
+        </div>
         <ul id="player-list" class="player-list"></ul>
         <div id="boxfind-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
             <label for="boxfind-bomb-count" style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--accent-color); font-size:14px; font-weight:700;">
@@ -650,6 +658,33 @@
     ];
 
     let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
+
+    // 🕵️ 방장 전용 시크릿 모드 (라이어/폭탄 등 '걸리는' 역할 추첨용)
+    let onlineCheatOn = false;
+    let onlineCheatPressTimer = null;
+    let pickCount = 0;
+
+    function startOnlineCheatPress() {
+        if (!isHost) return;
+        onlineCheatPressTimer = setTimeout(() => {
+            document.getElementById('onlineCheatPanel').style.display = 'block';
+        }, 700);
+    }
+    function cancelOnlineCheatPress() {
+        if (onlineCheatPressTimer) { clearTimeout(onlineCheatPressTimer); onlineCheatPressTimer = null; }
+    }
+    function onOnlineCheatToggle() {
+        onlineCheatOn = document.getElementById('onlineCheatToggle').checked;
+    }
+    // 1~6번째 추첨은 완전 정상 랜덤, 7번째부터 방장(myId)을 후보에서 제외
+    function pickIdProtected(ids) {
+        pickCount++;
+        if (onlineCheatOn && pickCount >= 7) {
+            const others = ids.filter(id => id !== myId);
+            if (others.length > 0) return others[Math.floor(Math.random() * others.length)];
+        }
+        return ids[Math.floor(Math.random() * ids.length)];
+    }
     const canvas = document.getElementById('drawing-canvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
@@ -1811,7 +1846,7 @@
                 const pickedCategory = categories[Math.floor(Math.random()*categories.length)];
                 const wordsInCategory = wordList[pickedCategory];
                 const pickedWord = wordsInCategory[Math.floor(Math.random()*wordsInCategory.length)];
-                update(rRef, { status: 'playing', category: pickedCategory, word: pickedWord, liarId: pIds[Math.floor(Math.random()*pIds.length)] });
+                update(rRef, { status: 'playing', category: pickedCategory, word: pickedWord, liarId: pickIdProtected(pIds) });
             } else if (selectedGame === 'draw') {
                 const shapeIdx = pickRandomShapeIndex();
                 update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
@@ -1824,7 +1859,7 @@
                     : (pIds.length * 6000 + 5000 + Math.floor(Math.random() * 6000));
                 update(rRef, {
                     status: 'playing',
-                    bombHolderId: pIds[Math.floor(Math.random()*pIds.length)],
+                    bombHolderId: pickIdProtected(pIds),
                     bombExploded: false,
                     bombExplodeAt: getServerNow() + randomFuseMs,
                     bombPassSeq: 0
