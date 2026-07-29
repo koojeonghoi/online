@@ -287,9 +287,13 @@
         .speed-target.wrong-tap { background: var(--danger-color) !important; }
         #speedFingerStatus { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
         #speedFingerFinalMsg { font-size: 15px; font-weight: bold; color: var(--danger-color); margin-top: 8px; min-height: 20px; }
+
+        .force-refresh-btn { position: fixed; top: 10px; right: 10px; z-index: 600; width: 38px; height: 38px; border-radius: 50%; border: none; background: rgba(21,21,24,0.85); color: #8E9AA8; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+        .force-refresh-btn:active { transform: scale(0.92); }
     </style>
 </head>
 <body>
+    <button type="button" class="force-refresh-btn" onclick="forceHardRefresh()" title="강제 새로고침">🔄</button>
 
 <div class="container" id="main-container">
     <div id="explosion-overlay"></div>
@@ -581,6 +585,24 @@
     const firebaseConfig = { databaseURL: "https://roulette-d9a12-default-rtdb.asia-southeast1.firebasedatabase.app/" };
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+
+    // 🔄 강제 새로고침: 서비스워커/캐시를 지우고 캐시버스팅 파라미터를 붙여 새로 불러온다
+    async function forceHardRefresh() {
+        try {
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const r of regs) await r.unregister();
+            }
+            if (window.caches) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k)));
+            }
+        } catch (e) { /* 무시하고 진행 */ }
+        const url = new URL(window.location.href);
+        url.searchParams.set('_r', Date.now());
+        window.location.replace(url.toString());
+    }
+    window.forceHardRefresh = forceHardRefresh;
 
     const wordList = {
         "연예/콘텐츠 📺": [
