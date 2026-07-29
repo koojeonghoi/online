@@ -303,6 +303,11 @@
 
     <div id="login-screen" class="screen active">
         <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
+        <div style="display:flex; gap:8px; margin:10px 0;">
+            <button type="button" id="gender-btn-m" class="gender-btn" onclick="selectGender('M')" style="flex:1; padding:10px; border-radius:10px; border:2px solid #3A3A42; background:#151518; color:#fff; font-weight:600;">👨 남자</button>
+            <button type="button" id="gender-btn-f" class="gender-btn" onclick="selectGender('F')" style="flex:1; padding:10px; border-radius:10px; border:2px solid #3A3A42; background:#151518; color:#fff; font-weight:600;">👩 여자</button>
+        </div>
+        <div style="font-size:11px; color:#8E9AA8; margin:-4px 0 10px; text-align:center;">👑 왕게임에서 남녀 짝을 맞추는 데 쓰여요</div>
         <div id="join-mode-box">
             <input type="text" id="room-code-input" placeholder="방 코드 4자리 입력">
             <button id="btn-join-room">방 참여하기</button>
@@ -353,6 +358,13 @@
                 </select>
             </label>
             <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">방장이 선택한 개수만큼 상자 안에 폭탄이 배치됩니다.</div>
+        </div>
+        <div id="king-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
+            <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--accent-color); font-size:14px; font-weight:700;">
+                <span>🔥 19금 모드</span>
+                <input type="checkbox" id="king19-toggle" style="width:20px; height:20px;">
+            </label>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">켜면 다소 수위 있는 커맨드도 섞여요. 두 명이 지목되는 커맨드는 항상 남녀 한 명씩만 짝지어지고, 남자만 있거나 여자만 있으면 자동으로 제외돼요.</div>
         </div>
         <button id="btn-start-game">게임 시작</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
@@ -657,7 +669,7 @@
         { q: "인생의 중대한 선택!", a: "타임머신 타고 20년 전 과거의 나 만나기", b: "타임머신 타고 20년 후 미래의 나 만나기" }
     ];
 
-    let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
+    let myId = '', myNickname = '', myGender = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
 
     // 🕵️ 방장 전용 시크릿 모드 (라이어/폭탄 등 '걸리는' 역할 추첨용)
     let onlineCheatOn = false;
@@ -673,6 +685,13 @@
     function cancelOnlineCheatPress() {
         if (onlineCheatPressTimer) { clearTimeout(onlineCheatPressTimer); onlineCheatPressTimer = null; }
     }
+    function selectGender(g) {
+        myGender = g;
+        document.getElementById('gender-btn-m').style.borderColor = (g === 'M') ? 'var(--accent-color)' : '#3A3A42';
+        document.getElementById('gender-btn-f').style.borderColor = (g === 'F') ? 'var(--accent-color)' : '#3A3A42';
+        localStorage.setItem('partyGameGender', g);
+    }
+
     function onOnlineCheatToggle() {
         onlineCheatOn = document.getElementById('onlineCheatToggle').checked;
     }
@@ -886,6 +905,8 @@
         setupCurrencyFormatting();
         const savedNickname = localStorage.getItem('partyGameNickname');
         if (savedNickname) document.getElementById('nickname-input').value = savedNickname;
+        const savedGender = localStorage.getItem('partyGameGender');
+        if (savedGender) selectGender(savedGender);
     });
 
     function setupCurrencyFormatting() {
@@ -928,6 +949,8 @@
         selectedGame = gameMode;
         const boxfindSettings = document.getElementById('boxfind-settings');
         if (boxfindSettings) boxfindSettings.style.display = (isHost && gameMode === 'boxfind') ? 'block' : 'none';
+        const kingSettings = document.getElementById('king-settings');
+        if (kingSettings) kingSettings.style.display = (isHost && gameMode === 'king') ? 'block' : 'none';
     }
 
     window.openImageModal = function(nickname, imgData) {
@@ -943,6 +966,7 @@
     document.getElementById('btn-create-room').addEventListener('click', () => {
         const nickname = document.getElementById('nickname-input').value.trim();
         if(!nickname) return alert('닉네임을 입력해주세요!');
+        if(!myGender) return alert('성별을 선택해주세요! (왕게임 남녀 짝짓기에 사용돼요)');
         localStorage.setItem('partyGameNickname', nickname);
         myNickname = nickname; currentRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
         myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
@@ -951,7 +975,7 @@
 
         set(ref(db, `rooms/${currentRoomCode}`), {
             status: 'waiting', hostId: myId, selectedGame: 'liar',
-            players: { [myId]: { nickname: nickname, isHost: true } }
+            players: { [myId]: { nickname: nickname, isHost: true, gender: myGender } }
         }).then(() => {
             initRoomListener(currentRoomCode); showScreen('lobby-screen');
             document.getElementById('btn-start-game').style.display = 'block';
@@ -963,6 +987,7 @@
         const nickname = document.getElementById('nickname-input').value.trim();
         const roomCode = document.getElementById('room-code-input').value.trim();
         if(!nickname || !roomCode) return alert('입력 값을 확인해주세요!');
+        if(!myGender) return alert('성별을 선택해주세요! (왕게임 남녀 짝짓기에 사용돼요)');
         localStorage.setItem('partyGameNickname', nickname);
         myNickname = nickname; currentRoomCode = roomCode;
         myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
@@ -971,7 +996,7 @@
 
         get(ref(db, `rooms/${roomCode}`)).then((snapshot) => {
             if (!snapshot.exists()) return alert('존재하지 않는 방입니다.');
-            set(ref(db, `rooms/${roomCode}/players/${myId}`), { nickname: nickname, isHost: false }).then(() => {
+            set(ref(db, `rooms/${roomCode}/players/${myId}`), { nickname: nickname, isHost: false, gender: myGender }).then(() => {
                 initRoomListener(roomCode); showScreen('lobby-screen');
                 document.getElementById('btn-start-game').style.display = 'none';
                 document.getElementById('wait-message').style.display = 'block';
@@ -1682,7 +1707,7 @@
             const playerCount = roomVal.kingPlayerCount || Object.keys(roomVal.kingNumbers || {}).length;
             if (!playerCount) return;
             update(ref(db, `rooms/${currentRoomCode}`), {
-                kingCommandText: drawKingCommand(playerCount),
+                kingCommandText: drawKingCommand(playerCount, roomVal.kingGenderMap || {}),
                 kingRound: (roomVal.kingRound || 0) + 1
             });
         });
@@ -1823,13 +1848,54 @@
         { text: "{A}번, 지금 심정을 이모티콘으로 표현하기", slots: 1 }
     ];
 
-    function drawKingCommand(playerCount) {
-        const eligible = kingCommands.filter(c => c.slots <= playerCount);
+    // 19금 모드 전용: 스킨십을 강요하지 않는 선에서 수위만 살짝 있는 커맨드.
+    // 2인 지목 커맨드는 항상 남녀 한 명씩으로만 짝지어짐 (drawKingCommand 참고)
+    const kingAdultCommands = [
+        { text: "🔥[19금] {A}번, {B}번에게 고백하듯 진지하게 말해보기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번 귀에 대고 자신의 이상형 속삭이기", slots: 2 },
+        { text: "🔥[19금] {A}번과 {B}번, 서로의 매력 포인트 3가지씩 말해주기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번과 포옹 대신 하이파이브 러브샷", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번에게 지금 가장 하고 싶은 말 한마디", slots: 2 },
+        { text: "🔥[19금] {A}번, 이상형을 묘사하면 {B}번이 몇 점인지 맞혀보기", slots: 2 },
+        { text: "🔥[19금] {A}번, 최근에 설렜던 순간 하나 공개하기", slots: 1 },
+        { text: "🔥[19금] {A}번, 자신의 연애 스타일을 한 단어로 표현하기", slots: 1 },
+        { text: "🔥[19금] {A}번, {B}번에게 첫인상이 어땠는지 솔직하게 말하기", slots: 2 },
+        { text: "🔥[19금] {A}번과 {B}번, 서로에게 재미있는 별명 지어주기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번과 눈 마주치고 5초간 안 웃기 챌린지 — 웃으면 원샷", slots: 2 },
+        { text: "🔥[19금] {A}번, 자신의 최근 썸/연애 스토리 한 줄로 요약하기", slots: 1 },
+        { text: "🔥[19금] {A}번과 {B}번, 서로에게 궁금했던 질문 하나씩 주고받기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번을 왜 좋아할 수밖에 없는지 3초 안에 즉석 드립으로 말하기", slots: 2 },
+        { text: "🔥[19금] {A}번, 핸드폰 배경화면 공개하기", slots: 1 },
+        { text: "🔥[19금] {A}번과 {B}번, 3초 안에 같은 숫자 외치기 텔레파시 게임 — 실패하면 같이 원샷", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번에게 지금 기분을 색깔 하나로 표현하고 이유 설명하기", slots: 2 }
+    ];
+
+    function drawKingCommand(playerCount, genderMap) {
+        genderMap = genderMap || {};
+        const males = [], females = [];
+        for (let n = 1; n <= playerCount; n++) {
+            if (genderMap[n] === 'M') males.push(n);
+            else if (genderMap[n] === 'F') females.push(n);
+        }
+        const hasMixedPair = males.length > 0 && females.length > 0;
+
+        const use19 = !!document.getElementById('king19-toggle')?.checked;
+        const source = use19 ? kingCommands.concat(kingAdultCommands) : kingCommands;
+
+        // 2인 지목 커맨드는 남녀 짝이 가능할 때만 후보에 포함 (남남/여여 매칭 방지)
+        const eligible = source.filter(c => c.slots <= playerCount && (c.slots < 2 || hasMixedPair));
         const tmpl = eligible[Math.floor(Math.random() * eligible.length)];
+
         const nums = [];
-        while (nums.length < tmpl.slots) {
-            const n = Math.floor(Math.random() * playerCount) + 1;
-            if (!nums.includes(n)) nums.push(n);
+        if (tmpl.slots === 2 && hasMixedPair) {
+            const a = males[Math.floor(Math.random() * males.length)];
+            const b = females[Math.floor(Math.random() * females.length)];
+            if (Math.random() < 0.5) { nums.push(a, b); } else { nums.push(b, a); }
+        } else {
+            while (nums.length < tmpl.slots) {
+                const n = Math.floor(Math.random() * playerCount) + 1;
+                if (!nums.includes(n)) nums.push(n);
+            }
         }
         let text = tmpl.text;
         if (tmpl.slots >= 1) text = text.replace('{A}', nums[0]);
@@ -1892,13 +1958,20 @@
                 });
             } else if (selectedGame === 'king') {
                 const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
+                const playersVal = snap.val();
                 const numbers = {};
-                shuffledOrder.forEach((id, idx) => { numbers[id] = idx + 1; });
+                const genderMap = {};
+                shuffledOrder.forEach((id, idx) => {
+                    const num = idx + 1;
+                    numbers[id] = num;
+                    genderMap[num] = (playersVal[id] && playersVal[id].gender) || null;
+                });
                 update(rRef, {
                     status: 'playing',
                     kingNumbers: numbers,
                     kingPlayerCount: shuffledOrder.length,
-                    kingCommandText: drawKingCommand(shuffledOrder.length),
+                    kingGenderMap: genderMap,
+                    kingCommandText: drawKingCommand(shuffledOrder.length, genderMap),
                     kingRound: 1
                 });
             } else if (selectedGame === 'balance') {
