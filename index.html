@@ -182,6 +182,52 @@
 
         #explosion-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; overflow: hidden; border-radius: 16px; }
         .particle { position: absolute; width: 10px; height: 10px; background-color: var(--danger-color); border-radius: 50%; opacity: 0; }
+
+        /* Full-screen BOOM effect shared by bomb games */
+        .boom-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(244, 63, 94, 0.95);
+            z-index: 20000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            padding: 24px;
+            box-sizing: border-box;
+            animation: boomFlash 0.3s infinite alternate;
+            cursor: pointer;
+        }
+        .boom-overlay.show { display: flex; }
+        .boom-overlay-title {
+            font-size: clamp(3rem, 13vw, 5.5rem);
+            line-height: 1;
+            margin: 0 0 18px;
+            color: #fff;
+            font-weight: 900;
+            text-shadow: 0 6px 20px rgba(0,0,0,0.45);
+        }
+        .boom-overlay-message {
+            font-size: clamp(1.15rem, 5vw, 1.7rem);
+            line-height: 1.5;
+            color: #fff;
+            font-weight: 800;
+            word-break: keep-all;
+            text-shadow: 0 3px 10px rgba(0,0,0,0.4);
+        }
+        .boom-overlay-guide {
+            margin-top: 18px;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.8);
+            font-weight: 700;
+        }
+        @keyframes boomFlash {
+            from { background: rgba(244, 63, 94, 0.95); }
+            to { background: rgba(159, 18, 57, 0.97); }
+        }
         
         .role-box { padding: 20px; border-radius: 12px; font-size: 22px; font-weight: bold; margin: 20px 0; border: 2px solid transparent; }
         .role-box.liar { background-color: #3d1d1d; border-color: var(--danger-color); color: #ff8b8b; }
@@ -247,8 +293,13 @@
 
 <div class="container" id="main-container">
     <div id="explosion-overlay"></div>
+    <div id="boom-overlay" class="boom-overlay" role="dialog" aria-modal="true" aria-live="assertive">
+        <div id="boom-overlay-title" class="boom-overlay-title">💥 BOOM! 💥</div>
+        <div id="boom-overlay-message" class="boom-overlay-message">폭탄 당첨!</div>
+        <div class="boom-overlay-guide">화면을 터치하면 닫힙니다</div>
+    </div>
     <h1>🎮 실시간 멀티 게임 패키지</h1>
-    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-07-29-v1</div>
+    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-07-29-v2</div>
 
     <div id="login-screen" class="screen active">
         <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
@@ -595,6 +646,8 @@
     let bombExplosionAttemptKey = null;
     let currentBombExplodeAt = null;
     let hasSeenMyselfInRoom = false;
+    let lastShownBoomKey = null;
+    let boomOverlayTimer = null;
 
     window.kickPlayer = function(id, nickname) {
         if (!isHost) return;
@@ -960,7 +1013,12 @@
                     const bombIcon = document.getElementById('bomb-icon');
                     if(data.bombExploded) {
                         bombIcon.innerText = "💥"; statusTextEl.innerHTML = `🚨 [${holderNick}] 폭사!`;
-                        document.getElementById('quiz-box').style.display = 'none'; triggerExplosionEffect();
+                        document.getElementById('quiz-box').style.display = 'none';
+                        triggerExplosionEffect({
+                            key: `bomb_${data.bombExplodeAt}`,
+                            title: '💥 BOOM! 💥',
+                            message: `${holderNick}님 폭탄 당첨!`
+                        });
                     } else {
                         bombIcon.innerText = "💣";
                         if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; const quizKey = `${data.bombHolderId}_${data.bombPassSeq || 0}`; if (lastBombQuizKey !== quizKey) { lastBombQuizKey = quizKey; generateQuiz(); } } 
@@ -978,7 +1036,13 @@
                     if (data.boxFindExploded) {
                         const loserNick = players[data.boxFindLoserId]?.nickname || '???';
                         statusEl.innerHTML = `🚨 [${loserNick}] 폭탄 발견! 벌주 당첨!`;
-                        if (data.boxFindLoserId === myId) triggerExplosionEffect();
+                        if (data.boxFindLoserId === myId) {
+                            triggerExplosionEffect({
+                                key: `boxfind_${data.boxFindBombIndex}_${data.boxFindLoserId}`,
+                                title: '💥 BOOM! 💥',
+                                message: `${loserNick}님 폭탄 발견!`
+                            });
+                        }
                     } else if (curPlayerId === myId) {
                         statusEl.innerHTML = `🔥 내 차례입니다! 상자를 골라 터치하세요!`;
                     } else {
@@ -1021,7 +1085,13 @@
                     if (data.speedLoserId) {
                         expBox.innerHTML = `💥 초성 대결 탈락 완료! 💥<br><span style="color:var(--accent-color); font-size:22px;">🚨 ${players[data.speedLoserId]?.nickname || "참가자"} 탈락! 벌칙 확정! 🚨</span>`;
                         expBox.style.display = 'block'; document.getElementById('btn-submit-speed').disabled = true;
-                        if(data.speedLoserId === myId) { triggerExplosionEffect(); }
+                        if(data.speedLoserId === myId) {
+                            triggerExplosionEffect({
+                                key: `speed_${data.speedLoserId}_${data.speedChosungIndex}`,
+                                title: '💥 탈락! 💥',
+                                message: `${players[data.speedLoserId]?.nickname || '참가자'}님 벌칙 당첨!`
+                            });
+                        }
                     } else {
                         expBox.style.display = 'none'; document.getElementById('btn-submit-speed').disabled = speedAnswers[myId] ? true : false;
                     }
@@ -1298,6 +1368,8 @@
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
+                hideBoomOverlay();
+                lastShownBoomKey = null;
             }
         });
     }
@@ -1593,14 +1665,59 @@
         });
     }
 
-    function triggerExplosionEffect() {
-        document.body.classList.add('explode-shake'); const overlay = document.getElementById('explosion-overlay'); overlay.innerHTML = '';
-        for (let i = 0; i < 20; i++) {
-            const p = document.createElement('div'); p.className = 'particle'; p.style.left = '50%'; p.style.top = '50%'; overlay.appendChild(p);
-            const ang = Math.random()*Math.PI*2, dist = Math.floor(Math.random()*150)+40;
-            p.animate([{ opacity: 1 }, { transform: `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px) scale(0)`, opacity: 0 }], { duration: 600, fill: 'forwards' });
+    function hideBoomOverlay() {
+        const boomOverlay = document.getElementById('boom-overlay');
+        if (boomOverlay) boomOverlay.classList.remove('show');
+        if (boomOverlayTimer) {
+            clearTimeout(boomOverlayTimer);
+            boomOverlayTimer = null;
         }
-        setTimeout(() => document.body.classList.remove('explode-shake'), 600);
+    }
+
+    function triggerExplosionEffect(options = {}) {
+        const effectKey = options.key || null;
+        if (effectKey && lastShownBoomKey === effectKey) return;
+        if (effectKey) lastShownBoomKey = effectKey;
+
+        document.body.classList.remove('explode-shake');
+        void document.body.offsetWidth;
+        document.body.classList.add('explode-shake');
+
+        const particleOverlay = document.getElementById('explosion-overlay');
+        particleOverlay.innerHTML = '';
+        for (let i = 0; i < 28; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = '50%';
+            p.style.top = '50%';
+            particleOverlay.appendChild(p);
+            const ang = Math.random() * Math.PI * 2;
+            const dist = Math.floor(Math.random() * 190) + 60;
+            p.animate(
+                [
+                    { opacity: 1, transform: 'translate(0, 0) scale(1.4)' },
+                    { transform: `translate(${Math.cos(ang) * dist}px, ${Math.sin(ang) * dist}px) scale(0)`, opacity: 0 }
+                ],
+                { duration: 750, fill: 'forwards', easing: 'ease-out' }
+            );
+        }
+
+        const boomOverlay = document.getElementById('boom-overlay');
+        const titleEl = document.getElementById('boom-overlay-title');
+        const messageEl = document.getElementById('boom-overlay-message');
+        titleEl.textContent = options.title || '💥 BOOM! 💥';
+        messageEl.textContent = options.message || '폭탄 당첨!';
+        boomOverlay.classList.add('show');
+        boomOverlay.onclick = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            hideBoomOverlay();
+        };
+
+        if (navigator.vibrate) navigator.vibrate(options.vibrate || [500, 100, 400]);
+        clearTimeout(boomOverlayTimer);
+        boomOverlayTimer = setTimeout(hideBoomOverlay, options.duration || 1800);
+        setTimeout(() => document.body.classList.remove('explode-shake'), 700);
     }
 
     // ===== 📦 폭탄찾기 (다같이 그리드 공유, 한명씩 순서대로 클릭) =====
