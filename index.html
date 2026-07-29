@@ -290,10 +290,21 @@
 
         .force-refresh-btn { position: fixed; top: 10px; right: 10px; z-index: 600; width: 38px; height: 38px; border-radius: 50%; border: none; background: rgba(21,21,24,0.85); color: #8E9AA8; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
         .force-refresh-btn:active { transform: scale(0.92); }
+        .loser-pick-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 700; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+        .loser-pick-overlay.show { display: flex; }
+        .loser-pick-box { background: #151518; border: 2px solid var(--accent-color); border-radius: 14px; padding: 18px; max-width: 340px; width: 100%; max-height: 80vh; overflow-y: auto; text-align: center; }
     </style>
 </head>
 <body>
     <button type="button" class="force-refresh-btn" onclick="forceHardRefresh()" title="강제 새로고침">🔄</button>
+    <div id="loserPickWaitBanner" style="display:none; position:fixed; top:56px; left:10px; right:10px; z-index:650; background:rgba(0,0,0,0.85); color:#fff; padding:8px 12px; border-radius:8px; font-size:12px; text-align:center;"></div>
+    <div id="loserPickModal" class="loser-pick-overlay">
+        <div class="loser-pick-box">
+            <div style="font-size:16px; font-weight:700; color:#fff; margin-bottom:4px;">😵 졌잖아요! 다음 게임을 골라주세요</div>
+            <div style="font-size:12px; color:#8E9AA8; margin-bottom:14px;">고른 게임이 바로 시작됩니다</div>
+            <div id="loserPickGameList" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+    </div>
 
 <div class="container" id="main-container">
     <div id="explosion-overlay"></div>
@@ -334,6 +345,8 @@
             <button class="tab-btn" id="tab-dutch" onclick="selectGameMode('dutch')">🍺 몰아주기</button>
             <button class="tab-btn" id="tab-boxfind" onclick="selectGameMode('boxfind')">📦 폭탄찾기</button>
             <button class="tab-btn" id="tab-king" onclick="selectGameMode('king')">👑 왕게임</button>
+            <button class="tab-btn" id="tab-gameofdeath" onclick="selectGameMode('gameofdeath')">☠️ 게임오브데스</button>
+            <button class="tab-btn" id="tab-sonbyungho" onclick="selectGameMode('sonbyungho')">✋ 손병호게임</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -427,6 +440,28 @@
         <button id="btn-king-next" style="background-color: var(--accent-color); color:#121214; display:none;">🎴 다음 카드 뽑기 (방장용)</button>
         <button id="btn-back-lobby-king" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
+
+    <!-- ☠️ 게임 오브 데스 스크린 -->
+    <div id="game-gameofdeath-screen" class="screen">
+        <h2>☠️ 게임 오브 데스</h2>
+        <div id="god-status-box" class="role-box liar" style="font-size:15px; line-height:1.6;">불러오는 중...</div>
+        <div id="god-target-list" style="display:flex; flex-direction:column; gap:8px; margin-top:12px;"></div>
+        <button id="btn-back-lobby-gameofdeath" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- ✋ 손병호 게임 스크린 -->
+    <div id="game-sonbyungho-screen" class="screen">
+        <h2>✋ 마스터 손병호 게임</h2>
+        <div class="quiz-container" style="border-color: var(--primary-color); background: #1a1a1e;">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 8px;">이번 조건</div>
+            <div id="son-condition-text" style="font-size: 18px; color: #66B2FF; font-weight:700;">조건을 뽑아주세요</div>
+        </div>
+        <button id="btn-son-next-condition" style="background-color: var(--secondary-color, #66B2FF); color:#121214; margin-bottom:12px;">🎲 다음 조건 뽑기</button>
+        <div id="son-fingers-list" style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;"></div>
+        <button id="btn-son-fold" style="background-color: var(--primary-color); color:#121214;">✋ 나도 해당돼요 (손가락 접기)</button>
+        <button id="btn-back-lobby-sonbyungho" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
 
     <!-- ⚡ 초성대결 게임 스크린 -->
     <div id="game-speed-screen" class="screen">
@@ -643,6 +678,7 @@
         { name: "번개 ⚡", points: [{x:160, y:30}, {x:60, y:150}, {x:130, y:150}, {x:100, y:250}, {x:210, y:120}, {x:140, y:120}, {x:160, y:30}], svg: '<polygon points="160,30 60,150 130,150 100,250 210,120 140,120" />' }
     ];
 
+    const usedChosungIndices = new Set(); // 초성퀴즈 중복 출제 방지용
     const chosungPool = [
         { chosung: "ㄱㅂ", answers: ["가방", "김밥", "갈비", "고부", "국밥", "가볍", "기부", "거부", "골방", "건배", "공반", "경비", "구방", "공방", "기반", "간부", "강변", "계반", "구비"] },
         { chosung: "ㄷㄹ", answers: ["다리", "도로", "도리", "드론", "대리", "도락", "두루", "대란", "단련", "달력", "도련", "동료", "달래", "다락", "동굴", "동래", "대량", "두목", "달빛"] },
@@ -702,6 +738,26 @@
     let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
     let hostGenderMap = {}; // 방장이 왕게임용으로 지정한 참여자별 성별 (playerId -> 'M'/'F')
     let latestPlayers = {}; // 현재 방의 참여자 목록 캐시 (성별 지정 UI 렌더링용)
+    let godLoserTriggeredKey = null; // 게임오브데스 결과 반영 중복 방지
+    let sonLoserTriggeredKey = null; // 손병호 게임 결과 반영 중복 방지
+
+    const GAME_LIST = [
+        { id: 'liar', label: '🤫 라이어' }, { id: 'draw', label: '📐 도형그리기' }, { id: 'bomb', label: '💣 폭탄돌리기' },
+        { id: 'speed', label: '⚡ 초성대결' }, { id: 'balance', label: '⚖️ 밸런스' }, { id: 'timing', label: '⏱️ 타이밍' },
+        { id: 'roulette', label: '🔫 러시안룰렛' }, { id: 'speedfinger', label: '👆 빠른손가락' }, { id: 'dutch', label: '🍺 몰아주기' },
+        { id: 'boxfind', label: '📦 폭탄찾기' }, { id: 'king', label: '👑 왕게임' }, { id: 'gameofdeath', label: '☠️ 게임오브데스' },
+        { id: 'sonbyungho', label: '✋ 손병호게임' }
+    ];
+
+    const sonConditionPool = [
+        "오늘 커피 마신 사람 접기", "안경이나 렌즈 낀 사람 접기", "생일이 상반기(1~6월)인 사람 접기",
+        "오늘 지각한 사람 접기", "형제자매가 있는 사람 접기", "핸드폰 배경화면이 인물 사진인 사람 접기",
+        "오늘 걸어서 온 사람 접기", "최근에 배달음식 시킨 사람 접기", "지금 목마른 사람 접기",
+        "오늘 사진 찍은 사람 접기", "양말 신은 사람 접기", "오늘 물 2잔 이상 마신 사람 접기",
+        "최근 한 달 안에 지각한 적 있는 사람 접기", "이 자리에서 제일 늦게 도착한 사람 접기",
+        "오늘 계단 이용한 사람 접기", "최근에 택시 탄 사람 접기", "지금 배고픈 사람 접기",
+        "오늘 SNS 확인한 사람 접기", "핸드폰 케이스 없는 사람 접기", "오늘 물건 잃어버린 적 있는 사람 접기"
+    ];
 
     // 🕵️ 방장 전용 시크릿 모드 (라이어/폭탄 등 '걸리는' 역할 추첨용)
     let onlineCheatOn = false;
@@ -717,6 +773,23 @@
     function cancelOnlineCheatPress() {
         if (onlineCheatPressTimer) { clearTimeout(onlineCheatPressTimer); onlineCheatPressTimer = null; }
     }
+    function renderLoserPickList() {
+        const el = document.getElementById('loserPickGameList');
+        if (!el) return;
+        el.innerHTML = '';
+        GAME_LIST.forEach(g => {
+            const b = document.createElement('button');
+            b.type = 'button'; b.textContent = g.label;
+            b.style.cssText = 'padding:12px; border-radius:10px; border:2px solid #3A3A42; background:#1c1c20; color:#fff; font-weight:600; font-size:14px;';
+            b.onclick = () => window.loserPickGame(g.id);
+            el.appendChild(b);
+        });
+    }
+    window.loserPickGame = function(gameId) {
+        document.getElementById('loserPickModal').classList.remove('show');
+        startGameFlow(gameId);
+    };
+
     function setHostGender(id, g) {
         hostGenderMap[id] = (hostGenderMap[id] === g) ? null : g; // 같은 버튼 다시 누르면 지정 취소
         renderKingGenderList();
@@ -819,6 +892,8 @@
             if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'bomb' || roomData.bombExploded) return undefined;
             if (!roomData.bombExplodeAt || getServerNow() < roomData.bombExplodeAt) return undefined;
             roomData.bombExploded = true;
+            roomData.roomLastLoserId = roomData.bombHolderId || null;
+            roomData.roomLoserPendingChoice = !!roomData.bombHolderId;
             return roomData;
         }).catch((error) => {
             console.error('bomb explosion transaction failed:', error);
@@ -1068,6 +1143,26 @@
             latestPlayers = players;
             document.getElementById('player-count').innerText = playerIds.length;
             renderKingGenderList();
+
+            // 😵 진 사람이 다음 게임을 고르는 중인지 확인
+            const loserModal = document.getElementById('loserPickModal');
+            const waitBanner = document.getElementById('loserPickWaitBanner');
+            if (loserModal && waitBanner) {
+                if (data.roomLoserPendingChoice && data.roomLastLoserId) {
+                    if (data.roomLastLoserId === myId) {
+                        renderLoserPickList();
+                        loserModal.classList.add('show');
+                        waitBanner.style.display = 'none';
+                    } else {
+                        loserModal.classList.remove('show');
+                        waitBanner.style.display = 'block';
+                        waitBanner.textContent = `⏳ ${players[data.roomLastLoserId]?.nickname || '참가자'}님이 다음 게임을 고르는 중...`;
+                    }
+                } else {
+                    loserModal.classList.remove('show');
+                    waitBanner.style.display = 'none';
+                }
+            }
 
             if (data.selectedGame) updateTabUI(data.selectedGame);
 
@@ -1493,6 +1588,102 @@
                     
                     document.getElementById('dutch-allocated-display').innerText = allocatedSum.toLocaleString();
                 }
+                else if (data.selectedGame === 'gameofdeath') {
+                    showScreen('game-gameofdeath-screen');
+                    const statusBox = document.getElementById('god-status-box');
+                    const targetListEl = document.getElementById('god-target-list');
+                    targetListEl.innerHTML = '';
+                    const isMaster = data.godMasterId === myId;
+                    const targets = data.godTargets || {};
+                    const allDesignated = playerIds.length > 0 && playerIds.every(id => !!targets[id]);
+                    const startNick = players[data.godStartId]?.nickname || '???';
+
+                    if (data.godRevealed) {
+                        const path = data.godPath || [];
+                        const pathText = path.map(id => players[id]?.nickname || '???').join(' → ');
+                        const loserNick = players[data.godLoserResult]?.nickname || '???';
+                        statusBox.innerHTML = `☠️ ${startNick}님부터 <b>${data.godNumber}</b>칸 이동!<br><span style="font-size:12px; color:#8E9AA8;">${pathText}</span><br>최종 지목: <b>${loserNick}</b>님 벌칙입니다 🍻`;
+                        statusBox.className = 'role-box liar';
+                    } else if (!allDesignated) {
+                        const doneCount = playerIds.filter(id => !!targets[id]).length;
+                        if (targets[myId]) {
+                            statusBox.innerHTML = `✅ 지목 완료! 다른 사람들을 기다리는 중 (${doneCount}/${playerIds.length})`;
+                            statusBox.className = 'role-box citizen';
+                            const changeBtn = document.createElement('button');
+                            changeBtn.type = 'button'; changeBtn.textContent = '🔄 다시 지목하기';
+                            changeBtn.style.cssText = 'padding:8px; border-radius:10px; background:#2c2c30; color:#ccc;';
+                            changeBtn.onclick = () => update(ref(db, `rooms/${currentRoomCode}/godTargets`), { [myId]: null });
+                            targetListEl.appendChild(changeBtn);
+                        } else {
+                            statusBox.innerHTML = `🤫 다른 참가자를 한 명 몰래 지목하세요. (${doneCount}/${playerIds.length}명 완료)<br><span style="font-size:12px; color:#8E9AA8;">벌칙이 시작되면 ${startNick}님부터 지목한 사람을 따라 이동해요.</span>`;
+                            statusBox.className = 'role-box liar';
+                            playerIds.filter(id => id !== myId).forEach(id => {
+                                const b = document.createElement('button');
+                                b.type = 'button'; b.textContent = players[id]?.nickname || '참가자';
+                                b.style.cssText = 'padding:10px; border-radius:10px; border:2px solid #3A3A42; background:#1c1c20; color:#fff;';
+                                b.onclick = () => update(ref(db, `rooms/${currentRoomCode}/godTargets`), { [myId]: id });
+                                targetListEl.appendChild(b);
+                            });
+                        }
+                    } else if (isMaster) {
+                        statusBox.innerHTML = `🎲 전원 지목 완료! 당신이 이번 라운드의 마스터입니다.<br>버튼을 눌러 운명의 숫자(10 이상)를 뽑으세요.`;
+                        statusBox.className = 'role-box liar';
+                        const rollBtn = document.createElement('button');
+                        rollBtn.type = 'button'; rollBtn.textContent = '🎲 운명의 숫자 뽑기';
+                        rollBtn.style.cssText = 'padding:12px; border-radius:10px; background:var(--danger-color); color:white; font-weight:700; width:100%;';
+                        rollBtn.onclick = () => {
+                            const num = 10 + Math.floor(Math.random() * 11); // 10~20
+                            let cur = data.godStartId; const path = [cur];
+                            for (let i = 0; i < num; i++) {
+                                const next = targets[cur];
+                                if (!next) break;
+                                cur = next; path.push(cur);
+                            }
+                            update(ref(db, `rooms/${currentRoomCode}`), {
+                                godNumber: num, godPath: path, godLoserResult: cur,
+                                godRevealed: true, roomLastLoserId: cur, roomLoserPendingChoice: true
+                            });
+                        };
+                        targetListEl.appendChild(rollBtn);
+                    } else {
+                        statusBox.innerHTML = `🎲 전원 지목 완료! 마스터가 운명의 숫자를 뽑는 중입니다...`;
+                        statusBox.className = 'role-box citizen';
+                    }
+                }
+                else if (data.selectedGame === 'sonbyungho') {
+                    showScreen('game-sonbyungho-screen');
+                    const fingers = data.sonFingers || {};
+                    const condIdx = data.sonConditionIndex;
+                    const answered = data.sonAnsweredIds || {};
+                    document.getElementById('son-condition-text').innerText = (condIdx !== null && condIdx !== undefined) ? sonConditionPool[condIdx] : '아래 버튼을 눌러 조건을 뽑아주세요';
+
+                    const listEl = document.getElementById('son-fingers-list'); listEl.innerHTML = '';
+                    const activeIds = [];
+                    playerIds.forEach(id => {
+                        const f = fingers[id] ?? 5;
+                        if (f > 0) activeIds.push(id);
+                        const row = document.createElement('div');
+                        row.style.cssText = 'display:flex; justify-content:space-between; padding:6px 10px; background:#1c1c20; border-radius:8px; font-size:13px;';
+                        row.innerHTML = `<span>${players[id]?.nickname || '참가자'}${id === myId ? ' (나)' : ''}</span><span>${f > 0 ? '✋'.repeat(f) : '💀 탈락'}</span>`;
+                        listEl.appendChild(row);
+                    });
+
+                    const foldBtn = document.getElementById('btn-son-fold');
+                    const myFingers = fingers[myId] ?? 5;
+                    const iAnswered = !!answered[myId];
+                    const hasCondition = condIdx !== null && condIdx !== undefined;
+                    foldBtn.disabled = !hasCondition || myFingers <= 0 || iAnswered;
+                    foldBtn.innerText = iAnswered ? '✅ 이번 조건 응답 완료' : (myFingers <= 0 ? '💀 이미 탈락' : '✋ 나도 해당돼요 (손가락 접기)');
+
+                    // 손가락이 남은 사람이 단 한 명이면 그 사람이 패자
+                    if (activeIds.length === 1 && playerIds.length > 1) {
+                        const roundKey = `${data.sonRoundKey || ''}`;
+                        if (sonLoserTriggeredKey !== roundKey) {
+                            sonLoserTriggeredKey = roundKey;
+                            update(ref(db, `rooms/${currentRoomCode}`), { roomLastLoserId: activeIds[0], roomLoserPendingChoice: true });
+                        }
+                    }
+                }
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => btn.style.display = isHost ? 'block' : 'none');
             }
             if(data.status === 'waiting') { 
@@ -1510,6 +1701,26 @@
     window.changeDutchStatus = function(targetPlayerId, statusBoolean) {
         update(ref(db, `rooms/${currentRoomCode}/dutchConfirmedUsers`), { [targetPlayerId]: statusBoolean });
     };
+
+    // ✋ 마스터 손병호 게임
+    document.getElementById('btn-son-next-condition').addEventListener('click', () => {
+        const idx = Math.floor(Math.random() * sonConditionPool.length);
+        update(ref(db, `rooms/${currentRoomCode}`), { sonConditionIndex: idx, sonAnsweredIds: {} });
+    });
+    document.getElementById('btn-son-fold').addEventListener('click', () => {
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d) return;
+            const fingers = d.sonFingers || {};
+            const answered = d.sonAnsweredIds || {};
+            if (answered[myId]) return;
+            const cur = fingers[myId] ?? 5;
+            if (cur <= 0) return;
+            const updates = {};
+            updates[`rooms/${currentRoomCode}/sonFingers/${myId}`] = cur - 1;
+            updates[`rooms/${currentRoomCode}/sonAnsweredIds/${myId}`] = true;
+            update(ref(db), updates);
+        });
+    });
 
     document.getElementById('btn-tab-random').addEventListener('click', () => {
         document.getElementById('btn-tab-random').classList.add('active');
@@ -1721,10 +1932,15 @@
             const rData = snap.val(); if(!rData || rData.speedLoserId) return;
             if (getChosung(userAns) !== rData.speedChosung) return alert(`초성이 일치하지 않습니다! (목표: ${rData.speedChosung})`);
             const currentAnswers = rData.speedAnswers || {}; if (currentAnswers[myId]) return;
+            if (Object.values(currentAnswers).includes(userAns)) return alert(`이미 나온 단어예요! 다른 단어를 입력하세요. (${userAns})`);
             const updates = {}; updates[`rooms/${currentRoomCode}/speedAnswers/${myId}`] = userAns;
             if (Object.keys(currentAnswers).length + 1 === Object.keys(rData.players).length - 1) {
                 const loserId = Object.keys(rData.players).find(id => id !== myId && !currentAnswers[id]);
-                if(loserId) updates[`rooms/${currentRoomCode}/speedLoserId`] = loserId;
+                if(loserId) {
+                    updates[`rooms/${currentRoomCode}/speedLoserId`] = loserId;
+                    updates[`rooms/${currentRoomCode}/roomLastLoserId`] = loserId;
+                    updates[`rooms/${currentRoomCode}/roomLoserPendingChoice`] = true;
+                }
             }
             update(ref(db), updates).then(() => { document.getElementById('speed-answer-input').value = ''; });
         });
@@ -1875,6 +2091,8 @@
                 roomData.boxFindOpened = opened;
                 roomData.boxFindExploded = true;
                 roomData.boxFindLoserId = myId;
+                roomData.roomLastLoserId = myId;
+                roomData.roomLoserPendingChoice = true;
             } else {
                 opened[idx] = 'safe';
                 roomData.boxFindOpened = opened;
@@ -1974,20 +2192,23 @@
         return text;
     }
 
-    document.getElementById('btn-start-game').addEventListener('click', () => {
-        get(ref(db, `rooms/${currentRoomCode}/players`)).then((snap) => {
-            const pIds = Object.keys(snap.val()); if(pIds.length < 2) return alert('최소 2명 필요합니다!');
+    function startGameFlow(gameId) {
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const roomSnapVal = snap.val() || {};
+            const pIds = Object.keys(roomSnapVal.players || {}); if(pIds.length < 2) return alert('최소 2명 필요합니다!');
+            const prevLoserId = roomSnapVal.roomLastLoserId || null;
             const rRef = ref(db, `rooms/${currentRoomCode}`);
-            if (selectedGame === 'liar') {
+            update(rRef, { roomLoserPendingChoice: false, roomLastLoserId: null, selectedGame: gameId });
+            if (gameId === 'liar') {
                 const categories = Object.keys(wordList);
                 const pickedCategory = categories[Math.floor(Math.random()*categories.length)];
                 const wordsInCategory = wordList[pickedCategory];
                 const pickedWord = wordsInCategory[Math.floor(Math.random()*wordsInCategory.length)];
                 update(rRef, { status: 'playing', category: pickedCategory, word: pickedWord, liarId: pickIdProtected(pIds) });
-            } else if (selectedGame === 'draw') {
+            } else if (gameId === 'draw') {
                 const shapeIdx = pickRandomShapeIndex();
                 update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
-            } else if (selectedGame === 'bomb') {
+            } else if (gameId === 'bomb') {
                 // 참여자 한 명당 약 6초의 문제 풀이 시간을 반영하고,
                 // 첫 문제 확인 및 Firebase 통신을 위한 기본 여유 시간을 추가함
                 // 2명: 15~20초 / 3명: 23~28초 / 4명: 29~34초
@@ -2001,10 +2222,14 @@
                     bombExplodeAt: getServerNow() + randomFuseMs,
                     bombPassSeq: 0
                 });
-            } else if (selectedGame === 'speed') {
-                const randIdx = Math.floor(Math.random() * chosungPool.length);
+            } else if (gameId === 'speed') {
+                // 이미 나온 초성은 전체 목록을 다 쓰기 전까진 다시 안 나오도록 (동일 문제 반복 방지)
+                let available = chosungPool.map((_, i) => i).filter(i => !usedChosungIndices.has(i));
+                if (available.length === 0) { usedChosungIndices.clear(); available = chosungPool.map((_, i) => i); }
+                const randIdx = available[Math.floor(Math.random() * available.length)];
+                usedChosungIndices.add(randIdx);
                 update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedAnswers: null, speedLoserId: null });
-            } else if (selectedGame === 'boxfind') {
+            } else if (gameId === 'boxfind') {
                 const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
                 const bombCountEl = document.getElementById('boxfind-bomb-count');
                 const requestedBombCount = parseInt(bombCountEl?.value || '1', 10);
@@ -2027,7 +2252,7 @@
                     boxFindExploded: false,
                     boxFindLoserId: null
                 });
-            } else if (selectedGame === 'king') {
+            } else if (gameId === 'king') {
                 const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
                 const numbers = {};
                 const genderMap = {};
@@ -2044,28 +2269,42 @@
                     kingCommandText: drawKingCommand(shuffledOrder.length, genderMap),
                     kingRound: 1
                 });
-            } else if (selectedGame === 'balance') {
+            } else if (gameId === 'balance') {
                 update(rRef, { status: 'playing', balanceIndex: Math.floor(Math.random() * balancePool.length), balanceVotes: null, balanceRevealed: false });
-            } else if (selectedGame === 'timing') {
+            } else if (gameId === 'timing') {
                 const target = Math.round(Math.random() * 1000) / 100; // 0.00 ~ 10.00
                 update(rRef, { status: 'playing', timingTarget: target, timingStartTime: getServerNow(), timingResults: null });
-            } else if (selectedGame === 'roulette') {
+            } else if (gameId === 'roulette') {
                 const slotCount = 6;
                 update(rRef, {
                     status: 'playing', rouletteSlotCount: slotCount, rouletteTurnOrder: pIds, rouletteTurnIdx: 0,
                     rouletteChamberPos: 0, rouletteBulletChamber: Math.floor(Math.random() * slotCount),
                     rouletteLastHitId: null, rouletteConsecutiveHits: 0, rouletteResultText: null
                 });
-            } else if (selectedGame === 'speedfinger') {
+            } else if (gameId === 'speedfinger') {
                 const delay = 2000 + Math.floor(Math.random() * 3000); // 2~5초 랜덤 대기 (부정 출발 방지)
                 const signalTime = getServerNow() + delay;
                 const targetSpot = Math.floor(Math.random() * 6); // 6칸 중 랜덤 위치
                 update(rRef, { status: 'playing', speedSignalTime: signalTime, speedTargetSpot: targetSpot, speedFingerResults: null, speedFalseStarts: null });
-            } else if (selectedGame === 'dutch') {
+            } else if (gameId === 'dutch') {
                 update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
+            } else if (gameId === 'gameofdeath') {
+                const masterId = pIds[Math.floor(Math.random() * pIds.length)];
+                const startId = (prevLoserId && pIds.includes(prevLoserId)) ? prevLoserId : pIds[Math.floor(Math.random() * pIds.length)];
+                godLoserTriggeredKey = null;
+                update(rRef, {
+                    status: 'playing', godMasterId: masterId, godStartId: startId,
+                    godTargets: {}, godNumber: null, godPath: null, godRevealed: false
+                });
+            } else if (gameId === 'sonbyungho') {
+                const fingers = {}; pIds.forEach(id => { fingers[id] = 5; });
+                sonLoserTriggeredKey = null;
+                update(rRef, { status: 'playing', sonFingers: fingers, sonConditionIndex: null, sonAnsweredIds: {}, sonRoundKey: getServerNow() });
             }
         });
-    });
+    }
+
+    document.getElementById('btn-start-game').addEventListener('click', () => startGameFlow(selectedGame));
 
     document.querySelectorAll('.btn-back-lobby').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -2076,7 +2315,10 @@
                 timingTarget: null, timingStartTime: null, timingResults: null,
                 rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
                 speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null,
-                boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null
+                boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null,
+                godMasterId: null, godStartId: null, godTargets: null, godNumber: null, godPath: null, godLoserResult: null, godRevealed: false,
+                sonFingers: null, sonConditionIndex: null, sonAnsweredIds: null, sonRoundKey: null,
+                roomLastLoserId: null, roomLoserPendingChoice: false
             });
         });
     });
