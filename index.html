@@ -381,6 +381,20 @@
             </label>
             <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">방장이 선택한 개수만큼 상자 안에 폭탄이 배치됩니다.</div>
         </div>
+        <div id="draw-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
+            <div style="color:var(--accent-color); font-size:14px; font-weight:700; margin-bottom:8px;">📐 그릴 도형 선택</div>
+            <select id="draw-shape-select" onchange="window.setDrawShape(this.value)" style="width:100%; padding:10px; border-radius:10px; background:#1c1c20; color:#fff; border:2px solid #3A3A42; font-size:14px;">
+                <option value="random">🎲 랜덤</option>
+            </select>
+        </div>
+        <div id="speed-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
+            <div style="color:var(--accent-color); font-size:14px; font-weight:700; margin-bottom:8px;">⚡ 초성대결 글자 수</div>
+            <div style="display:flex; gap:8px;">
+                <button type="button" id="speed-len-2" class="speed-len-btn" onclick="window.setSpeedWordLength(2)" style="flex:1; padding:10px; border-radius:10px; border:2px solid var(--accent-color); background:#1c1c20; color:#fff; font-weight:700;">2글자</button>
+                <button type="button" id="speed-len-3" class="speed-len-btn" onclick="window.setSpeedWordLength(3)" style="flex:1; padding:10px; border-radius:10px; border:2px solid #3A3A42; background:#1c1c20; color:#fff; font-weight:700;">3글자</button>
+            </div>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">정답은 미리 정해둔 단어 목록 안에서만 인정돼요 (없는 단어 입력 방지).</div>
+        </div>
         <div id="king-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
             <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--accent-color); font-size:14px; font-weight:700;">
                 <span>🔥 19금 모드</span>
@@ -723,11 +737,17 @@
         { name: "초승달 🌙", points: [{x:160, y:40}, {x:180, y:80}, {x:180, y:180}, {x:110, y:230}, {x:60, y:180}, {x:50, y:110}, {x:110, y:50}, {x:160, y:40}], svg: '<path d="M 160 40 C 70 40, 50 220, 180 220 C 100 200, 100 80, 160 40 Z" />' },
         { name: "뭉게구름 ☁️", points: [{x:90, y:100}, {x:140, y:70}, {x:200, y:100}, {x:230, y:140}, {x:190, y:200}, {x:90, y:200}, {x:60, y:150}, {x:90, y:100}], svg: '<path d="M 90 130 C 90 90, 140 70, 160 100 C 190 80, 230 110, 220 150 C 240 180, 190 210, 160 200 C 130 220, 80 210, 80 180 C 50 170, 60 130, 90 130 Z" />' },
         { name: "물방울 💧", points: [{x:140, y:40}, {x:210, y:160}, {x:200, y:210}, {x:140, y:240}, {x:80, y:210}, {x:70, y:160}, {x:140, y:40}], svg: '<path d="M 140 40 C 180 110, 220 160, 210 200 C 190 250, 90 250, 70 200 C 60 160, 100 110, 140 40 Z" />' },
-        { name: "번개 ⚡", points: [{x:160, y:30}, {x:60, y:150}, {x:130, y:150}, {x:100, y:250}, {x:210, y:120}, {x:140, y:120}, {x:160, y:30}], svg: '<polygon points="160,30 60,150 130,150 100,250 210,120 140,120" />' }
+        { name: "번개 ⚡", points: [{x:160, y:30}, {x:60, y:150}, {x:130, y:150}, {x:100, y:250}, {x:210, y:120}, {x:140, y:120}, {x:160, y:30}], svg: '<polygon points="160,30 60,150 130,150 100,250 210,120 140,120" />' },
+        { name: "생선 🐟", points: [{x:235,y:140},{x:205,y:100},{x:150,y:85},{x:95,y:95},{x:65,y:120},{x:35,y:90},{x:55,y:140},{x:35,y:190},{x:65,y:160},{x:95,y:185},{x:150,y:195},{x:205,y:180},{x:235,y:140}], svg: '<polygon points="235,140 205,100 150,85 95,95 65,120 35,90 55,140 35,190 65,160 95,185 150,195 205,180" />' },
+        { name: "돼지코 🐽", points: [{x:70,y:100},{x:210,y:100},{x:240,y:130},{x:240,y:170},{x:210,y:200},{x:70,y:200},{x:40,y:170},{x:40,y:130},{x:70,y:100}], svg: '<rect x="40" y="100" width="200" height="100" rx="35" ry="35" />' },
+        { name: "뫼비우스의 띠 ♾️", points: [{x:140,y:140},{x:110,y:100},{x:70,y:110},{x:60,y:140},{x:70,y:170},{x:110,y:180},{x:140,y:140},{x:170,y:100},{x:210,y:110},{x:220,y:140},{x:210,y:170},{x:170,y:180},{x:140,y:140}], svg: '<path d="M 140 140 C 130 100, 90 90, 65 110 C 45 128, 45 152, 65 170 C 90 190, 130 180, 140 140 C 150 100, 190 90, 215 110 C 235 128, 235 152, 215 170 C 190 190, 150 180, 140 140 Z" />' },
+        { name: "골뱅이 @", points: [{x:140,y:90},{x:95,y:100},{x:65,y:135},{x:62,y:175},{x:90,y:205},{x:135,y:210},{x:165,y:195},{x:175,y:165},{x:160,y:145},{x:135,y:140},{x:120,y:155},{x:125,y:172},{x:140,y:175}], svg: '<path d="M140,90 Q95,90 80,120 Q60,150 65,175 Q75,205 110,212 Q150,215 170,195 Q185,175 178,155 Q168,138 145,138 Q125,138 118,155 Q113,168 125,175" fill="none" />' },
+        { name: "리본 🎀", points: [{x:40,y:90},{x:140,y:130},{x:140,y:90},{x:170,y:90},{x:170,y:130},{x:240,y:90},{x:240,y:190},{x:170,y:150},{x:170,y:190},{x:140,y:190},{x:140,y:150},{x:40,y:190},{x:40,y:90}], svg: '<polygon points="40,90 140,130 140,90 170,90 170,130 240,90 240,190 170,150 170,190 140,190 140,150 40,190" />' }
     ];
 
-    const usedChosungIndices = new Set(); // 초성퀴즈 중복 출제 방지용
-    const chosungPool = [
+    const usedChosungIndices2 = new Set(); // 2글자 초성퀴즈 중복 출제 방지용
+    const usedChosungIndices3 = new Set(); // 3글자 초성퀴즈 중복 출제 방지용
+    const chosungPool2 = [
         { chosung: "ㄱㅂ", answers: ["가방", "김밥", "갈비", "고부", "국밥", "가볍", "기부", "거부", "골방", "건배", "공반", "경비", "구방", "공방", "기반", "간부", "강변", "계반", "구비"] },
         { chosung: "ㄷㄹ", answers: ["다리", "도로", "도리", "드론", "대리", "도락", "두루", "대란", "단련", "달력", "도련", "동료", "달래", "다락", "동굴", "동래", "대량", "두목", "달빛"] },
         { chosung: "ㅅㅂ", answers: ["수박", "신발", "소비", "새벽", "선배", "서부", "수반", "식빵", "사발", "시비", "수비", "상방", "소반", "삭발", "성벽", "수포", "상부", "시민", "수분", "심방"] },
@@ -748,6 +768,20 @@
         { chosung: "ㅋㅍ", answers: ["커피", "카페", "쿠폰", "캠핑", "코풍", "카포", "코파", "키포", "킹포", "카피", "키퍼", "코피", "카풀", "캄보", "코퍼", "카프", "쿠페", "콤비", "캠퍼", "카펫"] },
         { chosung: "ㅌㄹ", answers: ["트럭", "트리", "타락", "토론", "탈출", "투란", "타루", "투루", "테러", "토리", "통로", "탄력", "퇴근", "타로", "투표", "튜립", "트랙"] },
         { chosung: "ㅍㄷ", answers: ["포도", "파도", "판다", "푸딩", "폭탄", "풍두", "포두", "패도", "편도", "팔도", "풍도", "폭도", "피도", "포동", "평도", "포데", "파동", "폐단", "풍덕", "포덕"] }
+    ];
+
+    const chosungPool3 = [
+        { chosung: "ㅎㅇㅅ", answers: ["회사원", "학원생", "형용사"] },
+        { chosung: "ㅇㄱㅈ", answers: ["야구장", "안경점", "완구점"] },
+        { chosung: "ㅅㄱㅅ", answers: ["삼겹살", "시금석", "신고서"] },
+        { chosung: "ㄷㅅㄱ", answers: ["도서관", "대성공"] },
+        { chosung: "ㅁㅇㅅ", answers: ["미용실", "무역상"] },
+        { chosung: "ㅂㅁㄱ", answers: ["박물관", "방문객"] },
+        { chosung: "ㅈㄹㅈ", answers: ["정류장", "자료집"] },
+        { chosung: "ㅅㅎㄷ", answers: ["신호등", "사회당"] },
+        { chosung: "ㅈㅈㄱ", answers: ["자전거", "조종간", "저장고"] },
+        { chosung: "ㄴㅈㄱ", answers: ["냉장고", "노장군"] },
+        { chosung: "ㄷㅈㄱ", answers: ["된장국", "도자기"] }
     ];
 
     const balancePool = [
@@ -786,8 +820,19 @@
     let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
     let hostGenderMap = {}; // 방장이 왕게임용으로 지정한 참여자별 성별 (playerId -> 'M'/'F')
     let latestPlayers = {}; // 현재 방의 참여자 목록 캐시 (성별 지정 UI 렌더링용)
+    let speedWordLength = 2; // 초성대결 글자 수 (2 또는 3), 방장이 설정
+    window.setSpeedWordLength = function(len) {
+        speedWordLength = len;
+        const btn2 = document.getElementById('speed-len-2'), btn3 = document.getElementById('speed-len-3');
+        if (btn2) btn2.style.borderColor = (len === 2) ? 'var(--accent-color)' : '#3A3A42';
+        if (btn3) btn3.style.borderColor = (len === 3) ? 'var(--accent-color)' : '#3A3A42';
+    };
     let godLoserTriggeredKey = null; // 게임오브데스 결과 반영 중복 방지
     let sonLoserTriggeredKey = null; // 손병호 게임 결과 반영 중복 방지
+    let hostSelectedShapeIndex = null; // 도형그리기: null이면 랜덤, 아니면 방장이 고른 도형 인덱스
+    window.setDrawShape = function(val) {
+        hostSelectedShapeIndex = (val === 'random') ? null : parseInt(val, 10);
+    };
 
     const GAME_LIST = [
         { id: 'liar', label: '🤫 라이어' }, { id: 'draw', label: '📐 도형그리기' }, { id: 'bomb', label: '💣 폭탄돌리기' },
@@ -865,6 +910,29 @@
         document.getElementById('loserPickModal').classList.remove('show');
         startGameFlow(gameId);
     };
+
+    let boxfindProtectToastTimer = null;
+    function showBoxfindProtectToast(text) {
+        let el = document.getElementById('boxfindProtectToast');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'boxfindProtectToast';
+            el.style.cssText = 'position:fixed; top:56px; left:50%; transform:translateX(-50%); z-index:750; background:rgba(0,0,0,0.85); color:#fff; padding:8px 14px; border-radius:8px; font-size:13px; transition:opacity 0.3s; white-space:nowrap;';
+            document.body.appendChild(el);
+        }
+        el.textContent = text;
+        el.style.opacity = '1';
+        clearTimeout(boxfindProtectToastTimer);
+        boxfindProtectToastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1200);
+    }
+    function toggleBoxfindProtect(id, nickname) {
+        get(ref(db, `rooms/${currentRoomCode}/hostBoxfindProtectId`)).then((snap) => {
+            const cur = snap.val();
+            const newVal = (cur === id) ? null : id;
+            update(ref(db, `rooms/${currentRoomCode}`), { hostBoxfindProtectId: newVal });
+            showBoxfindProtectToast(newVal ? `🔒 ${nickname} 설정됨` : `🔓 ${nickname} 보호 해제됨`);
+        });
+    }
 
     function setHostGender(id, g) {
         hostGenderMap[id] = (hostGenderMap[id] === g) ? null : g; // 같은 버튼 다시 누르면 지정 취소
@@ -1120,6 +1188,14 @@
         setupCurrencyFormatting();
         const savedNickname = localStorage.getItem('partyGameNickname');
         if (savedNickname) document.getElementById('nickname-input').value = savedNickname;
+        const shapeSelect = document.getElementById('draw-shape-select');
+        if (shapeSelect) {
+            shapes.forEach((s, i) => {
+                const opt = document.createElement('option');
+                opt.value = String(i); opt.textContent = s.name;
+                shapeSelect.appendChild(opt);
+            });
+        }
     });
 
     function setupCurrencyFormatting() {
@@ -1164,6 +1240,10 @@
         if (boxfindSettings) boxfindSettings.style.display = (isHost && gameMode === 'boxfind') ? 'block' : 'none';
         const kingSettings = document.getElementById('king-settings');
         if (kingSettings) kingSettings.style.display = (isHost && gameMode === 'king') ? 'block' : 'none';
+        const speedSettings = document.getElementById('speed-settings');
+        if (speedSettings) speedSettings.style.display = (isHost && gameMode === 'speed') ? 'block' : 'none';
+        const drawSettings = document.getElementById('draw-settings');
+        if (drawSettings) drawSettings.style.display = (isHost && gameMode === 'draw') ? 'block' : 'none';
     }
 
     window.openImageModal = function(nickname, imgData) {
@@ -1264,6 +1344,19 @@
                     nameSpan.innerText = players[id].nickname;
                     if (id === myId) { li.classList.add('me'); nameSpan.innerText += " (나)"; }
                     if (players[id].isHost) { nameSpan.innerHTML += ` <span class="host-badge">방장</span>`; }
+                    if (isHost) {
+                        nameSpan.style.userSelect = 'none'; nameSpan.style.webkitUserSelect = 'none';
+                        nameSpan.style.webkitTouchCallout = 'none'; nameSpan.style.touchAction = 'manipulation';
+                        let pressTimer = null;
+                        const startPress = (e) => { if (e) e.preventDefault(); pressTimer = setTimeout(() => toggleBoxfindProtect(id, players[id].nickname), 700); };
+                        const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+                        nameSpan.addEventListener('touchstart', startPress, { passive: false });
+                        nameSpan.addEventListener('touchend', cancelPress);
+                        nameSpan.addEventListener('touchmove', cancelPress);
+                        nameSpan.addEventListener('mousedown', startPress);
+                        nameSpan.addEventListener('mouseup', cancelPress);
+                        nameSpan.addEventListener('mouseleave', cancelPress);
+                    }
                     li.appendChild(nameSpan);
                     if (isHost && id !== myId) {
                         const kickBtn = document.createElement('button');
@@ -2062,7 +2155,9 @@
         if (!userAns) return;
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
             const rData = snap.val(); if(!rData || rData.speedLoserId) return;
-            if (getChosung(userAns) !== rData.speedChosung) return alert(`초성이 일치하지 않습니다! (목표: ${rData.speedChosung})`);
+            const pool = rData.speedWordLength === 3 ? chosungPool3 : chosungPool2;
+            const entry = pool[rData.speedChosungIndex];
+            if (!entry || !entry.answers.includes(userAns)) return alert(`정답 목록에 없는 단어예요! 다른 단어를 입력해보세요. (목표 초성: ${rData.speedChosung})`);
             const currentAnswers = rData.speedAnswers || {}; if (currentAnswers[myId]) return;
             if (Object.values(currentAnswers).includes(userAns)) return alert(`이미 나온 단어예요! 다른 단어를 입력하세요. (${userAns})`);
             const updates = {}; updates[`rooms/${currentRoomCode}/speedAnswers/${myId}`] = userAns;
@@ -2218,7 +2313,10 @@
             if (opened[idx]) return undefined; // 이미 열린 상자
 
             const bombIndexes = roomData.boxFindBombIndexes || (Number.isInteger(roomData.boxFindBombIndex) ? [roomData.boxFindBombIndex] : []);
-            if (bombIndexes.includes(idx)) {
+            const protectedId = roomData.hostBoxfindProtectId || null;
+            const gameCount = roomData.boxfindGameCount || 0;
+            const isProtectedNow = protectedId && curPlayerId === protectedId && gameCount >= 7;
+            if (!isProtectedNow && bombIndexes.includes(idx)) {
                 opened[idx] = 'bomb';
                 roomData.boxFindOpened = opened;
                 roomData.boxFindExploded = true;
@@ -2259,36 +2357,23 @@
     // 19금 모드 전용: 스킨십을 강요하지 않는 선에서 수위만 살짝 있는 커맨드.
     // 2인 지목 커맨드는 항상 남녀 한 명씩으로만 짝지어짐 (drawKingCommand 참고)
     const kingAdultCommands = [
-        { text: "🔥[29금] {A}번과 {B}번, 15초간 옷속에 손을 넣어 맨살 어깨를 만지며 눈빛을 교환하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 목에 3초간 키스하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 입술 거리 1cm를 유지한 채 서로의 눈을 바라보시오. 웃거나 피하면 술한잔", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 무릎 위에 30초간 앉으시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 귓속에 3초간 숨을 천천히 불어넣으시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 허벅지를 10초간 손끝으로 천천히 쓰다듬으시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로의 뒷목을 감싸 안고 서로의 눈을 바라보시오. 웃거나 피하면 술한잔.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 양쪽 쇄골에 키스하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로의 속옷 색깔을 확인하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 맨살 등에 손을 넣고 만지시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 포옹샷으로 소주 한잔 원샷.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 볼에 립스틱 자욱 남기기.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 옷위로 엉덩이를 만지시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번에게 신체에서 가장 자신있는 부위 보여주기.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로 팔짱을 낀 상태로 5분간 유지하기.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번을 포옹해 10초간 유지 — 버티지 못하면 술한잔.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로 은밀한 섹스 판타지를 귓속말로 얘기할 것.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 엉덩이를 찰지게 때리기.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 입에서 입으로 소주 한잔을 넘겨주시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 귀를 혀로 핥으시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로의 허벅지 안쪽을 손으로 10초 동안 애무할 것.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 무릎에 앉아 러브샷 하기.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로의 손가락에 입맞출 것.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번에게 10초간 백허그를 하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 손을 잡고 자신의 몸 여기저기 가져다 대어라.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 발목부터 허벅지까지 마사지.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 다리를 자신의 무릎 위에 올려놓고 쓰다듬어라.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 무릎을 베고 누워서 20초간 유지.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 가슴 위에 손을 살포시 올리고 15초 유지.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 상의를 살짝 들어 올리고 배에 뽀뽀.", slots: 2 }
+        { text: "🔥[19금] {A}번, {B}번에게 고백하듯 진지하게 말해보기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번 귀에 대고 자신의 이상형 속삭이기", slots: 2 },
+        { text: "🔥[19금] {A}번과 {B}번, 서로의 매력 포인트 3가지씩 말해주기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번과 포옹 대신 하이파이브 러브샷", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번에게 지금 가장 하고 싶은 말 한마디", slots: 2 },
+        { text: "🔥[19금] {A}번, 이상형을 묘사하면 {B}번이 몇 점인지 맞혀보기", slots: 2 },
+        { text: "🔥[19금] {A}번, 최근에 설렜던 순간 하나 공개하기", slots: 1 },
+        { text: "🔥[19금] {A}번, 자신의 연애 스타일을 한 단어로 표현하기", slots: 1 },
+        { text: "🔥[19금] {A}번, {B}번에게 첫인상이 어땠는지 솔직하게 말하기", slots: 2 },
+        { text: "🔥[19금] {A}번과 {B}번, 서로에게 재미있는 별명 지어주기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번과 눈 마주치고 5초간 안 웃기 챌린지 — 웃으면 원샷", slots: 2 },
+        { text: "🔥[19금] {A}번, 자신의 최근 썸/연애 스토리 한 줄로 요약하기", slots: 1 },
+        { text: "🔥[19금] {A}번과 {B}번, 서로에게 궁금했던 질문 하나씩 주고받기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번을 왜 좋아할 수밖에 없는지 3초 안에 즉석 드립으로 말하기", slots: 2 },
+        { text: "🔥[19금] {A}번, 핸드폰 배경화면 공개하기", slots: 1 },
+        { text: "🔥[19금] {A}번과 {B}번, 3초 안에 같은 숫자 외치기 텔레파시 게임 — 실패하면 같이 원샷", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번에게 지금 기분을 색깔 하나로 표현하고 이유 설명하기", slots: 2 }
     ];
 
     function drawKingCommand(playerCount, genderMap) {
@@ -2338,7 +2423,8 @@
                 const pickedWord = wordsInCategory[Math.floor(Math.random()*wordsInCategory.length)];
                 update(rRef, { status: 'playing', category: pickedCategory, word: pickedWord, liarId: pickIdProtected(pIds) });
             } else if (gameId === 'draw') {
-                const shapeIdx = pickRandomShapeIndex();
+                const shapeIdx = (Number.isInteger(hostSelectedShapeIndex) && hostSelectedShapeIndex >= 0 && hostSelectedShapeIndex < shapes.length)
+                    ? hostSelectedShapeIndex : pickRandomShapeIndex();
                 update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
             } else if (gameId === 'bomb') {
                 // 참여자 한 명당 약 6초의 문제 풀이 시간을 반영하고,
@@ -2356,11 +2442,16 @@
                 });
             } else if (gameId === 'speed') {
                 // 이미 나온 초성은 전체 목록을 다 쓰기 전까진 다시 안 나오도록 (동일 문제 반복 방지)
-                let available = chosungPool.map((_, i) => i).filter(i => !usedChosungIndices.has(i));
-                if (available.length === 0) { usedChosungIndices.clear(); available = chosungPool.map((_, i) => i); }
+                const pool = speedWordLength === 3 ? chosungPool3 : chosungPool2;
+                const usedSet = speedWordLength === 3 ? usedChosungIndices3 : usedChosungIndices2;
+                let available = pool.map((_, i) => i).filter(i => !usedSet.has(i));
+                if (available.length === 0) { usedSet.clear(); available = pool.map((_, i) => i); }
                 const randIdx = available[Math.floor(Math.random() * available.length)];
-                usedChosungIndices.add(randIdx);
-                update(rRef, { status: 'playing', speedChosungIndex: randIdx, speedChosung: chosungPool[randIdx].chosung, speedAnswers: null, speedLoserId: null });
+                usedSet.add(randIdx);
+                update(rRef, {
+                    status: 'playing', speedChosungIndex: randIdx, speedChosung: pool[randIdx].chosung,
+                    speedWordLength: speedWordLength, speedAnswers: null, speedLoserId: null
+                });
             } else if (gameId === 'boxfind') {
                 const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
                 const bombCountEl = document.getElementById('boxfind-bomb-count');
@@ -2382,7 +2473,8 @@
                     boxFindTurnOrder: shuffledOrder,
                     boxFindTurnIndex: 0,
                     boxFindExploded: false,
-                    boxFindLoserId: null
+                    boxFindLoserId: null,
+                    boxfindGameCount: (roomSnapVal.boxfindGameCount || 0) + 1
                 });
             } else if (gameId === 'king') {
                 const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
