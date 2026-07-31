@@ -1200,11 +1200,20 @@
 
     function setupCurrencyFormatting() {
         const totalInput = document.getElementById('dutch-total-input');
+        let dutchTotalSyncTimer = null;
         totalInput.addEventListener('input', (e) => {
             let num = e.target.value.replace(/[^0-9]/g, '');
             e.target.value = num ? parseInt(num).toLocaleString() : '';
             if(document.getElementById('dutch-custom-section').style.display === 'block') {
                 validateDutchTotalSum();
+            }
+            // 방장이 타이핑하는 대로 참여자들에게도 총 술값이 실시간으로 보이도록 (분배 전 미리보기)
+            if (isHost && currentRoomCode && selectedGame === 'dutch') {
+                clearTimeout(dutchTotalSyncTimer);
+                dutchTotalSyncTimer = setTimeout(() => {
+                    const val = getCleanNumber(totalInput.value);
+                    update(ref(db, `rooms/${currentRoomCode}`), { dutchTotal: val, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
+                }, 300);
             }
         });
     }
@@ -1979,23 +1988,21 @@
     });
 
     function generateDutchCustomFields() {
-        get(ref(db, `rooms/${currentRoomCode}/players`)).then((snap) => {
-            const players = snap.val() || {}; const count = Object.keys(players).length || 2;
-            const container = document.getElementById('dutch-custom-inputs-container'); container.innerHTML = '';
-            for (let i = 1; i <= count; i++) {
-                const row = document.createElement('div'); row.className = 'custom-amount-row';
-                row.innerHTML = `<label>${i}등 금액:</label><div class="input-wrapper"><input type="text" class="dutch-custom-input" placeholder="직접 입력"><span class="input-unit">원</span></div>`;
-                container.appendChild(row);
-            }
-            document.querySelectorAll('.dutch-custom-input').forEach(input => {
-                input.addEventListener('input', (e) => {
-                    let num = e.target.value.replace(/[^0-9]/g, '');
-                    e.target.value = num ? parseInt(num).toLocaleString() : '';
-                    validateDutchTotalSum();
-                });
+        const count = Object.keys(latestPlayers).length || 2;
+        const container = document.getElementById('dutch-custom-inputs-container'); container.innerHTML = '';
+        for (let i = 1; i <= count; i++) {
+            const row = document.createElement('div'); row.className = 'custom-amount-row';
+            row.innerHTML = `<label>${i}등 금액:</label><div class="input-wrapper"><input type="text" class="dutch-custom-input" placeholder="직접 입력"><span class="input-unit">원</span></div>`;
+            container.appendChild(row);
+        }
+        document.querySelectorAll('.dutch-custom-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                let num = e.target.value.replace(/[^0-9]/g, '');
+                e.target.value = num ? parseInt(num).toLocaleString() : '';
+                validateDutchTotalSum();
             });
-            validateDutchTotalSum();
         });
+        validateDutchTotalSum();
     }
 
     window.validateDutchTotalSum = function() {
@@ -2016,23 +2023,23 @@
     document.getElementById('btn-dutch-distribute').addEventListener('click', () => {
         const total = getCleanNumber(document.getElementById('dutch-total-input').value);
         if (!total || total <= 0) return alert('금액을 입력하세요!');
-        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
-            const count = Object.keys(snap.val().players || {}).length;
-            let remaining = total, finalResults = [];
-            for (let i = 0; i < count - 1; i++) {
-                let max = Math.floor(remaining / (count - i)) * 1.5;
-                let amount = Math.floor(Math.random() * max); amount = Math.floor(amount / 10) * 10;
-                finalResults.push(amount); remaining -= amount;
-            }
-            finalResults.push(remaining); finalResults.sort(() => Math.random() - 0.5);
-            // 분배 시점에는 peekedUsers(오픈여부)와 confirmedUsers(완납여부)를 모두 밀어버림
-            update(ref(db, `rooms/${currentRoomCode}`), { 
-                dutchTotal: total, 
-                dutchDistributedBills: finalResults, 
-                dutchConfirmedUsers: null, 
-                dutchPeekedUsers: null 
-            });
+        const count = Object.keys(latestPlayers).length;
+        if (count < 2) return alert('참여자가 2명 이상이어야 합니다!');
+        let remaining = total, finalResults = [];
+        for (let i = 0; i < count - 1; i++) {
+            let max = Math.floor(remaining / (count - i)) * 1.5;
+            let amount = Math.floor(Math.random() * max); amount = Math.floor(amount / 10) * 10;
+            finalResults.push(amount); remaining -= amount;
+        }
+        finalResults.push(remaining); finalResults.sort(() => Math.random() - 0.5);
+        // 분배 시점에는 peekedUsers(오픈여부)와 confirmedUsers(완납여부)를 모두 밀어버림
+        update(ref(db, `rooms/${currentRoomCode}`), { 
+            dutchTotal: total, 
+            dutchDistributedBills: finalResults, 
+            dutchConfirmedUsers: null, 
+            dutchPeekedUsers: null 
         });
+        showDutchDistributeToast('🎲 랜덤 분배 완료!');
     });
 
     document.getElementById('btn-dutch-submit-custom').addEventListener('click', () => {
@@ -2047,7 +2054,23 @@
             dutchConfirmedUsers: null, 
             dutchPeekedUsers: null 
         });
+        showDutchDistributeToast('🎯 지정 금액 분배 완료!');
     });
+
+    let dutchToastTimer = null;
+    function showDutchDistributeToast(text) {
+        let el = document.getElementById('dutchDistributeToast');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'dutchDistributeToast';
+            el.style.cssText = 'position:fixed; top:56px; left:50%; transform:translateX(-50%); z-index:750; background:rgba(0,0,0,0.85); color:#fff; padding:8px 14px; border-radius:8px; font-size:13px; transition:opacity 0.3s; white-space:nowrap;';
+            document.body.appendChild(el);
+        }
+        el.textContent = text;
+        el.style.opacity = '1';
+        clearTimeout(dutchToastTimer);
+        dutchToastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1500);
+    }
 
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
@@ -2597,3 +2620,4 @@
 </script>
 </body>
 </html>
+
