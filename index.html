@@ -1473,9 +1473,9 @@
                         statusEl.insertAdjacentElement('afterend', protectInfoEl);
                     }
                     if (isHost && data.hostBoxfindProtectId) {
-                        const pClicks = data.boxFindProtectClicks || 0;
+                        const totalClicks = data.boxFindClickCount || 0;
                         const pNick = players[data.hostBoxfindProtectId]?.nickname || '???';
-                        protectInfoEl.textContent = `🔒 ${pNick} 보호: ${Math.min(pClicks, 7)}/7 클릭${pClicks >= 7 ? ' (이제부터 안 걸림)' : ''}`;
+                        protectInfoEl.textContent = `🔒 ${pNick} 보호: 전체 ${Math.min(totalClicks, 7)}/7 클릭${totalClicks >= 7 ? ' (이제부터 안 걸림)' : ''}`;
                     } else {
                         protectInfoEl.textContent = '';
                     }
@@ -2383,14 +2383,28 @@
 
             const bombIndexes = roomData.boxFindBombIndexes || (Number.isInteger(roomData.boxFindBombIndex) ? [roomData.boxFindBombIndex] : []);
             const protectedId = roomData.hostBoxfindProtectId || null;
-            let protectClicks = roomData.boxFindProtectClicks || 0;
-            let isProtectedNow = false;
-            if (protectedId && curPlayerId === protectedId) {
-                protectClicks += 1; // 이번 라운드에서 보호 대상이 몇 번째로 누르는 클릭인지
-                roomData.boxFindProtectClicks = protectClicks;
-                isProtectedNow = protectClicks >= 7; // 1~6번째는 평소처럼 걸릴 수 있고, 7번째부터 안 걸림
-            }
-            if (!isProtectedNow && bombIndexes.includes(idx)) {
+            const totalClicks = (roomData.boxFindClickCount || 0) + 1;
+            roomData.boxFindClickCount = totalClicks;
+            // 참여자 전체를 합쳐서 7번째 클릭부터 보호 대상은 폭탄을 밟아도 면제됨 (1~6번째까지는 누구나처럼 걸릴 수 있음)
+            const isProtectedNow = !!(protectedId && curPlayerId === protectedId && totalClicks >= 7);
+
+            if (isProtectedNow && bombIndexes.includes(idx)) {
+                // 보호 대상이 폭탄 칸을 밟았지만 면제됨 -> 안전 처리하고, 그 폭탄을 다른 미개봉 칸으로 옮겨서
+                // 전체 폭탄 개수는 그대로 유지 (다른 참여자가 여전히 걸릴 수 있도록)
+                opened[idx] = 'safe';
+                roomData.boxFindOpened = opened;
+                roomData.boxFindTurnIndex = turnIdx + 1;
+                const remainingBombs = bombIndexes.filter(b => b !== idx);
+                const candidates = [];
+                for (let i = 0; i < BOXFIND_TOTAL; i++) {
+                    if (i !== idx && !opened[i] && !remainingBombs.includes(i)) candidates.push(i);
+                }
+                if (candidates.length > 0) {
+                    const relocated = candidates[Math.floor(Math.random() * candidates.length)];
+                    remainingBombs.push(relocated);
+                }
+                roomData.boxFindBombIndexes = remainingBombs;
+            } else if (bombIndexes.includes(idx)) {
                 opened[idx] = 'bomb';
                 roomData.boxFindOpened = opened;
                 roomData.boxFindExploded = true;
@@ -2548,7 +2562,7 @@
                     boxFindTurnIndex: 0,
                     boxFindExploded: false,
                     boxFindLoserId: null,
-                    boxFindProtectClicks: 0
+                    boxFindClickCount: 0
                 });
             } else if (gameId === 'king') {
                 const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
@@ -2619,7 +2633,7 @@
                 timingTarget: null, timingStartTime: null, timingResults: null,
                 rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
                 speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null,
-                boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null, boxFindProtectClicks: null,
+                boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null, boxFindClickCount: null,
                 godMasterId: null, godStartId: null, godTargets: null, godNumber: null, godCurrentId: null, godStep: null, godPath: null, godLoserResult: null, godRevealed: false,
                 sonFingers: null, sonConditionIndex: null, sonAnsweredIds: null, sonRoundKey: null, sonTurnOrder: null, sonTurnIndex: null,
                 roomLastLoserId: null, roomLoserPendingChoice: false
@@ -2649,3 +2663,4 @@
 </script>
 </body>
 </html>
+
