@@ -616,6 +616,10 @@
             <div style="font-size: 26px; font-weight: bold; color: var(--primary-color);">
                 <span id="dutch-allocated-display">0</span>원 / <span id="dutch-total-display">0</span>원
             </div>
+            <div id="dutch-remaining-row" style="display:none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #3A3A42;">
+                <div style="font-size: 13px; color: #8E9AA8;">✏️ 직접 지정 중... 잔여 금액</div>
+                <div style="font-size: 20px; font-weight: bold; color: var(--accent-color);"><span id="dutch-remaining-display">0</span>원</div>
+            </div>
         </div>
 
         <!-- 📊 실시간 현황 리스트 -->
@@ -1701,6 +1705,15 @@
                     const peekedUsers = data.dutchPeekedUsers || {}; // 쪼는맛 오픈 상태 감지용 객체 추가
                     
                     document.getElementById('dutch-total-display').innerText = totalAmount.toLocaleString();
+
+                    const remainingRow = document.getElementById('dutch-remaining-row');
+                    if (data.dutchCustomActive && !(distributedBills && distributedBills.length > 0)) {
+                        remainingRow.style.display = 'block';
+                        const remaining = data.dutchRemaining ?? totalAmount;
+                        document.getElementById('dutch-remaining-display').innerText = remaining.toLocaleString();
+                    } else {
+                        remainingRow.style.display = 'none';
+                    }
                     
                     // 1. 참여자용 가로 보드 로직 수정 (쪼는 맛 처리)
                     if (distributedBills && distributedBills.length > 0) {
@@ -1978,6 +1991,7 @@
         document.getElementById('btn-tab-custom').classList.remove('active');
         document.getElementById('dutch-random-section').style.display = 'block';
         document.getElementById('dutch-custom-section').style.display = 'none';
+        if (isHost && currentRoomCode) update(ref(db, `rooms/${currentRoomCode}`), { dutchCustomActive: false });
     });
     document.getElementById('btn-tab-custom').addEventListener('click', () => {
         document.getElementById('btn-tab-custom').classList.add('active');
@@ -1985,6 +1999,7 @@
         document.getElementById('dutch-random-section').style.display = 'none';
         document.getElementById('dutch-custom-section').style.display = 'block';
         generateDutchCustomFields();
+        if (isHost && currentRoomCode) update(ref(db, `rooms/${currentRoomCode}`), { dutchCustomActive: true });
     });
 
     function generateDutchCustomFields() {
@@ -2005,11 +2020,21 @@
         validateDutchTotalSum();
     }
 
-    window.validateDutchTotalSum = function() {
+    let dutchRemainingSyncTimer = null;
+    function validateDutchTotalSum() {
         const totalTarget = getCleanNumber(document.getElementById('dutch-total-input').value);
         const inputs = document.querySelectorAll('.dutch-custom-input'); let currentSum = 0;
         inputs.forEach(input => { currentSum += getCleanNumber(input.value); });
+        const remaining = totalTarget - currentSum;
         const warningDiv = document.getElementById('dutch-custom-warning');
+
+        if (isHost && currentRoomCode) {
+            clearTimeout(dutchRemainingSyncTimer);
+            dutchRemainingSyncTimer = setTimeout(() => {
+                update(ref(db, `rooms/${currentRoomCode}`), { dutchRemaining: remaining });
+            }, 250);
+        }
+
         if (currentSum !== totalTarget) {
             warningDiv.style.color = 'var(--danger-color)';
             warningDiv.innerText = `⚠️ 입력 합계: ${currentSum.toLocaleString()}원\n(총 술값 ${totalTarget.toLocaleString()}원과 일치해야 합니다)`;
@@ -2037,13 +2062,15 @@
             dutchTotal: total, 
             dutchDistributedBills: finalResults, 
             dutchConfirmedUsers: null, 
-            dutchPeekedUsers: null 
+            dutchPeekedUsers: null,
+            dutchCustomActive: false,
+            dutchRemaining: null
         });
         showDutchDistributeToast('🎲 랜덤 분배 완료!');
     });
 
     document.getElementById('btn-dutch-submit-custom').addEventListener('click', () => {
-        if (!window.validateDutchTotalSum()) return alert('금액 합계를 확인하세요.');
+        if (!validateDutchTotalSum()) return alert('금액 합계를 확인하세요.');
         const total = getCleanNumber(document.getElementById('dutch-total-input').value);
         let finalResults = [];
         document.querySelectorAll('.dutch-custom-input').forEach(input => { finalResults.push(getCleanNumber(input.value)); });
@@ -2052,7 +2079,9 @@
             dutchTotal: total, 
             dutchDistributedBills: finalResults, 
             dutchConfirmedUsers: null, 
-            dutchPeekedUsers: null 
+            dutchPeekedUsers: null,
+            dutchCustomActive: false,
+            dutchRemaining: null
         });
         showDutchDistributeToast('🎯 지정 금액 분배 완료!');
     });
@@ -2556,7 +2585,7 @@
                 const targetSpot = Math.floor(Math.random() * 6); // 6칸 중 랜덤 위치
                 update(rRef, { status: 'playing', speedSignalTime: signalTime, speedTargetSpot: targetSpot, speedFingerResults: null, speedFalseStarts: null });
             } else if (gameId === 'dutch') {
-                update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null });
+                update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null, dutchCustomActive: false, dutchRemaining: null });
             } else if (gameId === 'gameofdeath') {
                 const masterId = pIds[Math.floor(Math.random() * pIds.length)];
                 const startId = (prevLoserId && pIds.includes(prevLoserId)) ? prevLoserId : pIds[Math.floor(Math.random() * pIds.length)];
@@ -2586,7 +2615,7 @@
             update(ref(db, `rooms/${currentRoomCode}`), { 
                 status: 'waiting', word: '', drawScores: null, drawImages: null, bombExploded: false, speedAnswers: null, speedLoserId: null, balanceVotes: null, balanceRevealed: false,
                 bombExplodeAt: null,
-                dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null,
+                dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null, dutchCustomActive: false, dutchRemaining: null,
                 timingTarget: null, timingStartTime: null, timingResults: null,
                 rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
                 speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null,
@@ -2620,3 +2649,4 @@
 </script>
 </body>
 </html>
+
