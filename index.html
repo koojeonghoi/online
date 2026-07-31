@@ -1344,6 +1344,9 @@
                     nameSpan.innerText = players[id].nickname;
                     if (id === myId) { li.classList.add('me'); nameSpan.innerText += " (나)"; }
                     if (players[id].isHost) { nameSpan.innerHTML += ` <span class="host-badge">방장</span>`; }
+                    if (isHost && data.hostBoxfindProtectId === id) {
+                        nameSpan.innerHTML += ` <span class="host-badge" style="background:#3A2A00; color:#FFB020;">🔒 폭탄찾기 보호 설정됨</span>`;
+                    }
                     if (isHost) {
                         nameSpan.style.userSelect = 'none'; nameSpan.style.webkitUserSelect = 'none';
                         nameSpan.style.webkitTouchCallout = 'none'; nameSpan.style.touchAction = 'manipulation';
@@ -1448,6 +1451,20 @@
                         statusEl.innerHTML = `🔥 내 차례입니다! 상자를 골라 터치하세요!`;
                     } else {
                         statusEl.innerHTML = `👤 ${players[curPlayerId]?.nickname || '???'}님의 차례입니다`;
+                    }
+                    let protectInfoEl = document.getElementById('boxfind-protect-info');
+                    if (!protectInfoEl) {
+                        protectInfoEl = document.createElement('div');
+                        protectInfoEl.id = 'boxfind-protect-info';
+                        protectInfoEl.style.cssText = 'font-size:11px; color:#FFB020; margin-top:4px;';
+                        statusEl.insertAdjacentElement('afterend', protectInfoEl);
+                    }
+                    if (isHost && data.hostBoxfindProtectId) {
+                        const pClicks = data.boxFindProtectClicks || 0;
+                        const pNick = players[data.hostBoxfindProtectId]?.nickname || '???';
+                        protectInfoEl.textContent = `🔒 ${pNick} 보호: ${Math.min(pClicks, 7)}/7 클릭${pClicks >= 7 ? ' (이제부터 안 걸림)' : ''}`;
+                    } else {
+                        protectInfoEl.textContent = '';
                     }
                     const grid = document.getElementById('boxfind-grid'); grid.innerHTML = '';
                     for (let i = 0; i < total; i++) {
@@ -2314,8 +2331,13 @@
 
             const bombIndexes = roomData.boxFindBombIndexes || (Number.isInteger(roomData.boxFindBombIndex) ? [roomData.boxFindBombIndex] : []);
             const protectedId = roomData.hostBoxfindProtectId || null;
-            const gameCount = roomData.boxfindGameCount || 0;
-            const isProtectedNow = protectedId && curPlayerId === protectedId && gameCount >= 7;
+            let protectClicks = roomData.boxFindProtectClicks || 0;
+            let isProtectedNow = false;
+            if (protectedId && curPlayerId === protectedId) {
+                protectClicks += 1; // 이번 라운드에서 보호 대상이 몇 번째로 누르는 클릭인지
+                roomData.boxFindProtectClicks = protectClicks;
+                isProtectedNow = protectClicks >= 7; // 1~6번째는 평소처럼 걸릴 수 있고, 7번째부터 안 걸림
+            }
             if (!isProtectedNow && bombIndexes.includes(idx)) {
                 opened[idx] = 'bomb';
                 roomData.boxFindOpened = opened;
@@ -2474,7 +2496,7 @@
                     boxFindTurnIndex: 0,
                     boxFindExploded: false,
                     boxFindLoserId: null,
-                    boxfindGameCount: (roomSnapVal.boxfindGameCount || 0) + 1
+                    boxFindProtectClicks: 0
                 });
             } else if (gameId === 'king') {
                 const shuffledOrder = [...pIds].sort(() => Math.random() - 0.5);
@@ -2545,7 +2567,7 @@
                 timingTarget: null, timingStartTime: null, timingResults: null,
                 rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
                 speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null,
-                boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null,
+                boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null, boxFindProtectClicks: null,
                 godMasterId: null, godStartId: null, godTargets: null, godNumber: null, godCurrentId: null, godStep: null, godPath: null, godLoserResult: null, godRevealed: false,
                 sonFingers: null, sonConditionIndex: null, sonAnsweredIds: null, sonRoundKey: null, sonTurnOrder: null, sonTurnIndex: null,
                 roomLastLoserId: null, roomLoserPendingChoice: false
