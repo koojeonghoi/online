@@ -579,7 +579,7 @@
         <div id="dutch-host-panel" class="quiz-container" style="border-color: var(--accent-color); background: #1e1e24; display: none; text-align: left;">
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 10px; font-weight: bold;">👑 총무 방장 전용: 술값 세팅 파트</div>
             <div class="input-wrapper">
-                <input type="text" id="dutch-total-input" placeholder="총 술값을 입력하세요" value="120,000">
+                <input type="text" id="dutch-total-input" placeholder="총 술값을 입력하세요" value="0">
                 <span class="input-unit">원</span>
             </div>
             <div class="dutch-mode-tabs">
@@ -612,9 +612,9 @@
 
         <!-- 공통 정산 요약 알림 판 -->
         <div class="quiz-container" style="border-color: var(--primary-color); background: #161c24; padding: 12px; margin-bottom: 12px;">
-            <div style="font-size: 13px; color: #8E9AA8;">💵 분배 완료 금액 / 총 술값</div>
+            <div style="font-size: 13px; color: #8E9AA8;">💵 총 술값</div>
             <div style="font-size: 26px; font-weight: bold; color: var(--primary-color);">
-                <span id="dutch-allocated-display">0</span>원 / <span id="dutch-total-display">0</span>원
+                <span id="dutch-total-display">0</span>원
             </div>
             <div id="dutch-remaining-row" style="display:none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #3A3A42;">
                 <div style="font-size: 13px; color: #8E9AA8;">✏️ 직접 지정 중... 잔여 금액</div>
@@ -1752,8 +1752,6 @@
                     const statusListEl = document.getElementById('dutch-status-list');
                     statusListEl.innerHTML = '';
                     
-                    let allocatedSum = 0;
-                    
                     playerIds.forEach((id, idx) => {
                         const row = document.createElement('div');
                         row.className = 'score-row';
@@ -1761,8 +1759,6 @@
                         const userBill = distributedBills[idx] || 0;
                         const isConfirmed = confirmedUsers[id] === true;
                         const isPeeked = peekedUsers[id] === true;
-                        
-                        if(isConfirmed) allocatedSum += userBill;
                         
                         // 정보 필드
                         const infoDiv = document.createElement('div');
@@ -1797,8 +1793,6 @@
                         row.appendChild(actionDiv);
                         statusListEl.appendChild(row);
                     });
-                    
-                    document.getElementById('dutch-allocated-display').innerText = allocatedSum.toLocaleString();
                 }
                 else if (data.selectedGame === 'gameofdeath') {
                     showScreen('game-gameofdeath-screen');
@@ -2599,7 +2593,7 @@
                 const targetSpot = Math.floor(Math.random() * 6); // 6칸 중 랜덤 위치
                 update(rRef, { status: 'playing', speedSignalTime: signalTime, speedTargetSpot: targetSpot, speedFingerResults: null, speedFalseStarts: null });
             } else if (gameId === 'dutch') {
-                update(rRef, { status: 'playing', dutchTotal: 120000, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null, dutchCustomActive: false, dutchRemaining: null });
+                update(rRef, { status: 'playing', dutchTotal: 0, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null, dutchCustomActive: false, dutchRemaining: null });
             } else if (gameId === 'gameofdeath') {
                 const masterId = pIds[Math.floor(Math.random() * pIds.length)];
                 const startId = (prevLoserId && pIds.includes(prevLoserId)) ? prevLoserId : pIds[Math.floor(Math.random() * pIds.length)];
@@ -2663,3 +2657,4 @@
 </script>
 </body>
 </html>
+
