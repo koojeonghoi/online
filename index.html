@@ -366,6 +366,13 @@
             </label>
             <div style="font-size:11px; color:#8E9AA8; margin-top:6px;">1~6번째 대상자 추첨은 완전히 정상 랜덤이고, 7번째부터 조용히 적용됩니다. 라이어/폭탄 등 '걸리는' 역할에 방장(나)은 그 이후로 걸리지 않습니다.</div>
             <button class="secondary" style="margin-top:8px; padding:6px 10px; font-size:12px;" onclick="document.getElementById('onlineCheatPanel').style.display='none'">닫기</button>
+            <div style="border-top:1px dashed #3A3A42; margin-top:12px; padding-top:12px;">
+                <div style="font-size:12px; color:#8E9AA8; margin-bottom:8px;">🧪 혼자 테스트용 가짜 플레이어 (봇). 폭탄돌리기/폭탄찾기는 자기 차례가 되면 1~2초 후 자동으로 진행돼요.</div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="number" id="fakePlayerCount" value="2" min="1" max="8" style="width:60px; padding:8px; border-radius:8px; background:#1c1c20; color:#fff; border:1px solid #3A3A42;">
+                    <button class="secondary" style="padding:8px 12px; font-size:13px; flex:1;" onclick="window.addFakeTestPlayers()">🤖 가짜 플레이어 추가</button>
+                </div>
+            </div>
         </div>
         <ul id="player-list" class="player-list"></ul>
         <div id="boxfind-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
@@ -996,11 +1003,33 @@
     let hasSeenMyselfInRoom = false;
     let lastShownBoomKey = null;
     let boomOverlayTimer = null;
+    let lastBotBombAutoKey = null;
+    let lastBotBoxfindAutoKey = null;
 
     window.kickPlayer = function(id, nickname) {
         if (!isHost) return;
         if (!confirm(`${nickname}님을 강퇴하시겠습니까?`)) return;
         remove(ref(db, `rooms/${currentRoomCode}/players/${id}`));
+    };
+
+    window.addFakeTestPlayers = function() {
+        if (!isHost || !currentRoomCode) return;
+        const countEl = document.getElementById('fakePlayerCount');
+        const count = Math.max(1, Math.min(8, parseInt(countEl?.value || '2', 10)));
+        get(ref(db, `rooms/${currentRoomCode}/players`)).then((snap) => {
+            const existing = snap.val() || {};
+            const existingBotCount = Object.values(existing).filter((p) => p.isBot).length;
+            const updates = {};
+            for (let i = 1; i <= count; i++) {
+                const botId = 'bot_' + Math.random().toString(36).substr(2, 9);
+                updates[`rooms/${currentRoomCode}/players/${botId}`] = {
+                    nickname: `🤖 봇${existingBotCount + i}`,
+                    isHost: false,
+                    isBot: true
+                };
+            }
+            update(ref(db), updates);
+        });
     };
 
     onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
@@ -1056,6 +1085,22 @@
             console.error('bomb explosion transaction failed:', error);
             bombExplosionAttemptKey = null;
         });
+    }
+
+    function autoPassBombForBot(botId, expectedKey) {
+        if (!currentRoomCode) return;
+        runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
+            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'bomb' || roomData.bombExploded) return undefined;
+            const curKey = `${roomData.bombHolderId}_${roomData.bombPassSeq || 0}`;
+            if (curKey !== expectedKey) return undefined; // 이미 상태가 바뀜 (터짐/다른 소지자)
+            if (!roomData.players?.[botId]?.isBot) return undefined;
+            const pIds = Object.keys(roomData.players || {});
+            const myIdx = pIds.indexOf(botId);
+            if (myIdx === -1) return undefined;
+            roomData.bombHolderId = pIds[(myIdx + 1) % pIds.length];
+            roomData.bombPassSeq = (roomData.bombPassSeq || 0) + 1;
+            return roomData;
+        }).catch((error) => console.error('bot bomb pass transaction failed:', error));
     }
 
     // ===== ⏱️ Up & Down 타이밍 게임 =====
@@ -1365,6 +1410,7 @@
                     const nameSpan = document.createElement('span');
                     nameSpan.innerText = players[id].nickname;
                     if (id === myId) { li.classList.add('me'); nameSpan.innerText += " (나)"; }
+                    if (players[id].isBot) { nameSpan.innerHTML += ` <span class="host-badge" style="background:#20304A; color:#6BA8FF;">🤖 봇</span>`; }
                     if (players[id].isHost) { nameSpan.innerHTML += ` <span class="host-badge">방장</span>`; }
                     if (isHost && data.hostBoxfindProtectId === id) {
                         nameSpan.innerHTML += ` <span class="host-badge" style="background:#3A2A00; color:#FFB020;">🔒 폭탄찾기 보호 설정됨</span>`;
@@ -1449,6 +1495,13 @@
                         bombIcon.innerText = "💣";
                         if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; const quizKey = `${data.bombHolderId}_${data.bombPassSeq || 0}`; if (lastBombQuizKey !== quizKey) { lastBombQuizKey = quizKey; generateQuiz(); } } 
                         else { statusTextEl.innerHTML = `👤 폭탄 소지자: ${holderNick}`; document.getElementById('quiz-box').style.display = 'none'; }
+                        if (isHost && players[data.bombHolderId]?.isBot) {
+                            const botKey = `${data.bombHolderId}_${data.bombPassSeq || 0}`;
+                            if (lastBotBombAutoKey !== botKey) {
+                                lastBotBombAutoKey = botKey;
+                                setTimeout(() => autoPassBombForBot(data.bombHolderId, botKey), 1200 + Math.random() * 800);
+                            }
+                        }
                     }
                 }
                 else if (data.selectedGame === 'boxfind') {
@@ -1462,6 +1515,13 @@
                     // 차례인 사람이 중간에 나가거나 강퇴됐으면 아무도 클릭할 수 없어 게임이 영원히 멈춤 -> 자동으로 다음 차례로 넘김
                     if (!data.boxFindExploded && curPlayerId && !data.players?.[curPlayerId]) {
                         skipMissingBoxFindTurn(turnIdx);
+                    }
+                    if (isHost && !data.boxFindExploded && curPlayerId && data.players?.[curPlayerId]?.isBot) {
+                        const botKey = `${currentRoomCode}_${turnIdx}`;
+                        if (lastBotBoxfindAutoKey !== botKey) {
+                            lastBotBoxfindAutoKey = botKey;
+                            setTimeout(() => autoClickBoxFindForBot(curPlayerId, turnIdx), 1000 + Math.random() * 800);
+                        }
                     }
                     const statusEl = document.getElementById('boxfind-status-text');
                     if (data.boxFindExploded) {
@@ -2453,6 +2513,60 @@
         });
     };
 
+    function autoClickBoxFindForBot(botId, expectedTurnIdx) {
+        if (!currentRoomCode) return;
+        runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
+            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'boxfind') return undefined;
+            if (roomData.boxFindExploded) return undefined;
+            const turnOrder = roomData.boxFindTurnOrder || [];
+            if (turnOrder.length === 0) return undefined;
+            const turnIdx = roomData.boxFindTurnIndex || 0;
+            if (turnIdx !== expectedTurnIdx) return undefined; // 이미 다른 클라이언트가 처리함
+            const curPlayerId = turnOrder[turnIdx % turnOrder.length];
+            if (curPlayerId !== botId || !roomData.players?.[botId]?.isBot) return undefined;
+            const opened = roomData.boxFindOpened || {};
+            const total = roomData.boxFindTotal || BOXFIND_TOTAL;
+            const candidates = [];
+            for (let i = 0; i < total; i++) { if (!opened[i]) candidates.push(i); }
+            if (candidates.length === 0) return undefined;
+            const idx = candidates[Math.floor(Math.random() * candidates.length)];
+
+            const bombIndexes = roomData.boxFindBombIndexes || (Number.isInteger(roomData.boxFindBombIndex) ? [roomData.boxFindBombIndex] : []);
+            const protectedId = roomData.hostBoxfindProtectId || null;
+            const totalClicks = (roomData.boxFindClickCount || 0) + 1;
+            roomData.boxFindClickCount = totalClicks;
+            const isProtectedNow = !!(protectedId && curPlayerId === protectedId && totalClicks >= 7);
+
+            if (isProtectedNow && bombIndexes.includes(idx)) {
+                opened[idx] = 'safe';
+                roomData.boxFindOpened = opened;
+                roomData.boxFindTurnIndex = turnIdx + 1;
+                const remainingBombs = bombIndexes.filter(b => b !== idx);
+                const relocCandidates = [];
+                for (let i = 0; i < total; i++) {
+                    if (i !== idx && !opened[i] && !remainingBombs.includes(i)) relocCandidates.push(i);
+                }
+                if (relocCandidates.length > 0) {
+                    const relocated = relocCandidates[Math.floor(Math.random() * relocCandidates.length)];
+                    remainingBombs.push(relocated);
+                }
+                roomData.boxFindBombIndexes = remainingBombs;
+            } else if (bombIndexes.includes(idx)) {
+                opened[idx] = 'bomb';
+                roomData.boxFindOpened = opened;
+                roomData.boxFindExploded = true;
+                roomData.boxFindLoserId = botId;
+                roomData.roomLastLoserId = botId;
+                roomData.roomLoserPendingChoice = true;
+            } else {
+                opened[idx] = 'safe';
+                roomData.boxFindOpened = opened;
+                roomData.boxFindTurnIndex = turnIdx + 1;
+            }
+            return roomData;
+        }).catch((error) => console.error('bot boxfind click transaction failed:', error));
+    }
+
     // ===== 👑 왕게임 (전원 랜덤 순서 뽑기 + 명령 카드 자동 생성) =====
     const kingCommands = [
         { text: "{A}번과 {B}번, 눈 마주치고 러브샷!", slots: 2 },
@@ -2476,8 +2590,6 @@
     ];
 
     // 19금 모드 전용: 스킨십을 강요하지 않는 선에서 수위만 살짝 있는 커맨드.
-    // 2인 지목 커맨드는 항상 남녀 한 명씩으로만 짝지어짐 (drawKingCommand 참고)
-        // 19금 모드 전용: 스킨십을 강요하지 않는 선에서 수위만 살짝 있는 커맨드.
     // 2인 지목 커맨드는 항상 남녀 한 명씩으로만 짝지어짐 (drawKingCommand 참고)
     const kingAdultCommands = [
         { text: "🔥[29금] {A}번과 {B}번, 15초간 옷속에 손을 넣어 맨살 어깨를 만지며 눈빛을 교환하시오.", slots: 2 },
