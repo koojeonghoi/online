@@ -1018,6 +1018,15 @@
         if (currentBombExplodeAt) tryExplodeBombIfDue(currentBombExplodeAt);
     }, 300);
 
+    // 모바일 브라우저는 화면이 꺼지거나 탭이 백그라운드로 가면 setInterval을 강하게 스로틀링/정지시켜서
+    // 폭탄 터질 시점이 지나도 안 터지는 것처럼 보이는 원인이 됨. 화면이 다시 켜지는 순간 즉시 재확인.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && currentBombExplodeAt) tryExplodeBombIfDue(currentBombExplodeAt);
+    });
+    window.addEventListener('focus', () => {
+        if (currentBombExplodeAt) tryExplodeBombIfDue(currentBombExplodeAt);
+    });
+
     function normalizeShapeIndex(index) {
         if (!shapes.length) return 0;
         const parsed = Number(index);
@@ -1450,6 +1459,10 @@
                     const turnOrder = data.boxFindTurnOrder || [];
                     const turnIdx = data.boxFindTurnIndex || 0;
                     const curPlayerId = turnOrder.length ? turnOrder[turnIdx % turnOrder.length] : null;
+                    // 차례인 사람이 중간에 나가거나 강퇴됐으면 아무도 클릭할 수 없어 게임이 영원히 멈춤 -> 자동으로 다음 차례로 넘김
+                    if (!data.boxFindExploded && curPlayerId && !data.players?.[curPlayerId]) {
+                        skipMissingBoxFindTurn(turnIdx);
+                    }
                     const statusEl = document.getElementById('boxfind-status-text');
                     if (data.boxFindExploded) {
                         const loserNick = players[data.boxFindLoserId]?.nickname || '???';
@@ -2287,14 +2300,16 @@
             const b = document.createElement('button'); b.className = 'quiz-btn'; b.innerText = o;
             b.onclick = () => {
                 if (o === currentAnswer) {
-                    get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
-                        const roomVal = snap.val();
-                        const pIds = Object.keys(roomVal.players || {});
-                        update(ref(db, `rooms/${currentRoomCode}/`), {
-                            bombHolderId: pIds[(pIds.indexOf(myId) + 1) % pIds.length],
-                            bombPassSeq: (roomVal.bombPassSeq || 0) + 1
-                        });
-                    });
+                    runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
+                        if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'bomb' || roomData.bombExploded) return undefined;
+                        if (roomData.bombHolderId !== myId) return undefined; // 이미 소지자가 바뀐 상태(터짐 등) - 아무 것도 하지 않음
+                        const pIds = Object.keys(roomData.players || {});
+                        const myIdx = pIds.indexOf(myId);
+                        if (myIdx === -1) return undefined;
+                        roomData.bombHolderId = pIds[(myIdx + 1) % pIds.length];
+                        roomData.bombPassSeq = (roomData.bombPassSeq || 0) + 1;
+                        return roomData;
+                    }).catch((error) => console.error('bomb pass transaction failed:', error));
                 } else {
                     isPenaltyActive = true; b.classList.add('wrong-animation');
                     setTimeout(() => { b.classList.remove('wrong-animation'); isPenaltyActive = false; }, 1000);
@@ -2361,6 +2376,30 @@
 
     // ===== 📦 폭탄찾기 (다같이 그리드 공유, 한명씩 순서대로 클릭) =====
     const BOXFIND_TOTAL = 25; // 5열 x 5행
+
+    let boxFindSkipAttemptKey = null;
+    function skipMissingBoxFindTurn(turnIdx) {
+        if (!currentRoomCode) return;
+        const key = `${currentRoomCode}_${turnIdx}`;
+        if (boxFindSkipAttemptKey === key) return;
+        boxFindSkipAttemptKey = key;
+        runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
+            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'boxfind' || roomData.boxFindExploded) return undefined;
+            const turnOrder = roomData.boxFindTurnOrder || [];
+            if (!turnOrder.length) return undefined;
+            let idx = roomData.boxFindTurnIndex || 0;
+            if (idx !== turnIdx) return undefined; // 이미 다른 클라이언트가 처리함
+            let steps = 0;
+            while (steps < turnOrder.length && !roomData.players?.[turnOrder[idx % turnOrder.length]]) {
+                idx += 1;
+                steps += 1;
+            }
+            if (steps === turnOrder.length) return undefined; // 전원이 나감 - 처리 불가
+            roomData.boxFindTurnIndex = idx;
+            return roomData;
+        }).catch((error) => console.error('boxfind skip-turn transaction failed:', error))
+          .finally(() => { boxFindSkipAttemptKey = null; });
+    }
 
     window.clickBoxFindTile = function(idx) {
         if (!currentRoomCode) return;
@@ -2438,24 +2477,39 @@
 
     // 19금 모드 전용: 스킨십을 강요하지 않는 선에서 수위만 살짝 있는 커맨드.
     // 2인 지목 커맨드는 항상 남녀 한 명씩으로만 짝지어짐 (drawKingCommand 참고)
+        // 19금 모드 전용: 스킨십을 강요하지 않는 선에서 수위만 살짝 있는 커맨드.
+    // 2인 지목 커맨드는 항상 남녀 한 명씩으로만 짝지어짐 (drawKingCommand 참고)
     const kingAdultCommands = [
-        { text: "🔥[19금] {A}번, {B}번에게 고백하듯 진지하게 말해보기", slots: 2 },
-        { text: "🔥[19금] {A}번, {B}번 귀에 대고 자신의 이상형 속삭이기", slots: 2 },
-        { text: "🔥[19금] {A}번과 {B}번, 서로의 매력 포인트 3가지씩 말해주기", slots: 2 },
-        { text: "🔥[19금] {A}번, {B}번과 포옹 대신 하이파이브 러브샷", slots: 2 },
-        { text: "🔥[19금] {A}번, {B}번에게 지금 가장 하고 싶은 말 한마디", slots: 2 },
-        { text: "🔥[19금] {A}번, 이상형을 묘사하면 {B}번이 몇 점인지 맞혀보기", slots: 2 },
-        { text: "🔥[19금] {A}번, 최근에 설렜던 순간 하나 공개하기", slots: 1 },
-        { text: "🔥[19금] {A}번, 자신의 연애 스타일을 한 단어로 표현하기", slots: 1 },
-        { text: "🔥[19금] {A}번, {B}번에게 첫인상이 어땠는지 솔직하게 말하기", slots: 2 },
-        { text: "🔥[19금] {A}번과 {B}번, 서로에게 재미있는 별명 지어주기", slots: 2 },
-        { text: "🔥[19금] {A}번, {B}번과 눈 마주치고 5초간 안 웃기 챌린지 — 웃으면 원샷", slots: 2 },
-        { text: "🔥[19금] {A}번, 자신의 최근 썸/연애 스토리 한 줄로 요약하기", slots: 1 },
-        { text: "🔥[19금] {A}번과 {B}번, 서로에게 궁금했던 질문 하나씩 주고받기", slots: 2 },
-        { text: "🔥[19금] {A}번, {B}번을 왜 좋아할 수밖에 없는지 3초 안에 즉석 드립으로 말하기", slots: 2 },
-        { text: "🔥[19금] {A}번, 핸드폰 배경화면 공개하기", slots: 1 },
-        { text: "🔥[19금] {A}번과 {B}번, 3초 안에 같은 숫자 외치기 텔레파시 게임 — 실패하면 같이 원샷", slots: 2 },
-        { text: "🔥[19금] {A}번, {B}번에게 지금 기분을 색깔 하나로 표현하고 이유 설명하기", slots: 2 }
+        { text: "🔥[29금] {A}번과 {B}번, 15초간 옷속에 손을 넣어 맨살 어깨를 만지며 눈빛을 교환하시오.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 목에 3초간 키스하시오.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 입술 거리 1cm를 유지한 채 서로의 눈을 바라보시오. 웃거나 피하면 술한잔", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 무릎 위에 30초간 앉으시오.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 귓속에 3초간 숨을 천천히 불어넣으시오.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 허벅지를 10초간 손끝으로 천천히 쓰다듬으시오.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 서로의 뒷목을 감싸 안고 서로의 눈을 바라보시오. 웃거나 피하면 술한잔.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 양쪽 쇄골에 키스하시오.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 서로의 속옷 색깔을 확인하시오.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 맨살 등에 손을 넣고 만지시오.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 포옹샷으로 소주 한잔 원샷.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 볼에 립스틱 자욱 남기기.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 옷위로 엉덩이를 만지시오.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번에게 신체에서 가장 자신있는 부위 보여주기.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 서로 팔짱을 낀 상태로 5분간 유지하기.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번을 포옹해 10초간 유지 — 버티지 못하면 술한잔.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 서로 은밀한 섹스 판타지를 귓속말로 얘기할 것.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 엉덩이를 찰지게 때리기.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 입에서 입으로 소주 한잔을 넘겨주시오.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 귀를 혀로 핥으시오.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 서로의 허벅지 안쪽을 손으로 10초 동안 애무할 것.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 무릎에 앉아 러브샷 하기.", slots: 2 },
+        { text: "🔥[29금] {A}번과 {B}번, 서로의 손가락에 입맞출 것.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번에게 10초간 백허그를 하시오.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 손을 잡고 자신의 몸 여기저기 가져다 대어라.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 발목부터 허벅지까지 마사지.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 다리를 자신의 무릎 위에 올려놓고 쓰다듬어라.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 무릎을 베고 누워서 20초간 유지.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 가슴 위에 손을 살포시 올리고 15초 유지.", slots: 2 },
+        { text: "🔥[29금] {A}번, {B}번의 상의를 살짝 들어 올리고 배에 뽀뽀.", slots: 2 }
     ];
 
     function drawKingCommand(playerCount, genderMap) {
@@ -2657,4 +2711,3 @@
 </script>
 </body>
 </html>
-
