@@ -1002,6 +1002,24 @@
     let boomOverlayTimer = null;
     let lastBotBombAutoKey = null;
     let lastBotBoxfindAutoKey = null;
+    let lastBotRouletteAutoKey = null;
+    let lastBotSonAutoKey = null;
+    let lastBotGodDesignateKey = null;
+    let lastBotGodMasterKey = null;
+    let lastBotGodTurnAutoKey = null;
+    let lastBotSpeedFingerAutoKey = null;
+    let lastBotSpeedAnswerAutoKey = null;
+    let lastBotBalanceAutoKey = null;
+    let lastBotDrawAutoKey = null;
+    let lastBotTimingAutoKey = null;
+    const sonBotFoldHandled = new Set();
+    const godBotHandled = new Set();
+    const speedBotAnswerHandled = new Set();
+    const balanceBotVoteHandled = new Set();
+    const drawBotSubmitHandled = new Set();
+    const timingBotStopHandled = new Set();
+    const dutchBotPeekHandled = new Set();
+    function botDelay(min, max) { return min + Math.random() * (max - min); }
 
     window.kickPlayer = function(id, nickname) {
         if (!isHost) return;
@@ -1128,7 +1146,10 @@
 
     function startTimingLoop(startTime, target) {
         function loop() {
-            const elapsed = Date.now() - startTime;
+            // getServerNow()를 써야 화면에 보이는 막대와 STOP을 눌렀을 때 기록되는 값이 같은 기준 시계를 쓰게 됨.
+            // 이전에는 여기서 Date.now()(기기 로컬 시계)를 썼는데, STOP 클릭 시점 값은 getServerNow()(서버 보정 시계)로
+            // 계산해서 두 시계가 어긋나는 만큼(기기 시계 오차) 눈에 보이는 위치와 실제 기록되는 오차가 달라지는 버그가 있었음.
+            const elapsed = getServerNow() - startTime;
             drawTimingBar(timingValueAt(elapsed), target, false);
             timingAnimId = requestAnimationFrame(loop);
         }
@@ -1163,6 +1184,28 @@
             return { value, error, clickedAt };
         });
     });
+
+    function autoStopTimingForBot(botId, expectedStartTime, target) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d || d.selectedGame !== 'timing' || d.timingStartTime !== expectedStartTime) return;
+            if (!d.players?.[botId]?.isBot) return;
+            const existing = (d.timingResults || {})[botId];
+            if (existing) return;
+            // 사람처럼 살짝 오차를 두고 클릭 (완벽한 정확도는 부자연스러움)
+            const humanLikeError = (Math.random() - 0.5) * 1.6; // 대략 ±0.8 오차
+            const clickedAt = getServerNow();
+            const elapsed = clickedAt - expectedStartTime;
+            const rawValue = timingValueAt(elapsed) + humanLikeError;
+            const value = Math.round(Math.max(0, Math.min(10, rawValue)) * 100) / 100;
+            const error = Math.round(Math.abs(value - target) * 100) / 100;
+            const path2 = `rooms/${currentRoomCode}/timingResults/${botId}`;
+            runTransaction(ref(db, path2), (existing2) => {
+                if (existing2) return undefined;
+                return { value, error, clickedAt };
+            });
+        });
+    }
 
     document.getElementById('btn-roulette-pull').addEventListener('click', () => {
         if (!rouletteLastData || !rouletteLastData.isMyTurn) return;
@@ -1206,6 +1249,54 @@
             }
         });
     });
+
+    function autoPullRouletteForBot(botId, expectedTurnIdx) {
+        if (!currentRoomCode) return;
+        runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
+            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'roulette') return undefined;
+            const turnOrder = roomData.rouletteTurnOrder || [];
+            const turnIdx = roomData.rouletteTurnIdx || 0;
+            if (turnIdx !== expectedTurnIdx) return undefined;
+            if (turnOrder[turnIdx] !== botId || !roomData.players?.[botId]?.isBot) return undefined;
+            const slotCount = roomData.rouletteSlotCount || 6;
+            const chamberPos = ((Number(roomData.rouletteChamberPos) || 0) % slotCount + slotCount) % slotCount;
+            const isHit = (chamberPos === roomData.rouletteBulletChamber);
+            const nextTurnIdx = (turnIdx + 1) % turnOrder.length;
+            const botNick = roomData.players?.[botId]?.nickname || '봇';
+            if (isHit) {
+                const consecutive = (roomData.rouletteLastHitId === botId) ? (roomData.rouletteConsecutiveHits || 1) + 1 : 1;
+                roomData.rouletteLastHitId = botId;
+                roomData.rouletteConsecutiveHits = consecutive;
+                roomData.rouletteResultText = consecutive > 1 ? `💥 ${botNick}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺` : `💥 ${botNick}님 총알 명중! 한 잔 마시기 🍺`;
+                roomData.rouletteBulletChamber = Math.floor(Math.random() * slotCount);
+                roomData.rouletteChamberPos = 0;
+            } else {
+                const nextChamberPos = chamberPos + 1;
+                roomData.rouletteResultText = null;
+                if (nextChamberPos >= slotCount) {
+                    roomData.rouletteBulletChamber = Math.floor(Math.random() * slotCount);
+                    roomData.rouletteChamberPos = 0;
+                } else {
+                    roomData.rouletteChamberPos = nextChamberPos;
+                }
+            }
+            roomData.rouletteTurnIdx = nextTurnIdx;
+            return roomData;
+        }).catch((error) => console.error('bot roulette pull transaction failed:', error));
+    }
+
+    function autoTapSpeedFingerForBot(botId, expectedSignalTime, targetSpot) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const rData = snap.val();
+            if (!rData || rData.speedSignalTime !== expectedSignalTime) return; // 라운드가 이미 바뀜
+            if (!rData.players?.[botId]?.isBot) return;
+            const already = (rData.speedFingerResults && rData.speedFingerResults[botId] !== undefined) || (rData.speedFalseStarts && rData.speedFalseStarts[botId]);
+            if (already) return;
+            const reaction = Math.max(1, getServerNow() - expectedSignalTime);
+            set(ref(db, `rooms/${currentRoomCode}/speedFingerResults/${botId}`), reaction);
+        });
+    }
 
     function handleSpeedFingerTap(spotIndex) {
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
@@ -1455,6 +1546,20 @@
                     document.getElementById('preview-svg').innerHTML = shapes[currentShapeIndex].svg;
 
                     const scores = data.drawScores || {}; const images = data.drawImages || {};
+                    if (isHost) {
+                        const botIds = playerIds.filter((id) => players[id]?.isBot && scores[id] === undefined);
+                        botIds.forEach((botId) => {
+                            const key = `${currentRoomCode}_${data.targetShapeIndex}_${botId}`;
+                            if (!drawBotSubmitHandled.has(key)) {
+                                drawBotSubmitHandled.add(key);
+                                setTimeout(() => {
+                                    if (!currentRoomCode) return;
+                                    const score = 40 + Math.floor(Math.random() * 55); // 40~94점
+                                    update(ref(db), { [`rooms/${currentRoomCode}/drawScores/${botId}`]: score });
+                                }, botDelay(1500, 4000));
+                            }
+                        });
+                    }
                     const scoreBoardEl = document.getElementById('draw-score-list'); scoreBoardEl.innerHTML = '';
                     const sorted = Object.keys(scores).map(id => ({ nickname: players[id]?.nickname || '참가자', score: scores[id], img: images[id] || null })).sort((a,b) => b.score - a.score);
                     if(sorted.length === 0) { scoreBoardEl.innerHTML = '<div style="color:#8E9AA8;">그림을 그린 후 아래 버튼을 눌러 제출하세요!</div>'; } 
@@ -1595,6 +1700,16 @@
                         }
                     } else {
                         expBox.style.display = 'none'; document.getElementById('btn-submit-speed').disabled = speedAnswers[myId] ? true : false;
+                        if (isHost) {
+                            const botIds = playerIds.filter((id) => players[id]?.isBot && !speedAnswers[id]);
+                            botIds.forEach((botId) => {
+                                const key = `${currentRoomCode}_${data.speedChosungIndex}_${botId}`;
+                                if (!speedBotAnswerHandled.has(key)) {
+                                    speedBotAnswerHandled.add(key);
+                                    setTimeout(() => autoAnswerSpeedForBot(botId, data.speedChosungIndex, data.speedWordLength), botDelay(1500, 4500));
+                                }
+                            });
+                        }
                     }
                 }
                 else if (data.selectedGame === 'balance') {
@@ -1605,6 +1720,19 @@
                     document.getElementById('text-option-b').innerText = `🅱️ ${balancePool[bIdx].b}`;
                     const votes = data.balanceVotes || {};
                     const isBalanceRevealed = !!data.balanceRevealed;
+                    if (isHost && !isBalanceRevealed) {
+                        const botIds = playerIds.filter((id) => players[id]?.isBot && votes[id] === undefined);
+                        botIds.forEach((botId) => {
+                            const key = `${currentRoomCode}_${bIdx}_${botId}`;
+                            if (!balanceBotVoteHandled.has(key)) {
+                                balanceBotVoteHandled.add(key);
+                                setTimeout(() => {
+                                    if (!currentRoomCode) return;
+                                    set(ref(db, `rooms/${currentRoomCode}/balanceVotes/${botId}`), Math.random() < 0.5 ? 'A' : 'B');
+                                }, botDelay(600, 2200));
+                            }
+                        });
+                    }
                     document.getElementById('btn-balance-a').className = `balance-option-btn ${votes[myId]==='A'?'selected':''}`;
                     document.getElementById('btn-balance-b').className = `balance-option-btn ${votes[myId]==='B'?'selected':''}`;
                     // 결과 공개 후에도 버튼은 계속 눌러야 하므로(결과 확인용) disabled 처리하지 않음
@@ -1650,6 +1778,17 @@
                     const results = data.timingResults || {};
                     const myResult = results[myId];
 
+                    if (isHost) {
+                        const botIds = playerIds.filter((id) => players[id]?.isBot && results[id] === undefined);
+                        botIds.forEach((botId) => {
+                            const key = `${currentRoomCode}_${data.timingStartTime}_${botId}`;
+                            if (!timingBotStopHandled.has(key)) {
+                                timingBotStopHandled.add(key);
+                                setTimeout(() => autoStopTimingForBot(botId, data.timingStartTime, target), botDelay(600, 3200));
+                            }
+                        });
+                    }
+
                     if (timingActiveRoundKey !== data.timingStartTime) {
                         timingActiveRoundKey = data.timingStartTime;
                         stopTimingLoop();
@@ -1680,6 +1819,14 @@
                     const isMyTurn = currentPid === myId;
 
                     rouletteLastData = { slotCount, turnOrder, turnIdx, chamberPos, bulletChamber: data.rouletteBulletChamber, lastHitId: data.rouletteLastHitId, consecutiveHits: data.rouletteConsecutiveHits, isMyTurn };
+
+                    if (isHost && currentPid && data.players?.[currentPid]?.isBot) {
+                        const botKey = `${currentRoomCode}_${turnIdx}`;
+                        if (lastBotRouletteAutoKey !== botKey) {
+                            lastBotRouletteAutoKey = botKey;
+                            setTimeout(() => autoPullRouletteForBot(currentPid, turnIdx), botDelay(900, 1700));
+                        }
+                    }
 
                     const slotsEl = document.getElementById('rouletteSlots');
                     slotsEl.innerHTML = '';
@@ -1739,6 +1886,12 @@
                             if (spotEl) { spotEl.className = 'speed-target active'; spotEl.textContent = '👆'; }
                             document.getElementById('speedFingerStatus').textContent = '지금 켜진 곳을 터치하세요!!';
                         }
+                        if (isHost) {
+                            const botIds = Object.keys(players).filter((id) => players[id]?.isBot);
+                            botIds.forEach((botId) => {
+                                setTimeout(() => autoTapSpeedFingerForBot(botId, signalTime, targetSpot), Math.max(0, delayLeft) + botDelay(250, 900));
+                            });
+                        }
                     }
 
                     const allIds = Object.keys(players);
@@ -1773,6 +1926,20 @@
                     const distributedBills = data.dutchDistributedBills || [];
                     const confirmedUsers = data.dutchConfirmedUsers || {};
                     const peekedUsers = data.dutchPeekedUsers || {}; // 쪼는맛 오픈 상태 감지용 객체 추가
+
+                    if (isHost && distributedBills.length > 0) {
+                        const botIds = playerIds.filter((id) => players[id]?.isBot && !peekedUsers[id]);
+                        botIds.forEach((botId) => {
+                            const key = `${currentRoomCode}_${distributedBills.join(',')}_${botId}`;
+                            if (!dutchBotPeekHandled.has(key)) {
+                                dutchBotPeekHandled.add(key);
+                                setTimeout(() => {
+                                    if (!currentRoomCode) return;
+                                    update(ref(db, `rooms/${currentRoomCode}/dutchPeekedUsers`), { [botId]: true });
+                                }, botDelay(500, 2500));
+                            }
+                        });
+                    }
                     
                     document.getElementById('dutch-total-display').innerText = totalAmount.toLocaleString();
 
@@ -1874,6 +2041,38 @@
                     const allDesignated = playerIds.length > 0 && playerIds.every(id => !!targets[id]);
                     const startNick = players[data.godStartId]?.nickname || '???';
                     const hasNumber = Number.isInteger(data.godNumber);
+
+                    if (isHost && !data.godRevealed) {
+                        if (!allDesignated) {
+                            const undesignatedBots = playerIds.filter((id) => players[id]?.isBot && !targets[id]);
+                            undesignatedBots.forEach((botId) => {
+                                const key = `${currentRoomCode}_designate_${botId}`;
+                                if (!godBotHandled.has(key)) {
+                                    godBotHandled.add(key);
+                                    const others = playerIds.filter((id) => id !== botId);
+                                    if (others.length) {
+                                        const choice = others[Math.floor(Math.random() * others.length)];
+                                        setTimeout(() => update(ref(db, `rooms/${currentRoomCode}/godTargets`), { [botId]: choice }), botDelay(500, 1800));
+                                    }
+                                }
+                            });
+                        } else if (!hasNumber && players[data.godMasterId]?.isBot) {
+                            const key = `${currentRoomCode}_master_${data.godStartId}`;
+                            if (lastBotGodMasterKey !== key) {
+                                lastBotGodMasterKey = key;
+                                setTimeout(() => {
+                                    const num = 10 + Math.floor(Math.random() * 11); // 10~20
+                                    update(ref(db, `rooms/${currentRoomCode}`), { godNumber: num, godCurrentId: data.godStartId, godStep: 0, godPath: [data.godStartId] });
+                                }, botDelay(800, 1800));
+                            }
+                        } else if (hasNumber && players[data.godCurrentId]?.isBot) {
+                            const key = `${currentRoomCode}_turn_${data.godStep}_${data.godCurrentId}`;
+                            if (lastBotGodTurnAutoKey !== key) {
+                                lastBotGodTurnAutoKey = key;
+                                setTimeout(() => autoAdvanceGodTurnForBot(data.godCurrentId, data.godStep), botDelay(700, 1600));
+                            }
+                        }
+                    }
 
                     if (data.godRevealed) {
                         const path = data.godPath || [];
@@ -1989,6 +2188,26 @@
                         if ((fingers[cand] ?? 5) > 0) { curTurnId = cand; break; }
                     }
                     const isMyTurn = curTurnId === myId;
+                    if (isHost && curTurnId && data.players?.[curTurnId]?.isBot) {
+                        const botTurnKey = `${currentRoomCode}_${turnIdx}_${curTurnId}`;
+                        if (lastBotSonAutoKey !== botTurnKey) {
+                            lastBotSonAutoKey = botTurnKey;
+                            setTimeout(() => autoDrawSonConditionForBot(curTurnId, turnOrder, turnIdx), botDelay(1000, 2000));
+                        }
+                    }
+                    if (isHost && (condIdx !== null && condIdx !== undefined)) {
+                        const botIds = Object.keys(players).filter((id) => players[id]?.isBot && (fingers[id] ?? 5) > 0 && !answered[id]);
+                        botIds.forEach((botId) => {
+                            const foldKey = `${currentRoomCode}_${condIdx}_${botId}`;
+                            if (!sonBotFoldHandled.has(foldKey)) {
+                                sonBotFoldHandled.add(foldKey);
+                                if (Math.random() < 0.35) {
+                                    setTimeout(() => autoFoldSonForBot(botId, condIdx), botDelay(500, 1800));
+                                }
+                            }
+                        });
+                    }
+
                     const nextBtn = document.getElementById('btn-son-next-condition');
                     const turnTextEl = document.getElementById('son-turn-text');
                     if (turnTextEl) turnTextEl.textContent = curTurnId ? `🙋 이번 조건은 ${players[curTurnId]?.nickname || '참가자'}님 차례` : '';
@@ -2049,6 +2268,58 @@
             update(ref(db), updates);
         });
     });
+
+    function autoAdvanceGodTurnForBot(botId, expectedStep) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d || d.selectedGame !== 'gameofdeath' || d.godRevealed) return;
+            if (d.godCurrentId !== botId || d.godStep !== expectedStep || !d.players?.[botId]?.isBot) return;
+            const targets = d.godTargets || {};
+            const next = targets[botId];
+            if (!next) return;
+            const path = d.godPath || [d.godStartId];
+            const newStep = d.godStep + 1;
+            const newPath = [...path, next];
+            if (newStep >= d.godNumber) {
+                update(ref(db, `rooms/${currentRoomCode}`), {
+                    godStep: newStep, godPath: newPath, godCurrentId: next,
+                    godLoserResult: next, godRevealed: true,
+                    roomLastLoserId: next, roomLoserPendingChoice: true
+                });
+            } else {
+                update(ref(db, `rooms/${currentRoomCode}`), { godStep: newStep, godPath: newPath, godCurrentId: next });
+            }
+        });
+    }
+
+    function autoDrawSonConditionForBot(botId, turnOrder, expectedTurnIdx) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d || d.selectedGame !== 'sonbyungho' || d.status !== 'playing') return;
+            const curTurnIdx = d.sonTurnIndex || 0;
+            if (curTurnIdx !== expectedTurnIdx) return; // 이미 다른 클라이언트가 처리함
+            if (!d.players?.[botId]?.isBot) return;
+            const idx = Math.floor(Math.random() * sonConditionPool.length);
+            const newTurnIdx = turnOrder.indexOf(botId) + 1;
+            update(ref(db, `rooms/${currentRoomCode}`), { sonConditionIndex: idx, sonAnsweredIds: {}, sonTurnIndex: newTurnIdx });
+        });
+    }
+
+    function autoFoldSonForBot(botId, expectedCondIdx) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d || d.sonConditionIndex !== expectedCondIdx) return;
+            const fingers = d.sonFingers || {};
+            const answered = d.sonAnsweredIds || {};
+            if (answered[botId] || !d.players?.[botId]?.isBot) return;
+            const cur = fingers[botId] ?? 5;
+            if (cur <= 0) return;
+            const updates = {};
+            updates[`rooms/${currentRoomCode}/sonFingers/${botId}`] = cur - 1;
+            updates[`rooms/${currentRoomCode}/sonAnsweredIds/${botId}`] = true;
+            update(ref(db), updates);
+        });
+    }
 
     document.getElementById('btn-tab-random').addEventListener('click', () => {
         document.getElementById('btn-tab-random').classList.add('active');
@@ -2283,6 +2554,34 @@
         return result;
     }
 
+    function autoAnswerSpeedForBot(botId, expectedChosungIndex, wordLength) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const rData = snap.val(); if (!rData || rData.speedLoserId) return;
+            if (rData.speedChosungIndex !== expectedChosungIndex) return; // 라운드가 이미 바뀜
+            if (!rData.players?.[botId]?.isBot) return;
+            const currentAnswers = rData.speedAnswers || {}; if (currentAnswers[botId]) return;
+            const pool = wordLength === 3 ? chosungPool3 : chosungPool2;
+            const entry = pool[expectedChosungIndex];
+            if (!entry) return;
+            const used = new Set(Object.values(currentAnswers));
+            const candidates = entry.answers.filter((w) => !used.has(w));
+            if (!candidates.length) return;
+            const userAns = candidates[Math.floor(Math.random() * candidates.length)];
+            const updates = {}; updates[`rooms/${currentRoomCode}/speedAnswers/${botId}`] = userAns;
+            if (Object.keys(currentAnswers).length + 1 === Object.keys(rData.players).length - 1) {
+                const loserId = Object.keys(rData.players).find((id) => id !== botId && !currentAnswers[id]);
+                if (loserId) {
+                    updates[`rooms/${currentRoomCode}/speedLoserId`] = loserId;
+                    updates[`rooms/${currentRoomCode}/roomLastLoserId`] = loserId;
+                    updates[`rooms/${currentRoomCode}/roomLoserPendingChoice`] = true;
+                }
+            }
+            update(ref(db), updates);
+        });
+    }
+
+    
     document.getElementById('btn-submit-speed').addEventListener('click', () => {
         const userAns = document.getElementById('speed-answer-input').value.trim().replace(/\s+/g, "");
         if (!userAns) return;
@@ -2589,36 +2888,23 @@
     // 19금 모드 전용: 스킨십을 강요하지 않는 선에서 수위만 살짝 있는 커맨드.
     // 2인 지목 커맨드는 항상 남녀 한 명씩으로만 짝지어짐 (drawKingCommand 참고)
     const kingAdultCommands = [
-        { text: "🔥[29금] {A}번과 {B}번, 15초간 옷속에 손을 넣어 맨살 어깨를 만지며 눈빛을 교환하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 목에 3초간 키스하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 입술 거리 1cm를 유지한 채 서로의 눈을 바라보시오. 웃거나 피하면 술한잔", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 무릎 위에 30초간 앉으시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 귓속에 3초간 숨을 천천히 불어넣으시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 허벅지를 10초간 손끝으로 천천히 쓰다듬으시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로의 뒷목을 감싸 안고 서로의 눈을 바라보시오. 웃거나 피하면 술한잔.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 양쪽 쇄골에 키스하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로의 속옷 색깔을 확인하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 맨살 등에 손을 넣고 만지시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 포옹샷으로 소주 한잔 원샷.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 볼에 립스틱 자욱 남기기.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 옷위로 엉덩이를 만지시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번에게 신체에서 가장 자신있는 부위 보여주기.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로 팔짱을 낀 상태로 5분간 유지하기.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번을 포옹해 10초간 유지 — 버티지 못하면 술한잔.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로 은밀한 섹스 판타지를 귓속말로 얘기할 것.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 엉덩이를 찰지게 때리기.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 입에서 입으로 소주 한잔을 넘겨주시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 귀를 혀로 핥으시오.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로의 허벅지 안쪽을 손으로 10초 동안 애무할 것.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 무릎에 앉아 러브샷 하기.", slots: 2 },
-        { text: "🔥[29금] {A}번과 {B}번, 서로의 손가락에 입맞출 것.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번에게 10초간 백허그를 하시오.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 손을 잡고 자신의 몸 여기저기 가져다 대어라.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 발목부터 허벅지까지 마사지.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 다리를 자신의 무릎 위에 올려놓고 쓰다듬어라.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 무릎을 베고 누워서 20초간 유지.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 가슴 위에 손을 살포시 올리고 15초 유지.", slots: 2 },
-        { text: "🔥[29금] {A}번, {B}번의 상의를 살짝 들어 올리고 배에 뽀뽀.", slots: 2 }
+        { text: "🔥[19금] {A}번, {B}번에게 고백하듯 진지하게 말해보기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번 귀에 대고 자신의 이상형 속삭이기", slots: 2 },
+        { text: "🔥[19금] {A}번과 {B}번, 서로의 매력 포인트 3가지씩 말해주기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번과 포옹 대신 하이파이브 러브샷", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번에게 지금 가장 하고 싶은 말 한마디", slots: 2 },
+        { text: "🔥[19금] {A}번, 이상형을 묘사하면 {B}번이 몇 점인지 맞혀보기", slots: 2 },
+        { text: "🔥[19금] {A}번, 최근에 설렜던 순간 하나 공개하기", slots: 1 },
+        { text: "🔥[19금] {A}번, 자신의 연애 스타일을 한 단어로 표현하기", slots: 1 },
+        { text: "🔥[19금] {A}번, {B}번에게 첫인상이 어땠는지 솔직하게 말하기", slots: 2 },
+        { text: "🔥[19금] {A}번과 {B}번, 서로에게 재미있는 별명 지어주기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번과 눈 마주치고 5초간 안 웃기 챌린지 — 웃으면 원샷", slots: 2 },
+        { text: "🔥[19금] {A}번, 자신의 최근 썸/연애 스토리 한 줄로 요약하기", slots: 1 },
+        { text: "🔥[19금] {A}번과 {B}번, 서로에게 궁금했던 질문 하나씩 주고받기", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번을 왜 좋아할 수밖에 없는지 3초 안에 즉석 드립으로 말하기", slots: 2 },
+        { text: "🔥[19금] {A}번, 핸드폰 배경화면 공개하기", slots: 1 },
+        { text: "🔥[19금] {A}번과 {B}번, 3초 안에 같은 숫자 외치기 텔레파시 게임 — 실패하면 같이 원샷", slots: 2 },
+        { text: "🔥[19금] {A}번, {B}번에게 지금 기분을 색깔 하나로 표현하고 이유 설명하기", slots: 2 }
     ];
 
     function drawKingCommand(playerCount, genderMap) {
@@ -2820,3 +3106,4 @@
 </script>
 </body>
 </html>
+
