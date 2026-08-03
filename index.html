@@ -243,6 +243,20 @@
         .boxfind-tile.safe { background: #0b0f19; font-size: 0.85rem; color: #475569; }
         .boxfind-tile.bomb { background: var(--danger-color); animation: shake 0.15s infinite; }
 
+        .bingo-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 15px 0; width: 100%; }
+        .bingo-cell { background: #252529; border: 2px solid #3A3A42; border-radius: 8px; height: 48px; display:flex; align-items:center; justify-content:center; font-size: 1rem; font-weight:700; color: #fff; }
+        .bingo-cell.marked { background: var(--accent-color); border-color: var(--accent-color); color: #121214; }
+        .bingo-pad { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 15px 0; width: 100%; }
+        .bingo-pad-btn { background: #334155; border: none; border-radius: 8px; height: 46px; font-size: 1rem; font-weight:700; color: #fff; cursor: pointer; }
+        .bingo-pad-btn:disabled { background: #1a1a1e; color: #475569; cursor: not-allowed; opacity: 0.8; }
+
+        .ladder-col-labels { display:flex; margin-bottom: 4px; }
+        .ladder-col-label { text-align:center; font-size: 11px; color: #B3B3B9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding: 0 2px; }
+        .ladder-col-label.me { color: var(--accent-color); font-weight: 700; }
+        .ladder-result-list { display:flex; flex-direction:column; gap:6px; margin-top: 14px; text-align:left; }
+        .ladder-result-row { display:flex; justify-content:space-between; background:#252529; border:2px solid #3A3A42; border-radius:10px; padding:10px 14px; font-size:14px; }
+        .ladder-result-row.penalty { border-color: var(--danger-color); background: #3d1d1d; color: #ff8b8b; font-weight:700; }
+
         .king-number-box { padding: 20px; border-radius: 14px; font-size: 44px; font-weight: 800; margin: 12px 0 20px; background: linear-gradient(135deg,#2a2410,#1e1e22); border: 2px solid var(--accent-color); color: var(--accent-color); }
         .king-command-box { background: #252529; border-radius: 12px; padding: 18px; margin-bottom: 15px; border: 2px solid var(--primary-color); font-size: 17px; font-weight: 700; line-height: 1.6; }
 
@@ -357,6 +371,8 @@
             <button class="tab-btn" id="tab-king" onclick="selectGameMode('king')">👑 왕게임</button>
             <button class="tab-btn" id="tab-gameofdeath" onclick="selectGameMode('gameofdeath')">☠️ 게임오브데스</button>
             <button class="tab-btn" id="tab-sonbyungho" onclick="selectGameMode('sonbyungho')">✋ 손병호게임</button>
+            <button class="tab-btn" id="tab-bingo" onclick="selectGameMode('bingo')">🎱 빙고</button>
+            <button class="tab-btn" id="tab-ladder" onclick="selectGameMode('ladder')">🪜 사다리타기</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -401,6 +417,32 @@
                 <button type="button" id="speed-len-3" class="speed-len-btn" onclick="window.setSpeedWordLength(3)" style="flex:1; padding:10px; border-radius:10px; border:2px solid #3A3A42; background:#1c1c20; color:#fff; font-weight:700;">3글자</button>
             </div>
             <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">정답은 미리 정해둔 단어 목록 안에서만 인정돼요 (없는 단어 입력 방지).</div>
+        </div>
+        <div id="bingo-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
+            <label for="bingo-lines-count" style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--accent-color); font-size:14px; font-weight:700;">
+                <span>🎱 몇 줄이면 빙고(패배)?</span>
+                <select id="bingo-lines-count" style="background:#252529; color:#fff; border:1px solid #3A3A42; border-radius:8px; padding:8px 12px; font-weight:700;">
+                    <option value="1" selected>1줄</option>
+                    <option value="2">2줄</option>
+                    <option value="3">3줄</option>
+                    <option value="4">4줄</option>
+                    <option value="5">5줄</option>
+                </select>
+            </label>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">각자 1~25가 무작위로 배치된 5x5 보드를 받아요. 차례대로 번호를 부르면 모두의 보드에 반영되고, 지정한 줄 수를 먼저 채우는 사람이 벌칙이에요.</div>
+        </div>
+        <div id="ladder-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
+            <label for="ladder-penalty-count" style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--accent-color); font-size:14px; font-weight:700;">
+                <span>🪜 벌칙 인원 수</span>
+                <select id="ladder-penalty-count" style="background:#252529; color:#fff; border:1px solid #3A3A42; border-radius:8px; padding:8px 12px; font-weight:700;">
+                    <option value="1" selected>1명</option>
+                    <option value="2">2명</option>
+                    <option value="3">3명</option>
+                    <option value="4">4명</option>
+                    <option value="5">5명</option>
+                </select>
+            </label>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">참여자 수보다 적게 선택해주세요. 각자 자기 줄을 따라 내려가서 벌칙 칸에 걸리면 벌칙!</div>
         </div>
         <div id="king-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
             <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--accent-color); font-size:14px; font-weight:700;">
@@ -494,6 +536,30 @@
         <button id="btn-back-lobby-sonbyungho" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
+
+    <!-- 🎱 빙고 게임 스크린 -->
+    <div id="game-bingo-screen" class="screen">
+        <h2>🎱 빙고 게임</h2>
+        <div class="bomb-status" id="bingo-status-text">불러오는 중...</div>
+        <p style="text-align:left; margin: 12px 4px 4px; font-weight:700; color: var(--primary-color); font-size:13px;">📢 번호 부르기</p>
+        <div class="bingo-pad" id="bingo-pad"></div>
+        <p style="text-align:left; margin: 16px 4px 4px; font-weight:700; color: var(--primary-color); font-size:13px;">🎯 내 보드</p>
+        <div class="bingo-grid" id="bingo-grid"></div>
+        <button id="btn-back-lobby-bingo" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 🪜 사다리타기 게임 스크린 -->
+    <div id="game-ladder-screen" class="screen">
+        <h2>🪜 사다리타기</h2>
+        <div class="bomb-status" id="ladder-status-text">불러오는 중...</div>
+        <div style="overflow-x:auto; margin-top: 10px;">
+            <div class="ladder-col-labels" id="ladder-col-labels"></div>
+            <div id="ladder-wrap" style="position:relative;"></div>
+        </div>
+        <button id="btn-reveal-ladder" style="background-color: var(--accent-color); color:#121214; display:none; margin-top:14px;">🪜 결과 공개 (방장용)</button>
+        <div class="ladder-result-list" id="ladder-result-list"></div>
+        <button id="btn-back-lobby-ladder" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
 
     <!-- ⚡ 초성대결 게임 스크린 -->
     <div id="game-speed-screen" class="screen">
@@ -847,7 +913,7 @@
         { id: 'speed', label: '⚡ 초성대결' }, { id: 'balance', label: '⚖️ 밸런스' }, { id: 'timing', label: '⏱️ 타이밍' },
         { id: 'roulette', label: '🔫 러시안룰렛' }, { id: 'speedfinger', label: '👆 빠른손가락' }, { id: 'dutch', label: '🍺 몰아주기' },
         { id: 'boxfind', label: '📦 폭탄찾기' }, { id: 'king', label: '👑 왕게임' }, { id: 'gameofdeath', label: '☠️ 게임오브데스' },
-        { id: 'sonbyungho', label: '✋ 손병호게임' }
+        { id: 'sonbyungho', label: '✋ 손병호게임' }, { id: 'bingo', label: '🎱 빙고' }, { id: 'ladder', label: '🪜 사다리타기' }
     ];
 
     const sonConditionPool = [
@@ -1019,7 +1085,74 @@
     const drawBotSubmitHandled = new Set();
     const timingBotStopHandled = new Set();
     const dutchBotPeekHandled = new Set();
+    const bingoBotCallHandled = new Set();
+    let bingoLoserTriggeredKey = null;
+    let ladderLoserTriggeredKey = null;
     function botDelay(min, max) { return min + Math.random() * (max - min); }
+
+    // 🎱 빙고: 배열 랜덤 셔플 (Fisher-Yates)
+    function shuffleArray(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    }
+    // 🎱 빙고: 5x5 보드에서 완성된 줄(가로/세로/대각선) 개수 세기
+    function countBingoLines(board, calledMap, size = 5) {
+        let count = 0;
+        for (let r = 0; r < size; r++) {
+            let full = true;
+            for (let c = 0; c < size; c++) { if (!calledMap[board[r * size + c]]) { full = false; break; } }
+            if (full) count++;
+        }
+        for (let c = 0; c < size; c++) {
+            let full = true;
+            for (let r = 0; r < size; r++) { if (!calledMap[board[r * size + c]]) { full = false; break; } }
+            if (full) count++;
+        }
+        let d1 = true, d2 = true;
+        for (let i = 0; i < size; i++) {
+            if (!calledMap[board[i * size + i]]) d1 = false;
+            if (!calledMap[board[i * size + (size - 1 - i)]]) d2 = false;
+        }
+        if (d1) count++;
+        if (d2) count++;
+        return count;
+    }
+    window.callBingoNumber = function(num) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}/bingoCalled/${num}`)).then((snap) => {
+            if (snap.exists()) return; // 이미 불린 숫자
+            update(ref(db, `rooms/${currentRoomCode}/bingoCalled`), { [num]: true });
+        });
+    };
+
+    // 🪜 사다리타기: 세로줄 colCount개, 가로줄 rowCount개의 사다리 랜덤 생성 (같은 줄에서 인접한 다리 겹치지 않게)
+    function buildLadderRungs(colCount, rowCount) {
+        const rungs = [];
+        for (let r = 0; r < rowCount; r++) {
+            const row = new Array(Math.max(0, colCount - 1)).fill(false);
+            let skip = false;
+            for (let c = 0; c < row.length; c++) {
+                if (skip) { skip = false; continue; }
+                if (Math.random() < 0.35) { row[c] = true; skip = true; }
+            }
+            rungs.push(row);
+        }
+        return rungs;
+    }
+    // 🪜 사다리타기: 특정 세로줄 시작점에서 사다리를 타고 내려갔을 때 도착하는 최종 세로줄 계산
+    function traceLadderPath(startCol, rungs) {
+        let col = startCol;
+        for (let r = 0; r < rungs.length; r++) {
+            const row = rungs[r] || [];
+            if (col > 0 && row[col - 1]) col = col - 1;
+            else if (col < row.length && row[col]) col = col + 1;
+        }
+        return col;
+    }
 
     window.kickPlayer = function(id, nickname) {
         if (!isHost) return;
@@ -1399,6 +1532,10 @@
         if (speedSettings) speedSettings.style.display = (isHost && gameMode === 'speed') ? 'block' : 'none';
         const drawSettings = document.getElementById('draw-settings');
         if (drawSettings) drawSettings.style.display = (isHost && gameMode === 'draw') ? 'block' : 'none';
+        const bingoSettings = document.getElementById('bingo-settings');
+        if (bingoSettings) bingoSettings.style.display = (isHost && gameMode === 'bingo') ? 'block' : 'none';
+        const ladderSettings = document.getElementById('ladder-settings');
+        if (ladderSettings) ladderSettings.style.display = (isHost && gameMode === 'ladder') ? 'block' : 'none';
     }
 
     window.openImageModal = function(nickname, imgData) {
@@ -2235,6 +2372,167 @@
                         }
                     }
                 }
+                else if (data.selectedGame === 'bingo') {
+                    showScreen('game-bingo-screen');
+                    const boards = data.bingoBoards || {};
+                    const called = data.bingoCalled || {};
+                    const linesToLose = data.bingoLinesToLose || 1;
+                    const myBoard = boards[myId];
+                    const calledCount = Object.keys(called).length;
+                    document.getElementById('bingo-status-text').innerText = `📢 부른 숫자 ${calledCount}/25 · ${linesToLose}줄 완성되면 벌칙!`;
+
+                    // 번호 부르기 패드 (1~25, 한 번 부른 번호는 비활성화)
+                    const padEl = document.getElementById('bingo-pad');
+                    if (padEl.children.length !== 25) {
+                        padEl.innerHTML = '';
+                        for (let n = 1; n <= 25; n++) {
+                            const b = document.createElement('button');
+                            b.type = 'button'; b.className = 'bingo-pad-btn'; b.textContent = n;
+                            b.onclick = () => window.callBingoNumber(n);
+                            padEl.appendChild(b);
+                        }
+                    }
+                    Array.from(padEl.children).forEach((btn, idx) => { btn.disabled = !!called[idx + 1]; });
+
+                    // 내 보드 렌더링
+                    const gridEl = document.getElementById('bingo-grid');
+                    gridEl.innerHTML = '';
+                    if (myBoard) {
+                        myBoard.forEach(num => {
+                            const cell = document.createElement('div');
+                            cell.className = 'bingo-cell' + (called[num] ? ' marked' : '');
+                            cell.textContent = num;
+                            gridEl.appendChild(cell);
+                        });
+                    }
+
+                    // 방장이 봇 대신 번호를 불러줌
+                    if (isHost) {
+                        const botIds = playerIds.filter((id) => players[id]?.isBot);
+                        botIds.forEach((botId) => {
+                            const key = `${data.bingoRoundKey || ''}_${calledCount}_${botId}`;
+                            if (!bingoBotCallHandled.has(key) && Math.random() < 0.5) {
+                                bingoBotCallHandled.add(key);
+                                setTimeout(() => {
+                                    get(ref(db, `rooms/${currentRoomCode}/bingoCalled`)).then((snap) => {
+                                        const curCalled = snap.val() || {};
+                                        const available = [];
+                                        for (let n = 1; n <= 25; n++) if (!curCalled[n]) available.push(n);
+                                        if (available.length) {
+                                            const pick = available[Math.floor(Math.random() * available.length)];
+                                            update(ref(db, `rooms/${currentRoomCode}/bingoCalled`), { [pick]: true });
+                                        }
+                                    });
+                                }, botDelay(1000, 2500));
+                            }
+                        });
+                    }
+
+                    // 내 보드가 지정된 줄 수를 채웠으면 내가 패자
+                    if (myBoard) {
+                        const myLines = countBingoLines(myBoard, called);
+                        if (myLines >= linesToLose) {
+                            const roundKey = `${data.bingoRoundKey || ''}`;
+                            if (bingoLoserTriggeredKey !== roundKey) {
+                                bingoLoserTriggeredKey = roundKey;
+                                update(ref(db, `rooms/${currentRoomCode}`), { roomLastLoserId: myId, roomLoserPendingChoice: true, bingoLoserId: myId });
+                            }
+                        }
+                    }
+                }
+                else if (data.selectedGame === 'ladder') {
+                    showScreen('game-ladder-screen');
+                    const order = data.ladderPlayerOrder || [];
+                    const rungs = data.ladderRungs || [];
+                    const penaltyBottoms = data.ladderPenaltyBottoms || [];
+                    const revealed = !!data.ladderRevealed;
+                    const colCount = order.length;
+
+                    document.getElementById('ladder-status-text').innerText = revealed
+                        ? '🪜 결과가 공개됐어요!'
+                        : '🪜 사다리가 준비됐어요. 방장이 결과를 공개하면 벌칙이 확인돼요.';
+
+                    const labelsEl = document.getElementById('ladder-col-labels');
+                    labelsEl.innerHTML = '';
+                    order.forEach((id) => {
+                        const label = document.createElement('div');
+                        label.className = 'ladder-col-label' + (id === myId ? ' me' : '');
+                        label.style.flex = '1';
+                        label.textContent = players[id]?.nickname || '참가자';
+                        labelsEl.appendChild(label);
+                    });
+
+                    const wrapEl = document.getElementById('ladder-wrap');
+                    if (colCount > 0) {
+                        const rowHeight = 28, topPad = 10, bottomPad = 30;
+                        const svgHeight = rungs.length * rowHeight + topPad + bottomPad;
+                        const colX = (i) => i * 60 + 30;
+                        let svg = `<svg width="100%" height="${svgHeight}" viewBox="0 0 ${colCount * 60} ${svgHeight}" preserveAspectRatio="none">`;
+                        for (let c = 0; c < colCount; c++) {
+                            svg += `<line x1="${colX(c)}" y1="${topPad}" x2="${colX(c)}" y2="${svgHeight - bottomPad}" stroke="#3A3A42" stroke-width="3" />`;
+                        }
+                        rungs.forEach((row, r) => {
+                            (row || []).forEach((has, c) => {
+                                if (has) {
+                                    const y = topPad + r * rowHeight;
+                                    svg += `<line x1="${colX(c)}" y1="${y}" x2="${colX(c + 1)}" y2="${y}" stroke="#3A3A42" stroke-width="3" />`;
+                                }
+                            });
+                        });
+                        const myStartCol = order.indexOf(myId);
+                        if (myStartCol >= 0) {
+                            let col = myStartCol;
+                            let pathD = `M ${colX(col)} ${topPad}`;
+                            for (let r = 0; r < rungs.length; r++) {
+                                const row = rungs[r] || [];
+                                const y1 = topPad + r * rowHeight, y2 = topPad + (r + 1) * rowHeight;
+                                let nextCol = col;
+                                if (col > 0 && row[col - 1]) nextCol = col - 1;
+                                else if (col < row.length && row[col]) nextCol = col + 1;
+                                if (nextCol !== col) pathD += ` L ${colX(col)} ${y1} L ${colX(nextCol)} ${y1}`;
+                                pathD += ` L ${colX(nextCol)} ${y2}`;
+                                col = nextCol;
+                            }
+                            svg += `<path d="${pathD}" fill="none" style="stroke:var(--primary-color); stroke-width:4; stroke-linecap:round;" />`;
+                        }
+                        for (let c = 0; c < colCount; c++) {
+                            const isPenalty = penaltyBottoms.includes(c);
+                            const text = revealed ? (isPenalty ? '💥' : '⭕') : '❓';
+                            const fillColor = revealed ? (isPenalty ? 'var(--danger-color)' : '#8be28b') : '#8E9AA8';
+                            svg += `<text x="${colX(c)}" y="${svgHeight - 8}" font-size="16" text-anchor="middle" style="fill:${fillColor};">${text}</text>`;
+                        }
+                        svg += `</svg>`;
+                        wrapEl.innerHTML = svg;
+                    } else {
+                        wrapEl.innerHTML = '';
+                    }
+
+                    const revealBtn = document.getElementById('btn-reveal-ladder');
+                    revealBtn.style.display = (isHost && !revealed) ? 'block' : 'none';
+                    revealBtn.onclick = () => { update(ref(db, `rooms/${currentRoomCode}`), { ladderRevealed: true }); };
+
+                    const resultListEl = document.getElementById('ladder-result-list');
+                    resultListEl.innerHTML = '';
+                    if (revealed && colCount > 0) {
+                        const penaltyIds = [];
+                        order.forEach((id, idx) => {
+                            const finalCol = traceLadderPath(idx, rungs);
+                            const isPenalty = penaltyBottoms.includes(finalCol);
+                            if (isPenalty) penaltyIds.push(id);
+                            const row = document.createElement('div');
+                            row.className = 'ladder-result-row' + (isPenalty ? ' penalty' : '');
+                            row.innerHTML = `<span>${players[id]?.nickname || '참가자'}${id === myId ? ' (나)' : ''}</span><span>${isPenalty ? '💥 벌칙!' : '⭕ 안전'}</span>`;
+                            resultListEl.appendChild(row);
+                        });
+                        if (penaltyIds.length > 0) {
+                            const roundKey = `${data.ladderRoundKey || ''}`;
+                            if (isHost && ladderLoserTriggeredKey !== roundKey) {
+                                ladderLoserTriggeredKey = roundKey;
+                                update(ref(db, `rooms/${currentRoomCode}`), { roomLastLoserId: penaltyIds[0], roomLoserPendingChoice: true });
+                            }
+                        }
+                    }
+                }
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => btn.style.display = isHost ? 'block' : 'none');
             }
             if(data.status === 'waiting') { 
@@ -2245,6 +2543,8 @@
                 document.getElementById('dutch-custom-section').style.display = 'none';
                 hideBoomOverlay();
                 lastShownBoomKey = null;
+                bingoLoserTriggeredKey = null;
+                ladderLoserTriggeredKey = null;
             }
         });
     }
@@ -3061,6 +3361,28 @@
                     status: 'playing', sonFingers: fingers, sonConditionIndex: null, sonAnsweredIds: {},
                     sonRoundKey: getServerNow(), sonTurnOrder: turnOrder, sonTurnIndex: 0
                 });
+            } else if (gameId === 'bingo') {
+                const linesEl = document.getElementById('bingo-lines-count');
+                const linesToLose = Math.max(1, Math.min(5, parseInt(linesEl?.value || '1', 10)));
+                const boards = {};
+                pIds.forEach(id => { boards[id] = shuffleArray(Array.from({ length: 25 }, (_, i) => i + 1)); });
+                bingoLoserTriggeredKey = null;
+                update(rRef, {
+                    status: 'playing', bingoBoards: boards, bingoCalled: {}, bingoLinesToLose: linesToLose,
+                    bingoRoundKey: getServerNow(), bingoLoserId: null
+                });
+            } else if (gameId === 'ladder') {
+                const penaltyEl = document.getElementById('ladder-penalty-count');
+                let penaltyCount = Math.max(1, Math.min(5, parseInt(penaltyEl?.value || '1', 10)));
+                penaltyCount = Math.min(penaltyCount, Math.max(1, pIds.length - 1));
+                const shuffledOrder = shuffleArray(pIds);
+                const rungs = buildLadderRungs(shuffledOrder.length, 10);
+                const bottomIndexes = shuffleArray(shuffledOrder.map((_, i) => i)).slice(0, penaltyCount);
+                ladderLoserTriggeredKey = null;
+                update(rRef, {
+                    status: 'playing', ladderPlayerOrder: shuffledOrder, ladderRungs: rungs,
+                    ladderPenaltyBottoms: bottomIndexes, ladderRevealed: false, ladderRoundKey: getServerNow()
+                });
             }
         });
     }
@@ -3079,6 +3401,8 @@
                 boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null, boxFindClickCount: null,
                 godMasterId: null, godStartId: null, godTargets: null, godNumber: null, godCurrentId: null, godStep: null, godPath: null, godLoserResult: null, godRevealed: false,
                 sonFingers: null, sonConditionIndex: null, sonAnsweredIds: null, sonRoundKey: null, sonTurnOrder: null, sonTurnIndex: null,
+                bingoBoards: null, bingoCalled: null, bingoLinesToLose: null, bingoRoundKey: null, bingoLoserId: null,
+                ladderPlayerOrder: null, ladderRungs: null, ladderPenaltyBottoms: null, ladderRevealed: null, ladderRoundKey: null,
                 roomLastLoserId: null, roomLoserPendingChoice: false
             });
         });
