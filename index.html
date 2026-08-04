@@ -244,11 +244,9 @@
         .boxfind-tile.bomb { background: var(--danger-color); animation: shake 0.15s infinite; }
 
         .bingo-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 15px 0; width: 100%; }
-        .bingo-cell { background: #252529; border: 2px solid #3A3A42; border-radius: 8px; height: 48px; display:flex; align-items:center; justify-content:center; font-size: 1rem; font-weight:700; color: #fff; }
+        .bingo-cell { background: #252529; border: 2px solid #3A3A42; border-radius: 8px; height: 48px; display:flex; align-items:center; justify-content:center; font-size: 1rem; font-weight:700; color: #fff; cursor: default; }
         .bingo-cell.marked { background: var(--accent-color); border-color: var(--accent-color); color: #121214; }
-        .bingo-pad { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 15px 0; width: 100%; }
-        .bingo-pad-btn { background: #334155; border: none; border-radius: 8px; height: 46px; font-size: 1rem; font-weight:700; color: #fff; cursor: pointer; }
-        .bingo-pad-btn:disabled { background: #1a1a1e; color: #475569; cursor: not-allowed; opacity: 0.8; }
+        .bingo-cell.clickable { border-color: var(--primary-color); cursor: pointer; box-shadow: 0 0 8px rgba(92,158,255,0.4); }
 
         .ladder-col-labels { display:flex; margin-bottom: 4px; }
         .ladder-col-label { text-align:center; font-size: 11px; color: #B3B3B9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding: 0 2px; }
@@ -541,9 +539,7 @@
     <div id="game-bingo-screen" class="screen">
         <h2>🎱 빙고 게임</h2>
         <div class="bomb-status" id="bingo-status-text">불러오는 중...</div>
-        <p style="text-align:left; margin: 12px 4px 4px; font-weight:700; color: var(--primary-color); font-size:13px;">📢 번호 부르기</p>
-        <div class="bingo-pad" id="bingo-pad"></div>
-        <p style="text-align:left; margin: 16px 4px 4px; font-weight:700; color: var(--primary-color); font-size:13px;">🎯 내 보드</p>
+        <p id="bingo-turn-text" style="text-align:left; margin: 12px 4px 4px; font-weight:700; color: var(--primary-color); font-size:13px;">🎯 내 보드 (내 차례에 숫자를 눌러 번호를 부르세요)</p>
         <div class="bingo-grid" id="bingo-grid"></div>
         <button id="btn-back-lobby-bingo" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
@@ -557,6 +553,8 @@
             <div id="ladder-wrap" style="position:relative;"></div>
         </div>
         <button id="btn-reveal-ladder" style="background-color: var(--accent-color); color:#121214; display:none; margin-top:14px;">🪜 결과 공개 (방장용)</button>
+        <button id="btn-ladder-my-reveal" style="background-color: var(--primary-color); color:#121214; display:none; margin-top:14px;">🎬 내 결과 보기</button>
+        <div id="ladder-my-result-text" style="display:none; text-align:center; font-weight:800; font-size:18px; margin-top:12px;"></div>
         <div class="ladder-result-list" id="ladder-result-list"></div>
         <button id="btn-back-lobby-ladder" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
@@ -1078,6 +1076,8 @@
     let lastBotBalanceAutoKey = null;
     let lastBotDrawAutoKey = null;
     let lastBotTimingAutoKey = null;
+    let sonLastData = null;
+    const SON_MIN_FOLD_WINDOW_MS = 4000; // 조건이 나온 뒤 최소 이만큼은 기다려야 다음 조건을 뽑을 수 있음 (접을 시간 확보)
     const sonBotFoldHandled = new Set();
     const godBotHandled = new Set();
     const speedBotAnswerHandled = new Set();
@@ -1088,6 +1088,8 @@
     const bingoBotCallHandled = new Set();
     let bingoLoserTriggeredKey = null;
     let ladderLoserTriggeredKey = null;
+    let ladderMyRevealState = 'hidden'; // 'hidden' | 'animating' | 'revealed'
+    let ladderMyRevealRoundKey = null;
     function botDelay(min, max) { return min + Math.random() * (max - min); }
 
     // 🎱 빙고: 배열 랜덤 셔플 (Fisher-Yates)
@@ -1123,13 +1125,21 @@
     }
     window.callBingoNumber = function(num) {
         if (!currentRoomCode) return;
-        get(ref(db, `rooms/${currentRoomCode}/bingoCalled/${num}`)).then((snap) => {
-            if (snap.exists()) return; // 이미 불린 숫자
-            update(ref(db, `rooms/${currentRoomCode}/bingoCalled`), { [num]: true });
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d || d.selectedGame !== 'bingo' || d.status !== 'playing') return;
+            const called = d.bingoCalled || {};
+            if (called[num]) return; // 이미 부른 번호
+            const turnOrder = (d.bingoTurnOrder && d.bingoTurnOrder.length) ? d.bingoTurnOrder : Object.keys(d.players || {});
+            const turnIdx = (d.bingoTurnIdx || 0) % Math.max(1, turnOrder.length);
+            if (turnOrder[turnIdx] !== myId) return; // 내 차례가 아님
+            const nextTurnIdx = (turnIdx + 1) % turnOrder.length;
+            update(ref(db, `rooms/${currentRoomCode}`), { [`bingoCalled/${num}`]: true, bingoTurnIdx: nextTurnIdx });
         });
     };
 
     // 🪜 사다리타기: 세로줄 colCount개, 가로줄 rowCount개의 사다리 랜덤 생성 (같은 줄에서 인접한 다리 겹치지 않게)
+    // 세로줄 colCount개, 가로줄 rowCount개의 사다리를 랜덤 생성 (같은 줄에서 인접한 다리는 겹치지 않게).
+    // 다리 수가 너무 적어 보이지 않도록 확률을 높이고, 다리가 하나도 없는 줄은 강제로 하나 추가한다.
     function buildLadderRungs(colCount, rowCount) {
         const rungs = [];
         for (let r = 0; r < rowCount; r++) {
@@ -1137,7 +1147,10 @@
             let skip = false;
             for (let c = 0; c < row.length; c++) {
                 if (skip) { skip = false; continue; }
-                if (Math.random() < 0.35) { row[c] = true; skip = true; }
+                if (Math.random() < 0.55) { row[c] = true; skip = true; }
+            }
+            if (row.length > 0 && !row.some(Boolean)) {
+                row[Math.floor(Math.random() * row.length)] = true;
             }
             rungs.push(row);
         }
@@ -1194,6 +1207,23 @@
     setInterval(() => {
         if (currentBombExplodeAt) tryExplodeBombIfDue(currentBombExplodeAt);
     }, 300);
+
+    // 손병호 게임: 조건이 나오고 최소 대기시간이 지나야 다음 조건을 뽑을 수 있도록 버튼 상태를
+    // 0.4초마다 직접 갱신 (onValue는 새 데이터 변경이 있을 때만 실행되므로 시간 경과만으로는 갱신 안 됨).
+    setInterval(() => {
+        if (!sonLastData) return;
+        const nextBtn = document.getElementById('btn-son-next-condition');
+        if (!nextBtn) return;
+        const { isMyTurn, hasCondition, conditionSetAt } = sonLastData;
+        const elapsed = getServerNow() - (conditionSetAt || 0);
+        const waiting = hasCondition && elapsed < SON_MIN_FOLD_WINDOW_MS;
+        nextBtn.disabled = !isMyTurn || waiting;
+        if (isMyTurn) {
+            nextBtn.innerText = waiting
+                ? `⏳ ${Math.max(1, Math.ceil((SON_MIN_FOLD_WINDOW_MS - elapsed) / 1000))}초 후 뽑기 가능`
+                : '🎲 다음 조건 뽑기 (내 차례!)';
+        }
+    }, 400);
 
     // 모바일 브라우저는 화면이 꺼지거나 탭이 백그라운드로 가면 setInterval을 강하게 스로틀링/정지시켜서
     // 폭탄 터질 시점이 지나도 안 터지는 것처럼 보이는 원인이 됨. 화면이 다시 켜지는 순간 즉시 재확인.
@@ -1349,15 +1379,12 @@
         const nextTurnIdx = (rData.turnIdx + 1) % rData.turnOrder.length;
         const updates = {};
         if (isHit) {
-            const consecutive = (rData.lastHitId === myId) ? (rData.consecutiveHits || 1) + 1 : 1;
+            // 총알에 맞으면 그 사람이 이번 라운드의 패자 — 다음 사람 차례로 넘기지 않고 라운드를 종료한다.
             updates[`rooms/${currentRoomCode}/rouletteLastHitId`] = myId;
-            updates[`rooms/${currentRoomCode}/rouletteConsecutiveHits`] = consecutive;
-            updates[`rooms/${currentRoomCode}/rouletteResultText`] = consecutive > 1
-                ? `💥 ${myNickname}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺`
-                : `💥 ${myNickname}님 총알 명중! 한 잔 마시기 🍺`;
-            updates[`rooms/${currentRoomCode}/rouletteBulletChamber`] = Math.floor(Math.random() * slotCount);
-            updates[`rooms/${currentRoomCode}/rouletteChamberPos`] = 0;
-            updates[`rooms/${currentRoomCode}/rouletteTurnIdx`] = nextTurnIdx;
+            updates[`rooms/${currentRoomCode}/rouletteConsecutiveHits`] = 1;
+            updates[`rooms/${currentRoomCode}/rouletteResultText`] = `💥 ${myNickname}님 총알 명중! 한 잔 마시기 🍺`;
+            updates[`rooms/${currentRoomCode}/roomLastLoserId`] = myId;
+            updates[`rooms/${currentRoomCode}/roomLoserPendingChoice`] = true;
         } else {
             const nextChamberPos = chamberPos + 1;
             updates[`rooms/${currentRoomCode}/rouletteResultText`] = null;
@@ -1397,12 +1424,12 @@
             const nextTurnIdx = (turnIdx + 1) % turnOrder.length;
             const botNick = roomData.players?.[botId]?.nickname || '봇';
             if (isHit) {
-                const consecutive = (roomData.rouletteLastHitId === botId) ? (roomData.rouletteConsecutiveHits || 1) + 1 : 1;
+                // 총알에 맞으면 그 사람이 이번 라운드의 패자 — 다음 사람 차례로 넘기지 않고 라운드를 종료한다.
                 roomData.rouletteLastHitId = botId;
-                roomData.rouletteConsecutiveHits = consecutive;
-                roomData.rouletteResultText = consecutive > 1 ? `💥 ${botNick}님 총알 명중! ${consecutive}연속 당첨! ${consecutive}잔 마시기 🍺` : `💥 ${botNick}님 총알 명중! 한 잔 마시기 🍺`;
-                roomData.rouletteBulletChamber = Math.floor(Math.random() * slotCount);
-                roomData.rouletteChamberPos = 0;
+                roomData.rouletteConsecutiveHits = 1;
+                roomData.rouletteResultText = `💥 ${botNick}님 총알 명중! 한 잔 마시기 🍺`;
+                roomData.roomLastLoserId = botId;
+                roomData.roomLoserPendingChoice = true;
             } else {
                 const nextChamberPos = chamberPos + 1;
                 roomData.rouletteResultText = null;
@@ -1412,8 +1439,8 @@
                 } else {
                     roomData.rouletteChamberPos = nextChamberPos;
                 }
+                roomData.rouletteTurnIdx = nextTurnIdx;
             }
-            roomData.rouletteTurnIdx = nextTurnIdx;
             return roomData;
         }).catch((error) => console.error('bot roulette pull transaction failed:', error));
     }
@@ -1953,11 +1980,12 @@
                     const turnOrder = data.rouletteTurnOrder || [];
                     const turnIdx = data.rouletteTurnIdx || 0;
                     const currentPid = turnOrder[turnIdx];
-                    const isMyTurn = currentPid === myId;
+                    const roundOver = !!data.roomLoserPendingChoice;
+                    const isMyTurn = currentPid === myId && !roundOver;
 
                     rouletteLastData = { slotCount, turnOrder, turnIdx, chamberPos, bulletChamber: data.rouletteBulletChamber, lastHitId: data.rouletteLastHitId, consecutiveHits: data.rouletteConsecutiveHits, isMyTurn };
 
-                    if (isHost && currentPid && data.players?.[currentPid]?.isBot) {
+                    if (!roundOver && isHost && currentPid && data.players?.[currentPid]?.isBot) {
                         const botKey = `${currentRoomCode}_${turnIdx}`;
                         if (lastBotRouletteAutoKey !== botKey) {
                             lastBotRouletteAutoKey = botKey;
@@ -1974,9 +2002,11 @@
                         slotsEl.appendChild(s);
                     }
 
-                    document.getElementById('rouletteTurnText').innerHTML = isMyTurn
-                        ? '🎯 당신의 차례입니다! 방아쇠를 당기세요!'
-                        : `⏳ <strong>${players[currentPid]?.nickname || '참가자'}</strong>님의 차례를 기다려주세요...`;
+                    document.getElementById('rouletteTurnText').innerHTML = roundOver
+                        ? `💀 <strong>${players[data.roomLastLoserId]?.nickname || '참가자'}</strong>님이 총알에 맞았어요! 다음 게임을 고르는 중...`
+                        : (isMyTurn
+                            ? '🎯 당신의 차례입니다! 방아쇠를 당기세요!'
+                            : `⏳ <strong>${players[currentPid]?.nickname || '참가자'}</strong>님의 차례를 기다려주세요...`);
 
                     document.getElementById('btn-roulette-pull').disabled = !isMyTurn;
 
@@ -2348,12 +2378,20 @@
                     const nextBtn = document.getElementById('btn-son-next-condition');
                     const turnTextEl = document.getElementById('son-turn-text');
                     if (turnTextEl) turnTextEl.textContent = curTurnId ? `🙋 이번 조건은 ${players[curTurnId]?.nickname || '참가자'}님 차례` : '';
-                    nextBtn.disabled = !isMyTurn;
-                    nextBtn.innerText = isMyTurn ? '🎲 다음 조건 뽑기 (내 차례!)' : '⏳ 다른 사람 차례';
+                    const hasConditionNow = condIdx !== null && condIdx !== undefined;
+                    const foldElapsed = getServerNow() - (data.sonConditionSetAt || 0);
+                    const stillWaitingForFolds = hasConditionNow && foldElapsed < SON_MIN_FOLD_WINDOW_MS;
+                    sonLastData = { isMyTurn, hasCondition: hasConditionNow, conditionSetAt: data.sonConditionSetAt || 0 };
+                    nextBtn.disabled = !isMyTurn || stillWaitingForFolds;
+                    nextBtn.innerText = !isMyTurn
+                        ? '⏳ 다른 사람 차례'
+                        : (stillWaitingForFolds
+                            ? `⏳ ${Math.max(1, Math.ceil((SON_MIN_FOLD_WINDOW_MS - foldElapsed) / 1000))}초 후 뽑기 가능`
+                            : '🎲 다음 조건 뽑기 (내 차례!)');
                     nextBtn.onclick = isMyTurn ? () => {
                         const idx = Math.floor(Math.random() * sonConditionPool.length);
                         const newTurnIdx = turnOrder.indexOf(curTurnId) + 1;
-                        update(ref(db, `rooms/${currentRoomCode}`), { sonConditionIndex: idx, sonAnsweredIds: {}, sonTurnIndex: newTurnIdx });
+                        update(ref(db, `rooms/${currentRoomCode}`), { sonConditionIndex: idx, sonAnsweredIds: {}, sonTurnIndex: newTurnIdx, sonConditionSetAt: getServerNow() });
                     } : null;
 
                     const foldBtn = document.getElementById('btn-son-fold');
@@ -2379,53 +2417,53 @@
                     const linesToLose = data.bingoLinesToLose || 1;
                     const myBoard = boards[myId];
                     const calledCount = Object.keys(called).length;
+                    const bingoTurnOrder = (data.bingoTurnOrder && data.bingoTurnOrder.length) ? data.bingoTurnOrder : playerIds;
+                    const bingoTurnIdx = (data.bingoTurnIdx || 0) % Math.max(1, bingoTurnOrder.length);
+                    const bingoCallerId = bingoTurnOrder[bingoTurnIdx];
+                    const isMyCallTurn = bingoCallerId === myId;
+
                     document.getElementById('bingo-status-text').innerText = `📢 부른 숫자 ${calledCount}/25 · ${linesToLose}줄 완성되면 벌칙!`;
-
-                    // 번호 부르기 패드 (1~25, 한 번 부른 번호는 비활성화)
-                    const padEl = document.getElementById('bingo-pad');
-                    if (padEl.children.length !== 25) {
-                        padEl.innerHTML = '';
-                        for (let n = 1; n <= 25; n++) {
-                            const b = document.createElement('button');
-                            b.type = 'button'; b.className = 'bingo-pad-btn'; b.textContent = n;
-                            b.onclick = () => window.callBingoNumber(n);
-                            padEl.appendChild(b);
-                        }
+                    const turnTextEl = document.getElementById('bingo-turn-text');
+                    if (turnTextEl) {
+                        turnTextEl.innerHTML = isMyCallTurn
+                            ? '🎯 <strong>당신의 차례!</strong> 아직 안 부른 숫자를 내 보드에서 눌러주세요'
+                            : `⏳ <strong>${players[bingoCallerId]?.nickname || '참가자'}</strong>님이 번호를 부를 차례예요`;
                     }
-                    Array.from(padEl.children).forEach((btn, idx) => { btn.disabled = !!called[idx + 1]; });
 
-                    // 내 보드 렌더링
+                    // 내 보드 렌더링 — 내 차례일 때만 아직 안 부른 칸을 눌러서 번호를 부를 수 있음
                     const gridEl = document.getElementById('bingo-grid');
                     gridEl.innerHTML = '';
                     if (myBoard) {
                         myBoard.forEach(num => {
                             const cell = document.createElement('div');
-                            cell.className = 'bingo-cell' + (called[num] ? ' marked' : '');
+                            const isMarked = !!called[num];
+                            const isClickable = isMyCallTurn && !isMarked;
+                            cell.className = 'bingo-cell' + (isMarked ? ' marked' : '') + (isClickable ? ' clickable' : '');
                             cell.textContent = num;
+                            if (isClickable) cell.onclick = () => window.callBingoNumber(num);
                             gridEl.appendChild(cell);
                         });
                     }
 
-                    // 방장이 봇 대신 번호를 불러줌
-                    if (isHost) {
-                        const botIds = playerIds.filter((id) => players[id]?.isBot);
-                        botIds.forEach((botId) => {
-                            const key = `${data.bingoRoundKey || ''}_${calledCount}_${botId}`;
-                            if (!bingoBotCallHandled.has(key) && Math.random() < 0.5) {
-                                bingoBotCallHandled.add(key);
-                                setTimeout(() => {
-                                    get(ref(db, `rooms/${currentRoomCode}/bingoCalled`)).then((snap) => {
-                                        const curCalled = snap.val() || {};
-                                        const available = [];
-                                        for (let n = 1; n <= 25; n++) if (!curCalled[n]) available.push(n);
-                                        if (available.length) {
-                                            const pick = available[Math.floor(Math.random() * available.length)];
-                                            update(ref(db, `rooms/${currentRoomCode}/bingoCalled`), { [pick]: true });
-                                        }
-                                    });
-                                }, botDelay(1000, 2500));
-                            }
-                        });
+                    // 방장이 봇 차례일 때 대신 번호를 불러줌
+                    if (isHost && players[bingoCallerId]?.isBot) {
+                        const key = `${data.bingoRoundKey || ''}_${bingoTurnIdx}_${bingoCallerId}`;
+                        if (!bingoBotCallHandled.has(key)) {
+                            bingoBotCallHandled.add(key);
+                            setTimeout(() => {
+                                get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+                                    const d = snap.val(); if (!d || d.selectedGame !== 'bingo' || (d.bingoTurnIdx || 0) % bingoTurnOrder.length !== bingoTurnIdx) return;
+                                    const curCalled = d.bingoCalled || {};
+                                    const available = [];
+                                    for (let n = 1; n <= 25; n++) if (!curCalled[n]) available.push(n);
+                                    if (available.length) {
+                                        const pick = available[Math.floor(Math.random() * available.length)];
+                                        const nextTurnIdx = (bingoTurnIdx + 1) % bingoTurnOrder.length;
+                                        update(ref(db, `rooms/${currentRoomCode}`), { [`bingoCalled/${pick}`]: true, bingoTurnIdx: nextTurnIdx });
+                                    }
+                                });
+                            }, botDelay(1000, 2000));
+                        }
                     }
 
                     // 내 보드가 지정된 줄 수를 채웠으면 내가 패자
@@ -2448,9 +2486,15 @@
                     const revealed = !!data.ladderRevealed;
                     const colCount = order.length;
 
+                    // 라운드가 바뀌면 "내 결과 보기" 상태를 초기화 (다시 숨김 상태로)
+                    if (ladderMyRevealRoundKey !== data.ladderRoundKey) {
+                        ladderMyRevealRoundKey = data.ladderRoundKey;
+                        ladderMyRevealState = 'hidden';
+                    }
+
                     document.getElementById('ladder-status-text').innerText = revealed
-                        ? '🪜 결과가 공개됐어요!'
-                        : '🪜 사다리가 준비됐어요. 방장이 결과를 공개하면 벌칙이 확인돼요.';
+                        ? '🪜 바닥 결과가 공개됐어요! "내 결과 보기"를 눌러 내 줄을 확인하세요.'
+                        : '🪜 사다리가 준비됐어요. 방장이 결과를 공개하면 확인할 수 있어요.';
 
                     const labelsEl = document.getElementById('ladder-col-labels');
                     labelsEl.innerHTML = '';
@@ -2463,53 +2507,106 @@
                     });
 
                     const wrapEl = document.getElementById('ladder-wrap');
-                    if (colCount > 0) {
-                        const rowHeight = 28, topPad = 10, bottomPad = 30;
-                        const svgHeight = rungs.length * rowHeight + topPad + bottomPad;
-                        const colX = (i) => i * 60 + 30;
-                        let svg = `<svg width="100%" height="${svgHeight}" viewBox="0 0 ${colCount * 60} ${svgHeight}" preserveAspectRatio="none">`;
-                        for (let c = 0; c < colCount; c++) {
-                            svg += `<line x1="${colX(c)}" y1="${topPad}" x2="${colX(c)}" y2="${svgHeight - bottomPad}" stroke="#3A3A42" stroke-width="3" />`;
+                    const rowHeight = 28, topPad = 10, bottomPad = 30;
+                    const colX = (i) => i * 60 + 30;
+                    const myStartCol = order.indexOf(myId);
+                    const buildMyPathD = () => {
+                        let col = myStartCol;
+                        let pathD = `M ${colX(col)} ${topPad}`;
+                        for (let r = 0; r < rungs.length; r++) {
+                            const row = rungs[r] || [];
+                            const y1 = topPad + r * rowHeight, y2 = topPad + (r + 1) * rowHeight;
+                            let nextCol = col;
+                            if (col > 0 && row[col - 1]) nextCol = col - 1;
+                            else if (col < row.length && row[col]) nextCol = col + 1;
+                            if (nextCol !== col) pathD += ` L ${colX(col)} ${y1} L ${colX(nextCol)} ${y1}`;
+                            pathD += ` L ${colX(nextCol)} ${y2}`;
+                            col = nextCol;
                         }
-                        rungs.forEach((row, r) => {
-                            (row || []).forEach((has, c) => {
-                                if (has) {
-                                    const y = topPad + r * rowHeight;
-                                    svg += `<line x1="${colX(c)}" y1="${y}" x2="${colX(c + 1)}" y2="${y}" stroke="#3A3A42" stroke-width="3" />`;
-                                }
-                            });
-                        });
-                        const myStartCol = order.indexOf(myId);
-                        if (myStartCol >= 0) {
-                            let col = myStartCol;
-                            let pathD = `M ${colX(col)} ${topPad}`;
-                            for (let r = 0; r < rungs.length; r++) {
-                                const row = rungs[r] || [];
-                                const y1 = topPad + r * rowHeight, y2 = topPad + (r + 1) * rowHeight;
-                                let nextCol = col;
-                                if (col > 0 && row[col - 1]) nextCol = col - 1;
-                                else if (col < row.length && row[col]) nextCol = col + 1;
-                                if (nextCol !== col) pathD += ` L ${colX(col)} ${y1} L ${colX(nextCol)} ${y1}`;
-                                pathD += ` L ${colX(nextCol)} ${y2}`;
-                                col = nextCol;
+                        return pathD;
+                    };
+
+                    // 애니메이션 진행 중에는 DOM을 다시 그리지 않는다 (진행 중인 애니메이션이 끊기지 않도록).
+                    if (ladderMyRevealState !== 'animating') {
+                        if (colCount > 0) {
+                            const svgHeight = rungs.length * rowHeight + topPad + bottomPad;
+                            let svg = `<svg width="100%" height="${svgHeight}" viewBox="0 0 ${colCount * 60} ${svgHeight}" preserveAspectRatio="none">`;
+                            for (let c = 0; c < colCount; c++) {
+                                svg += `<line x1="${colX(c)}" y1="${topPad}" x2="${colX(c)}" y2="${svgHeight - bottomPad}" stroke="#3A3A42" stroke-width="3" />`;
                             }
-                            svg += `<path d="${pathD}" fill="none" style="stroke:var(--primary-color); stroke-width:4; stroke-linecap:round;" />`;
+                            rungs.forEach((row, r) => {
+                                (row || []).forEach((has, c) => {
+                                    if (has) {
+                                        const y = topPad + r * rowHeight;
+                                        svg += `<line x1="${colX(c)}" y1="${y}" x2="${colX(c + 1)}" y2="${y}" stroke="#3A3A42" stroke-width="3" />`;
+                                    }
+                                });
+                            });
+                            // 내 줄이 어디로 향하는지는 "내 결과 보기"를 눌러 애니메이션으로 확인하기 전까지는 숨긴다.
+                            if (myStartCol >= 0 && ladderMyRevealState === 'revealed') {
+                                svg += `<path d="${buildMyPathD()}" fill="none" style="stroke:var(--primary-color); stroke-width:4; stroke-linecap:round;" />`;
+                            }
+                            for (let c = 0; c < colCount; c++) {
+                                const isPenalty = penaltyBottoms.includes(c);
+                                const text = revealed ? (isPenalty ? '💥' : '⭕') : '❓';
+                                const fillColor = revealed ? (isPenalty ? 'var(--danger-color)' : '#8be28b') : '#8E9AA8';
+                                svg += `<text x="${colX(c)}" y="${svgHeight - 8}" font-size="16" text-anchor="middle" style="fill:${fillColor};">${text}</text>`;
+                            }
+                            svg += `</svg>`;
+                            wrapEl.innerHTML = svg;
+                        } else {
+                            wrapEl.innerHTML = '';
                         }
-                        for (let c = 0; c < colCount; c++) {
-                            const isPenalty = penaltyBottoms.includes(c);
-                            const text = revealed ? (isPenalty ? '💥' : '⭕') : '❓';
-                            const fillColor = revealed ? (isPenalty ? 'var(--danger-color)' : '#8be28b') : '#8E9AA8';
-                            svg += `<text x="${colX(c)}" y="${svgHeight - 8}" font-size="16" text-anchor="middle" style="fill:${fillColor};">${text}</text>`;
-                        }
-                        svg += `</svg>`;
-                        wrapEl.innerHTML = svg;
-                    } else {
-                        wrapEl.innerHTML = '';
                     }
 
                     const revealBtn = document.getElementById('btn-reveal-ladder');
                     revealBtn.style.display = (isHost && !revealed) ? 'block' : 'none';
                     revealBtn.onclick = () => { update(ref(db, `rooms/${currentRoomCode}`), { ladderRevealed: true }); };
+
+                    const myRevealBtn = document.getElementById('btn-ladder-my-reveal');
+                    const myResultTextEl = document.getElementById('ladder-my-result-text');
+                    if (revealed && myStartCol >= 0 && ladderMyRevealState === 'hidden') {
+                        myRevealBtn.style.display = 'block';
+                        myResultTextEl.style.display = 'none';
+                        myRevealBtn.onclick = () => {
+                            if (ladderMyRevealState !== 'hidden') return;
+                            ladderMyRevealState = 'animating';
+                            myRevealBtn.style.display = 'none';
+                            const svgEl = wrapEl.querySelector('svg');
+                            if (!svgEl) { ladderMyRevealState = 'revealed'; return; }
+                            const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                            pathEl.setAttribute('d', buildMyPathD());
+                            pathEl.setAttribute('fill', 'none');
+                            pathEl.style.stroke = 'var(--primary-color)';
+                            pathEl.style.strokeWidth = '4';
+                            pathEl.style.strokeLinecap = 'round';
+                            svgEl.appendChild(pathEl);
+                            const totalLen = pathEl.getTotalLength();
+                            pathEl.style.strokeDasharray = `${totalLen}`;
+                            pathEl.style.strokeDashoffset = `${totalLen}`;
+                            pathEl.getBoundingClientRect(); // 강제 리플로우 (트랜지션이 확실히 처음부터 적용되도록)
+                            const animMs = 1400;
+                            pathEl.style.transition = `stroke-dashoffset ${animMs}ms ease-in-out`;
+                            requestAnimationFrame(() => { pathEl.style.strokeDashoffset = '0'; });
+                            setTimeout(() => {
+                                ladderMyRevealState = 'revealed';
+                                const isPenalty = penaltyBottoms.includes(traceLadderPath(myStartCol, rungs));
+                                myResultTextEl.style.display = 'block';
+                                myResultTextEl.textContent = isPenalty ? '💥 벌칙에 걸렸어요!' : '⭕ 안전해요!';
+                                myResultTextEl.style.color = isPenalty ? 'var(--danger-color)' : '#8be28b';
+                            }, animMs + 150);
+                        };
+                    } else {
+                        myRevealBtn.style.display = 'none';
+                        if (ladderMyRevealState === 'revealed' && myStartCol >= 0) {
+                            const isPenalty = penaltyBottoms.includes(traceLadderPath(myStartCol, rungs));
+                            myResultTextEl.style.display = 'block';
+                            myResultTextEl.textContent = isPenalty ? '💥 벌칙에 걸렸어요!' : '⭕ 안전해요!';
+                            myResultTextEl.style.color = isPenalty ? 'var(--danger-color)' : '#8be28b';
+                        } else if (ladderMyRevealState !== 'animating') {
+                            myResultTextEl.style.display = 'none';
+                        }
+                    }
 
                     const resultListEl = document.getElementById('ladder-result-list');
                     resultListEl.innerHTML = '';
@@ -2545,6 +2642,8 @@
                 lastShownBoomKey = null;
                 bingoLoserTriggeredKey = null;
                 ladderLoserTriggeredKey = null;
+                ladderMyRevealState = 'hidden';
+                ladderMyRevealRoundKey = null;
             }
         });
     }
@@ -2599,9 +2698,16 @@
             const curTurnIdx = d.sonTurnIndex || 0;
             if (curTurnIdx !== expectedTurnIdx) return; // 이미 다른 클라이언트가 처리함
             if (!d.players?.[botId]?.isBot) return;
+            const hasCondition = d.sonConditionIndex !== null && d.sonConditionIndex !== undefined;
+            const elapsed = getServerNow() - (d.sonConditionSetAt || 0);
+            if (hasCondition && elapsed < SON_MIN_FOLD_WINDOW_MS) {
+                // 다른 사람(봇 포함)이 접을 시간이 아직 남았으면 그만큼 더 기다렸다가 다시 시도
+                setTimeout(() => autoDrawSonConditionForBot(botId, turnOrder, expectedTurnIdx), SON_MIN_FOLD_WINDOW_MS - elapsed + 200);
+                return;
+            }
             const idx = Math.floor(Math.random() * sonConditionPool.length);
             const newTurnIdx = turnOrder.indexOf(botId) + 1;
-            update(ref(db, `rooms/${currentRoomCode}`), { sonConditionIndex: idx, sonAnsweredIds: {}, sonTurnIndex: newTurnIdx });
+            update(ref(db, `rooms/${currentRoomCode}`), { sonConditionIndex: idx, sonAnsweredIds: {}, sonTurnIndex: newTurnIdx, sonConditionSetAt: getServerNow() });
         });
     }
 
@@ -3369,6 +3475,7 @@
                 bingoLoserTriggeredKey = null;
                 update(rRef, {
                     status: 'playing', bingoBoards: boards, bingoCalled: {}, bingoLinesToLose: linesToLose,
+                    bingoTurnOrder: shuffleArray(pIds), bingoTurnIdx: 0,
                     bingoRoundKey: getServerNow(), bingoLoserId: null
                 });
             } else if (gameId === 'ladder') {
@@ -3376,7 +3483,7 @@
                 let penaltyCount = Math.max(1, Math.min(5, parseInt(penaltyEl?.value || '1', 10)));
                 penaltyCount = Math.min(penaltyCount, Math.max(1, pIds.length - 1));
                 const shuffledOrder = shuffleArray(pIds);
-                const rungs = buildLadderRungs(shuffledOrder.length, 10);
+                const rungs = buildLadderRungs(shuffledOrder.length, 16);
                 const bottomIndexes = shuffleArray(shuffledOrder.map((_, i) => i)).slice(0, penaltyCount);
                 ladderLoserTriggeredKey = null;
                 update(rRef, {
@@ -3400,8 +3507,8 @@
                 speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null,
                 boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null, boxFindClickCount: null,
                 godMasterId: null, godStartId: null, godTargets: null, godNumber: null, godCurrentId: null, godStep: null, godPath: null, godLoserResult: null, godRevealed: false,
-                sonFingers: null, sonConditionIndex: null, sonAnsweredIds: null, sonRoundKey: null, sonTurnOrder: null, sonTurnIndex: null,
-                bingoBoards: null, bingoCalled: null, bingoLinesToLose: null, bingoRoundKey: null, bingoLoserId: null,
+                sonFingers: null, sonConditionIndex: null, sonAnsweredIds: null, sonRoundKey: null, sonTurnOrder: null, sonTurnIndex: null, sonConditionSetAt: null,
+                bingoBoards: null, bingoCalled: null, bingoLinesToLose: null, bingoRoundKey: null, bingoLoserId: null, bingoTurnOrder: null, bingoTurnIdx: null,
                 ladderPlayerOrder: null, ladderRungs: null, ladderPenaltyBottoms: null, ladderRevealed: null, ladderRoundKey: null,
                 roomLastLoserId: null, roomLoserPendingChoice: false
             });
