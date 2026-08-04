@@ -1056,6 +1056,9 @@
     const canvas = document.getElementById('drawing-canvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false, userDrawingPoints = [], currentShapeIndex = 0;
+    let drawLocked = false; // 제출 완료 후에는 더 그리거나 다시 제출할 수 없도록 잠금
+    let drawSubmittedRoundKey = null;
+    let drawSeenRoundKey = null;
     let currentAnswer = 0, isPenaltyActive = false, lastBombQuizKey = null, balanceOpenedRoundKey = null;
     let lastBombGameStartKey = null;
     let serverTimeOffset = 0;
@@ -1383,6 +1386,7 @@
             updates[`rooms/${currentRoomCode}/rouletteLastHitId`] = myId;
             updates[`rooms/${currentRoomCode}/rouletteConsecutiveHits`] = 1;
             updates[`rooms/${currentRoomCode}/rouletteResultText`] = `💥 ${myNickname}님 총알 명중! 한 잔 마시기 🍺`;
+            updates[`rooms/${currentRoomCode}/rouletteHitKey`] = getServerNow();
             updates[`rooms/${currentRoomCode}/roomLastLoserId`] = myId;
             updates[`rooms/${currentRoomCode}/roomLoserPendingChoice`] = true;
         } else {
@@ -1428,6 +1432,7 @@
                 roomData.rouletteLastHitId = botId;
                 roomData.rouletteConsecutiveHits = 1;
                 roomData.rouletteResultText = `💥 ${botNick}님 총알 명중! 한 잔 마시기 🍺`;
+                roomData.rouletteHitKey = getServerNow();
                 roomData.roomLastLoserId = botId;
                 roomData.roomLoserPendingChoice = true;
             } else {
@@ -1709,7 +1714,27 @@
                     document.getElementById('target-shape-text').innerText = `목표 도형: ${shapes[currentShapeIndex].name}`;
                     document.getElementById('preview-svg').innerHTML = shapes[currentShapeIndex].svg;
 
+                    // 새 라운드(새 도형)가 시작되면 캔버스와 제출 잠금 상태를 초기화
+                    if (drawSeenRoundKey !== data.drawRoundKey) {
+                        drawSeenRoundKey = data.drawRoundKey;
+                        drawLocked = false;
+                        drawSubmittedRoundKey = null;
+                        clearCanvas();
+                        const submitBtn = document.getElementById('btn-submit-score');
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = '📐 내 그림 제출하고 채점받기';
+                    }
+
                     const scores = data.drawScores || {}; const images = data.drawImages || {};
+                    // 서버에 이미 내 점수가 기록돼 있으면(새로고침 등으로 로컬 상태가 초기화된 경우 포함) 잠금 상태를 맞춰준다.
+                    if (scores[myId] !== undefined && !drawLocked) {
+                        drawLocked = true;
+                        drawSubmittedRoundKey = data.drawRoundKey;
+                        const submitBtn = document.getElementById('btn-submit-score');
+                        submitBtn.disabled = true;
+                        submitBtn.innerText = '✅ 제출 완료 (채점 결과는 아래 목록에서 확인)';
+                    }
+
                     if (isHost) {
                         const botIds = playerIds.filter((id) => players[id]?.isBot && scores[id] === undefined);
                         botIds.forEach((botId) => {
@@ -2013,6 +2038,17 @@
                     const rResultEl = document.getElementById('rouletteResultText');
                     if (data.rouletteResultText) { rResultEl.textContent = data.rouletteResultText; rResultEl.style.display = 'block'; }
                     else { rResultEl.style.display = 'none'; }
+
+                    // 총알에 맞았을 때는 결과를 볼 틈도 없이 바로 "다음 게임 고르기" 모달이 뜨는 문제가 있었음 —
+                    // 폭탄게임처럼 전체 화면 연출을 먼저 띄우고, 직접 터치해서 닫아야 그 뒤의 모달이 보이도록 함.
+                    if (roundOver && data.roomLastLoserId) {
+                        triggerExplosionEffect({
+                            key: `roulette_${data.rouletteHitKey || data.roomLastLoserId}`,
+                            title: '💥 명중! 💥',
+                            message: data.rouletteResultText || `${players[data.roomLastLoserId]?.nickname || '참가자'}님 총알 명중!`,
+                            duration: 0
+                        });
+                    }
                 }
                 else if (data.selectedGame === 'speedfinger') {
                     showScreen('game-speedfinger-screen');
@@ -2446,8 +2482,10 @@
                     }
 
                     // 방장이 봇 차례일 때 대신 번호를 불러줌
+                    // (턴은 0~n-1을 계속 순환하므로 turnIdx만으로 키를 만들면 두 번째 바퀴부터 같은 키가 재사용되어
+                    //  "이미 처리함"으로 착각해 건너뛰는 버그가 있었음 — 계속 증가하는 calledCount를 섞어 매 차례 고유한 키로 만든다)
                     if (isHost && players[bingoCallerId]?.isBot) {
-                        const key = `${data.bingoRoundKey || ''}_${bingoTurnIdx}_${bingoCallerId}`;
+                        const key = `${data.bingoRoundKey || ''}_${calledCount}_${bingoTurnIdx}_${bingoCallerId}`;
                         if (!bingoBotCallHandled.has(key)) {
                             bingoBotCallHandled.add(key);
                             setTimeout(() => {
@@ -2493,18 +2531,8 @@
                     }
 
                     document.getElementById('ladder-status-text').innerText = revealed
-                        ? '🪜 바닥 결과가 공개됐어요! "내 결과 보기"를 눌러 내 줄을 확인하세요.'
+                        ? '🪜 바닥 결과가 공개됐어요! 맨 위 내 이름(또는 "내 결과 보기")을 눌러 내 줄을 확인하세요.'
                         : '🪜 사다리가 준비됐어요. 방장이 결과를 공개하면 확인할 수 있어요.';
-
-                    const labelsEl = document.getElementById('ladder-col-labels');
-                    labelsEl.innerHTML = '';
-                    order.forEach((id) => {
-                        const label = document.createElement('div');
-                        label.className = 'ladder-col-label' + (id === myId ? ' me' : '');
-                        label.style.flex = '1';
-                        label.textContent = players[id]?.nickname || '참가자';
-                        labelsEl.appendChild(label);
-                    });
 
                     const wrapEl = document.getElementById('ladder-wrap');
                     const rowHeight = 28, topPad = 10, bottomPad = 30;
@@ -2525,6 +2553,54 @@
                         }
                         return pathD;
                     };
+                    const myResultTextEl = document.getElementById('ladder-my-result-text');
+                    const myRevealBtn = document.getElementById('btn-ladder-my-reveal');
+                    const startMyLadderReveal = () => {
+                        if (ladderMyRevealState !== 'hidden' || myStartCol < 0) return;
+                        ladderMyRevealState = 'animating';
+                        myRevealBtn.style.display = 'none';
+                        const svgEl = wrapEl.querySelector('svg');
+                        if (!svgEl) { ladderMyRevealState = 'revealed'; return; }
+                        const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        pathEl.setAttribute('d', buildMyPathD());
+                        pathEl.setAttribute('fill', 'none');
+                        pathEl.style.stroke = 'var(--primary-color)';
+                        pathEl.style.strokeWidth = '4';
+                        pathEl.style.strokeLinecap = 'round';
+                        svgEl.appendChild(pathEl);
+                        const totalLen = pathEl.getTotalLength();
+                        pathEl.style.strokeDasharray = `${totalLen}`;
+                        pathEl.style.strokeDashoffset = `${totalLen}`;
+                        pathEl.getBoundingClientRect(); // 강제 리플로우 (트랜지션이 확실히 처음부터 적용되도록)
+                        const animMs = 1400;
+                        pathEl.style.transition = `stroke-dashoffset ${animMs}ms ease-in-out`;
+                        requestAnimationFrame(() => { pathEl.style.strokeDashoffset = '0'; });
+                        setTimeout(() => {
+                            ladderMyRevealState = 'revealed';
+                            const isPenalty = penaltyBottoms.includes(traceLadderPath(myStartCol, rungs));
+                            myResultTextEl.style.display = 'block';
+                            myResultTextEl.textContent = isPenalty ? '💥 벌칙에 걸렸어요!' : '⭕ 안전해요!';
+                            myResultTextEl.style.color = isPenalty ? 'var(--danger-color)' : '#8be28b';
+                        }, animMs + 150);
+                    };
+
+                    const canRevealMine = revealed && myStartCol >= 0 && ladderMyRevealState === 'hidden';
+                    const labelsEl = document.getElementById('ladder-col-labels');
+                    labelsEl.innerHTML = '';
+                    order.forEach((id) => {
+                        const label = document.createElement('div');
+                        const isMe = id === myId;
+                        label.className = 'ladder-col-label' + (isMe ? ' me' : '');
+                        label.style.flex = '1';
+                        label.textContent = players[id]?.nickname || '참가자';
+                        // 내 이름을 눌러도 "내 결과 보기"와 동일하게 애니메이션이 시작되도록 함
+                        if (isMe && canRevealMine) {
+                            label.style.cursor = 'pointer';
+                            label.style.textDecoration = 'underline';
+                            label.onclick = () => startMyLadderReveal();
+                        }
+                        labelsEl.appendChild(label);
+                    });
 
                     // 애니메이션 진행 중에는 DOM을 다시 그리지 않는다 (진행 중인 애니메이션이 끊기지 않도록).
                     if (ladderMyRevealState !== 'animating') {
@@ -2542,7 +2618,7 @@
                                     }
                                 });
                             });
-                            // 내 줄이 어디로 향하는지는 "내 결과 보기"를 눌러 애니메이션으로 확인하기 전까지는 숨긴다.
+                            // 내 줄이 어디로 향하는지는 "내 결과 보기"(또는 내 이름)를 눌러 애니메이션으로 확인하기 전까지는 숨긴다.
                             if (myStartCol >= 0 && ladderMyRevealState === 'revealed') {
                                 svg += `<path d="${buildMyPathD()}" fill="none" style="stroke:var(--primary-color); stroke-width:4; stroke-linecap:round;" />`;
                             }
@@ -2563,39 +2639,10 @@
                     revealBtn.style.display = (isHost && !revealed) ? 'block' : 'none';
                     revealBtn.onclick = () => { update(ref(db, `rooms/${currentRoomCode}`), { ladderRevealed: true }); };
 
-                    const myRevealBtn = document.getElementById('btn-ladder-my-reveal');
-                    const myResultTextEl = document.getElementById('ladder-my-result-text');
-                    if (revealed && myStartCol >= 0 && ladderMyRevealState === 'hidden') {
+                    if (canRevealMine) {
                         myRevealBtn.style.display = 'block';
                         myResultTextEl.style.display = 'none';
-                        myRevealBtn.onclick = () => {
-                            if (ladderMyRevealState !== 'hidden') return;
-                            ladderMyRevealState = 'animating';
-                            myRevealBtn.style.display = 'none';
-                            const svgEl = wrapEl.querySelector('svg');
-                            if (!svgEl) { ladderMyRevealState = 'revealed'; return; }
-                            const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                            pathEl.setAttribute('d', buildMyPathD());
-                            pathEl.setAttribute('fill', 'none');
-                            pathEl.style.stroke = 'var(--primary-color)';
-                            pathEl.style.strokeWidth = '4';
-                            pathEl.style.strokeLinecap = 'round';
-                            svgEl.appendChild(pathEl);
-                            const totalLen = pathEl.getTotalLength();
-                            pathEl.style.strokeDasharray = `${totalLen}`;
-                            pathEl.style.strokeDashoffset = `${totalLen}`;
-                            pathEl.getBoundingClientRect(); // 강제 리플로우 (트랜지션이 확실히 처음부터 적용되도록)
-                            const animMs = 1400;
-                            pathEl.style.transition = `stroke-dashoffset ${animMs}ms ease-in-out`;
-                            requestAnimationFrame(() => { pathEl.style.strokeDashoffset = '0'; });
-                            setTimeout(() => {
-                                ladderMyRevealState = 'revealed';
-                                const isPenalty = penaltyBottoms.includes(traceLadderPath(myStartCol, rungs));
-                                myResultTextEl.style.display = 'block';
-                                myResultTextEl.textContent = isPenalty ? '💥 벌칙에 걸렸어요!' : '⭕ 안전해요!';
-                                myResultTextEl.style.color = isPenalty ? 'var(--danger-color)' : '#8be28b';
-                            }, animMs + 150);
-                        };
+                        myRevealBtn.onclick = () => startMyLadderReveal();
                     } else {
                         myRevealBtn.style.display = 'none';
                         if (ladderMyRevealState === 'revealed' && myStartCol >= 0) {
@@ -2644,6 +2691,11 @@
                 ladderLoserTriggeredKey = null;
                 ladderMyRevealState = 'hidden';
                 ladderMyRevealRoundKey = null;
+                drawLocked = false;
+                drawSubmittedRoundKey = null;
+                drawSeenRoundKey = null;
+                const drawSubmitBtn = document.getElementById('btn-submit-score');
+                if (drawSubmitBtn) { drawSubmitBtn.disabled = false; drawSubmitBtn.innerText = '📐 내 그림 제출하고 채점받기'; }
             }
         });
     }
@@ -2857,11 +2909,11 @@
         return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
     }
     function clearCanvas() { ctx.fillStyle = '#151518'; ctx.fillRect(0, 0, canvas.width, canvas.height); userDrawingPoints = []; }
-    canvas.addEventListener('mousedown', (e) => { isDrawing = true; ctx.beginPath(); const c = getCanvasCoordinates(e); ctx.moveTo(c.x, c.y); ctx.strokeStyle = '#5C9EFF'; ctx.lineWidth = 5; userDrawingPoints.push(c); });
-    canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); });
+    canvas.addEventListener('mousedown', (e) => { if (drawLocked) return; isDrawing = true; ctx.beginPath(); const c = getCanvasCoordinates(e); ctx.moveTo(c.x, c.y); ctx.strokeStyle = '#5C9EFF'; ctx.lineWidth = 5; userDrawingPoints.push(c); });
+    canvas.addEventListener('mousemove', (e) => { if (drawLocked || !isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); });
     canvas.addEventListener('mouseup', () => isDrawing = false);
-    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); isDrawing = true; ctx.beginPath(); const c = getCanvasCoordinates(e); ctx.moveTo(c.x, c.y); ctx.strokeStyle = '#5C9EFF'; ctx.lineWidth = 5; userDrawingPoints.push(c); }, { passive: false });
-    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); }, { passive: false });
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); if (drawLocked) return; isDrawing = true; ctx.beginPath(); const c = getCanvasCoordinates(e); ctx.moveTo(c.x, c.y); ctx.strokeStyle = '#5C9EFF'; ctx.lineWidth = 5; userDrawingPoints.push(c); }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (drawLocked || !isDrawing) return; const c = getCanvasCoordinates(e); ctx.lineTo(c.x, c.y); ctx.stroke(); userDrawingPoints.push(c); }, { passive: false });
     canvas.addEventListener('touchend', (e) => { e.preventDefault(); isDrawing = false; });
 
     // ===== 도형 채점 로직 (Chamfer Distance 기반 유사도 채점) =====
@@ -2922,6 +2974,7 @@
     }
 
     document.getElementById('btn-submit-score').addEventListener('click', () => {
+        if (drawLocked) return; // 이미 제출 완료 — 다시 제출 불가
         if (userDrawingPoints.length < 5) return alert("도형을 그려주세요!");
 
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -2945,6 +2998,11 @@
         }
 
         const thumb = document.createElement('canvas'); thumb.width = 60; thumb.height = 60; thumb.getContext('2d').drawImage(canvas, 0, 0, 60, 60);
+        drawLocked = true;
+        drawSubmittedRoundKey = drawSeenRoundKey;
+        const submitBtn = document.getElementById('btn-submit-score');
+        submitBtn.disabled = true;
+        submitBtn.innerText = '✅ 제출 완료 (채점 결과는 아래 목록에서 확인)';
         update(ref(db), { [`rooms/${currentRoomCode}/drawScores/${myId}`]: finalScore, [`rooms/${currentRoomCode}/drawImages/${myId}`]: thumb.toDataURL('image/jpeg', 0.5) });
     });
 
@@ -3061,6 +3119,7 @@
         Array.from(opts).sort(() => Math.random() - 0.5).forEach(o => {
             const b = document.createElement('button'); b.className = 'quiz-btn'; b.innerText = o;
             b.onclick = () => {
+                if (isPenaltyActive) return; // 오답 페널티 중에는 아무 버튼도 선택되지 않도록 막음
                 if (o === currentAnswer) {
                     runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
                         if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'bomb' || roomData.bombExploded) return undefined;
@@ -3074,7 +3133,12 @@
                     }).catch((error) => console.error('bomb pass transaction failed:', error));
                 } else {
                     isPenaltyActive = true; b.classList.add('wrong-animation');
-                    setTimeout(() => { b.classList.remove('wrong-animation'); isPenaltyActive = false; }, 1000);
+                    Array.from(box.children).forEach((btn) => { btn.disabled = true; });
+                    setTimeout(() => {
+                        b.classList.remove('wrong-animation');
+                        isPenaltyActive = false;
+                        Array.from(box.children).forEach((btn) => { btn.disabled = false; });
+                    }, 1000);
                 }
             };
             box.appendChild(b);
@@ -3362,7 +3426,7 @@
             } else if (gameId === 'draw') {
                 const shapeIdx = (Number.isInteger(hostSelectedShapeIndex) && hostSelectedShapeIndex >= 0 && hostSelectedShapeIndex < shapes.length)
                     ? hostSelectedShapeIndex : pickRandomShapeIndex();
-                update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null });
+                update(rRef, { status: 'playing', targetShapeIndex: shapeIdx, drawScores: null, drawImages: null, drawRoundKey: getServerNow() });
             } else if (gameId === 'bomb') {
                 // 참여자 한 명당 약 6초의 문제 풀이 시간을 반영하고,
                 // 첫 문제 확인 및 Firebase 통신을 위한 기본 여유 시간을 추가함
@@ -3440,7 +3504,7 @@
                 update(rRef, {
                     status: 'playing', rouletteSlotCount: slotCount, rouletteTurnOrder: pIds, rouletteTurnIdx: 0,
                     rouletteChamberPos: 0, rouletteBulletChamber: Math.floor(Math.random() * slotCount),
-                    rouletteLastHitId: null, rouletteConsecutiveHits: 0, rouletteResultText: null
+                    rouletteLastHitId: null, rouletteConsecutiveHits: 0, rouletteResultText: null, rouletteHitKey: null
                 });
             } else if (gameId === 'speedfinger') {
                 const delay = 2000 + Math.floor(Math.random() * 3000); // 2~5초 랜덤 대기 (부정 출발 방지)
@@ -3499,11 +3563,11 @@
     document.querySelectorAll('.btn-back-lobby').forEach(btn => {
         btn.addEventListener('click', () => {
             update(ref(db, `rooms/${currentRoomCode}`), { 
-                status: 'waiting', word: '', drawScores: null, drawImages: null, bombExploded: false, speedAnswers: null, speedLoserId: null, balanceVotes: null, balanceRevealed: false,
+                status: 'waiting', word: '', drawScores: null, drawImages: null, drawRoundKey: null, bombExploded: false, speedAnswers: null, speedLoserId: null, balanceVotes: null, balanceRevealed: false,
                 bombExplodeAt: null,
                 dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null, dutchCustomActive: false, dutchRemaining: null,
                 timingTarget: null, timingStartTime: null, timingResults: null,
-                rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null,
+                rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null, rouletteHitKey: null,
                 speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null,
                 boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null, boxFindClickCount: null,
                 godMasterId: null, godStartId: null, godTargets: null, godNumber: null, godCurrentId: null, godStep: null, godPath: null, godLoserResult: null, godRevealed: false,
