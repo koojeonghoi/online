@@ -2514,6 +2514,17 @@
                             }
                         }
                     }
+
+                    // 빙고 완성되면 결과를 볼 틈도 없이 바로 "다음 게임 고르기" 모달이 뜨는 문제가 있었음 —
+                    // 다른 게임들처럼 전체 화면 연출을 먼저 띄우고, 직접 터치해서 닫아야 그 뒤의 모달이 보이도록 함.
+                    if (data.bingoLoserId) {
+                        triggerExplosionEffect({
+                            key: `bingo_${data.bingoRoundKey || ''}_${data.bingoLoserId}`,
+                            title: '🎱 빙고! 💥',
+                            message: `${players[data.bingoLoserId]?.nickname || '참가자'}님 빙고 완성! 벌칙 당첨!`,
+                            duration: 0
+                        });
+                    }
                 }
                 else if (data.selectedGame === 'ladder') {
                     showScreen('game-ladder-screen');
