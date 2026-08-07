@@ -201,6 +201,43 @@
         .quiz-btn { padding: 14px; font-size: 18px; font-weight: bold; background-color: var(--secondary-btn); color: #fff; border: none; border-radius: 8px; cursor: pointer; }
         .quiz-btn.wrong-animation { background-color: var(--danger-color) !important; animation: shake 0.2s ease-in-out 2; }
 
+        .dice-cube {
+            width: 96px; height: 96px;
+            background: linear-gradient(150deg, #ffffff 0%, #dfe3ea 100%);
+            border-radius: 20px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 6px;
+            padding: 15px;
+            box-sizing: border-box;
+            box-shadow: 0 10px 22px rgba(0,0,0,0.5), inset 0 -4px 8px rgba(0,0,0,0.10), inset 0 3px 5px rgba(255,255,255,0.95);
+            transition: transform 0.18s ease;
+        }
+        .dice-pip {
+            width: 100%; aspect-ratio: 1;
+            border-radius: 50%;
+            align-self: center; justify-self: center;
+            background: radial-gradient(circle at 32% 30%, #5a5a5a, #0e0e10 75%);
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.3);
+            opacity: 0;
+            transform: scale(0.5);
+            transition: opacity 0.12s ease, transform 0.12s ease;
+        }
+        .dice-pip.show { opacity: 1; transform: scale(1); }
+        .dice-cube.spinning { animation: diceSpinCube 0.16s linear infinite; box-shadow: 0 4px 14px rgba(255,210,92,0.5), inset 0 -4px 8px rgba(0,0,0,0.10); }
+        @keyframes diceSpinCube {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.12); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+        .dice-cube.landed { animation: diceLandCube 0.45s cubic-bezier(.34,1.56,.64,1); }
+        @keyframes diceLandCube {
+            0% { transform: scale(1.3) rotate(0deg); }
+            60% { transform: scale(0.9) rotate(-6deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
         #explosion-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; overflow: hidden; border-radius: 16px; }
         .particle { position: absolute; width: 10px; height: 10px; background-color: var(--danger-color); border-radius: 50%; opacity: 0; }
 
@@ -639,9 +676,17 @@
             <div style="font-size: 13px; color: #8E9AA8;">🎯 목표 숫자 (이 숫자에서 가장 먼 사람이 패배!)</div>
             <div id="dice-target-display" style="font-size: 38px; font-weight: bold; color: var(--accent-color);">-</div>
         </div>
-        <div style="display: flex; justify-content: center; gap: 16px; margin: 15px auto;">
-            <div style="width: 80px; height: 80px; background: #fff; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 48px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"><span id="dice-face-1">🎲</span></div>
-            <div style="width: 80px; height: 80px; background: #fff; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 48px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"><span id="dice-face-2">🎲</span></div>
+        <div style="display: flex; justify-content: center; gap: 20px; margin: 18px auto;">
+            <div class="dice-cube" id="dice-face-1">
+                <div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div>
+                <div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div>
+                <div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div>
+            </div>
+            <div class="dice-cube" id="dice-face-2">
+                <div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div>
+                <div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div>
+                <div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div>
+            </div>
         </div>
         <button id="btn-arm-dice-shake" class="secondary" style="margin-bottom: 8px;" onclick="window.armDiceShake()">🤳 흔들어서 굴리기 켜기</button>
         <button id="btn-roll-dice" style="background-color: var(--accent-color); color: #121214; font-size: 20px; padding: 16px; margin-bottom: 15px;" onclick="window.rollDice()">🎲 굴리기!</button>
@@ -1398,8 +1443,14 @@
     }
 
     // ===== 🎲 주사위게임 =====
-    const DICE_FACES = { 1: '⚀', 2: '⚁', 3: '⚂', 4: '⚃', 5: '⚄', 6: '⚅' };
-    function renderDiceFace(el, val) { if (el) el.textContent = DICE_FACES[val] || '🎲'; }
+    const DICE_PIP_MAP = { 0: [], 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+    function renderDiceFace(container, val) {
+        if (!container) return;
+        const active = new Set(DICE_PIP_MAP[val] || []);
+        Array.from(container.children).forEach((pip, idx) => {
+            pip.classList.toggle('show', active.has(idx + 1));
+        });
+    }
 
     let diceLastShakeTime = 0;
     function handleDiceMotion(e) {
@@ -1440,6 +1491,8 @@
         if (btn) { btn.disabled = true; btn.innerText = '🎲 굴리는 중...'; }
         const d1el = document.getElementById('dice-face-1');
         const d2el = document.getElementById('dice-face-2');
+        d1el?.classList.remove('landed'); d2el?.classList.remove('landed');
+        d1el?.classList.add('spinning'); d2el?.classList.add('spinning');
         const finalD1 = 1 + Math.floor(Math.random() * 6);
         const finalD2 = 1 + Math.floor(Math.random() * 6);
         const target = diceLastData.target;
@@ -1451,8 +1504,11 @@
             renderDiceFace(d2el, 1 + Math.floor(Math.random() * 6));
             if (ticks >= 14) {
                 clearInterval(spinTimer);
+                d1el?.classList.remove('spinning'); d2el?.classList.remove('spinning');
                 renderDiceFace(d1el, finalD1);
                 renderDiceFace(d2el, finalD2);
+                d1el?.classList.add('landed'); d2el?.classList.add('landed');
+                if (navigator.vibrate) navigator.vibrate(180);
                 if (btn) btn.innerText = '✅ 굴렸어요!';
                 if (!currentRoomCode || diceLastData.roundKey !== roundKeyAtRoll) return;
                 const sum = finalD1 + finalD2;
@@ -1464,7 +1520,7 @@
                 });
             }
         }, 70);
-        if (navigator.vibrate) navigator.vibrate(100);
+        if (navigator.vibrate) navigator.vibrate(40);
     };
 
     function autoRollDiceForBot(botId, expectedRoundKey, target) {
@@ -2123,8 +2179,10 @@
                     const armBtn = document.getElementById('btn-arm-dice-shake');
                     if (diceActiveRoundKey !== data.diceRoundKey) {
                         diceActiveRoundKey = data.diceRoundKey;
-                        renderDiceFace(document.getElementById('dice-face-1'), 0);
-                        renderDiceFace(document.getElementById('dice-face-2'), 0);
+                        const d1el = document.getElementById('dice-face-1'), d2el = document.getElementById('dice-face-2');
+                        d1el?.classList.remove('spinning', 'landed'); d2el?.classList.remove('spinning', 'landed');
+                        renderDiceFace(d1el, 0);
+                        renderDiceFace(d2el, 0);
                         if (rollBtn) { rollBtn.disabled = false; rollBtn.innerText = '🎲 굴리기!'; }
                         if (armBtn) { armBtn.disabled = false; armBtn.innerText = '🤳 흔들어서 굴리기 켜기'; }
                     }
