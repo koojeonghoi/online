@@ -3316,7 +3316,17 @@
             const rData = snap.val(); if(!rData || rData.speedLoserId) return;
             const pool = rData.speedWordLength === 3 ? chosungPool3 : chosungPool2;
             const entry = pool[rData.speedChosungIndex];
-            if (!entry || !entry.answers.includes(userAns)) return alert(`정답 목록에 없는 단어예요! 다른 단어를 입력해보세요. (목표 초성: ${rData.speedChosung})`);
+            if (!entry) return;
+            const targetChosung = entry.chosung;
+            // 완성형 한글 음절인지 + 글자 수가 맞는지 + 초성이 일치하는지만 검사.
+            // 미리 정해둔 answers 목록에 없어도, 초성이 맞는 실제 글자 조합이면 통과시킨다.
+            const isCompleteHangul = [...userAns].every((ch) => {
+                const code = ch.charCodeAt(0) - 0xAC00;
+                return code >= 0 && code <= 11171;
+            });
+            if (userAns.length !== targetChosung.length || !isCompleteHangul || getChosung(userAns) !== targetChosung) {
+                return alert(`목표 초성(${targetChosung})과 맞지 않아요! 다시 입력해보세요.`);
+            }
             const currentAnswers = rData.speedAnswers || {}; if (currentAnswers[myId]) return;
             if (Object.values(currentAnswers).includes(userAns)) return alert(`이미 나온 단어예요! 다른 단어를 입력하세요. (${userAns})`);
             const updates = {}; updates[`rooms/${currentRoomCode}/speedAnswers/${myId}`] = userAns;
