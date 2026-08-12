@@ -366,21 +366,10 @@
             transform: translateY(-60px); opacity: 0; pointer-events: none;
             transition: transform 0.15s ease-out, opacity 0.15s ease-out;
         }
-        .loser-pick-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 700; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
-        .loser-pick-overlay.show { display: flex; }
-        .loser-pick-box { background: #151518; border: 2px solid var(--accent-color); border-radius: 14px; padding: 18px; max-width: 340px; width: 100%; max-height: 80vh; overflow-y: auto; text-align: center; }
     </style>
 </head>
 <body>
     <div id="pullRefreshIndicator" class="pull-refresh-indicator">↓ 당겨서 새로고침</div>
-    <div id="loserPickWaitBanner" style="display:none; position:fixed; top:56px; left:10px; right:10px; z-index:650; background:rgba(0,0,0,0.85); color:#fff; padding:8px 12px; border-radius:8px; font-size:12px; text-align:center;"></div>
-    <div id="loserPickModal" class="loser-pick-overlay">
-        <div class="loser-pick-box">
-            <div style="font-size:16px; font-weight:700; color:#fff; margin-bottom:4px;">😵 졌잖아요! 다음 게임을 골라주세요</div>
-            <div style="font-size:12px; color:#8E9AA8; margin-bottom:14px;">고른 게임이 바로 시작됩니다</div>
-            <div id="loserPickGameList" style="display:flex; flex-direction:column; gap:8px;"></div>
-        </div>
-    </div>
 
 <div class="container" id="main-container">
     <div id="explosion-overlay"></div>
@@ -502,6 +491,7 @@
         </div>
         <button id="btn-start-game">게임 시작</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
+        <button id="btn-host-reclaim-pick" class="secondary" style="display:none; margin-top:8px; font-size:12px; padding:8px;">🔧 방장이 대신 고르기 (상대방이 응답 없을 때)</button>
     </div>
 
     <!-- 🤫 라이어 게임 스크린 -->
@@ -964,7 +954,8 @@
         { q: "인생의 중대한 선택!", a: "타임머신 타고 20년 전 과거의 나 만나기", b: "타임머신 타고 20년 후 미래의 나 만나기" }
     ];
 
-    let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar'; 
+    let myId = '', myNickname = '', currentRoomCode = '', isHost = false, selectedGame = 'liar';
+    let canControlLobby = false; // 대기실에서 게임 선택/시작 권한 (방장이거나, 직전 패배자가 본인인 경우)
     let hostGenderMap = {}; // 방장이 왕게임용으로 지정한 참여자별 성별 (playerId -> 'M'/'F')
     let latestPlayers = {}; // 현재 방의 참여자 목록 캐시 (성별 지정 UI 렌더링용)
     let speedWordLength = 2; // 초성대결 글자 수 (2 또는 3), 방장이 설정
@@ -980,15 +971,6 @@
     window.setDrawShape = function(val) {
         hostSelectedShapeIndex = (val === 'random') ? null : parseInt(val, 10);
     };
-
-    const GAME_LIST = [
-        { id: 'liar', label: '🤫 라이어' }, { id: 'draw', label: '📐 도형그리기' }, { id: 'bomb', label: '💣 폭탄돌리기' },
-        { id: 'speed', label: '⚡ 초성대결' }, { id: 'balance', label: '⚖️ 밸런스' }, { id: 'timing', label: '⏱️ 타이밍' },
-        { id: 'roulette', label: '🔫 러시안룰렛' }, { id: 'speedfinger', label: '👆 빠른손가락' }, { id: 'dutch', label: '🍺 몰아주기' },
-        { id: 'boxfind', label: '📦 폭탄찾기' }, { id: 'king', label: '👑 왕게임' }, { id: 'gameofdeath', label: '☠️ 게임오브데스' },
-        { id: 'sonbyungho', label: '✋ 손병호게임' }, { id: 'bingo', label: '🎱 빙고' }, { id: 'ladder', label: '🪜 사다리타기' },
-        { id: 'dice', label: '🎲 주사위게임' }
-    ];
 
     const sonConditionPool = [
         "오늘 커피 마신 사람 접기", "안경이나 렌즈 낀 사람 접기", "생일이 상반기(1~6월)인 사람 접기",
@@ -1040,23 +1022,6 @@
     function cancelOnlineCheatPress() {
         if (onlineCheatPressTimer) { clearTimeout(onlineCheatPressTimer); onlineCheatPressTimer = null; }
     }
-    function renderLoserPickList() {
-        const el = document.getElementById('loserPickGameList');
-        if (!el) return;
-        el.innerHTML = '';
-        GAME_LIST.forEach(g => {
-            const b = document.createElement('button');
-            b.type = 'button'; b.textContent = g.label;
-            b.style.cssText = 'padding:12px; border-radius:10px; border:2px solid #3A3A42; background:#1c1c20; color:#fff; font-weight:600; font-size:14px;';
-            b.onclick = () => window.loserPickGame(g.id);
-            el.appendChild(b);
-        });
-    }
-    window.loserPickGame = function(gameId) {
-        document.getElementById('loserPickModal').classList.remove('show');
-        startGameFlow(gameId);
-    };
-
     let boxfindProtectToastTimer = null;
     function showBoxfindProtectToast(text) {
         let el = document.getElementById('boxfindProtectToast');
@@ -1087,7 +1052,7 @@
 
     function renderKingGenderList() {
         const container = document.getElementById('king-gender-list');
-        if (!container || !isHost) return;
+        if (!container || !canControlLobby) return;
         const ids = Object.keys(latestPlayers);
         // 방을 나간 사람의 지정 정보는 정리
         Object.keys(hostGenderMap).forEach(id => { if (!ids.includes(id)) delete hostGenderMap[id]; });
@@ -1717,7 +1682,7 @@
     }
 
     window.selectGameMode = function(gameMode) {
-        if (!isHost) return alert("게임 모드는 방장만 변경할 수 있습니다!");
+        if (!canControlLobby) return alert("지금은 게임을 고를 수 없습니다!");
         update(ref(db, `rooms/${currentRoomCode}`), { selectedGame: gameMode });
     }
 
@@ -1726,17 +1691,18 @@
         if(document.getElementById(`tab-${gameMode}`)) document.getElementById(`tab-${gameMode}`).classList.add('active');
         selectedGame = gameMode;
         const boxfindSettings = document.getElementById('boxfind-settings');
-        if (boxfindSettings) boxfindSettings.style.display = (isHost && gameMode === 'boxfind') ? 'block' : 'none';
+        if (boxfindSettings) boxfindSettings.style.display = (canControlLobby && gameMode === 'boxfind') ? 'block' : 'none';
         const kingSettings = document.getElementById('king-settings');
-        if (kingSettings) kingSettings.style.display = (isHost && gameMode === 'king') ? 'block' : 'none';
+        if (kingSettings) kingSettings.style.display = (canControlLobby && gameMode === 'king') ? 'block' : 'none';
         const speedSettings = document.getElementById('speed-settings');
-        if (speedSettings) speedSettings.style.display = (isHost && gameMode === 'speed') ? 'block' : 'none';
+        if (speedSettings) speedSettings.style.display = (canControlLobby && gameMode === 'speed') ? 'block' : 'none';
         const drawSettings = document.getElementById('draw-settings');
-        if (drawSettings) drawSettings.style.display = (isHost && gameMode === 'draw') ? 'block' : 'none';
+        if (drawSettings) drawSettings.style.display = (canControlLobby && gameMode === 'draw') ? 'block' : 'none';
         const bingoSettings = document.getElementById('bingo-settings');
-        if (bingoSettings) bingoSettings.style.display = (isHost && gameMode === 'bingo') ? 'block' : 'none';
+        if (bingoSettings) bingoSettings.style.display = (canControlLobby && gameMode === 'bingo') ? 'block' : 'none';
         const ladderSettings = document.getElementById('ladder-settings');
-        if (ladderSettings) ladderSettings.style.display = (isHost && gameMode === 'ladder') ? 'block' : 'none';
+        if (ladderSettings) ladderSettings.style.display = (canControlLobby && gameMode === 'ladder') ? 'block' : 'none';
+        if (kingSettings && canControlLobby && gameMode === 'king') renderKingGenderList();
     }
 
     window.openImageModal = function(nickname, imgData) {
@@ -1797,24 +1763,27 @@
             document.getElementById('player-count').innerText = playerIds.length;
             renderKingGenderList();
 
-            // 😵 진 사람이 다음 게임을 고르는 중인지 확인
-            const loserModal = document.getElementById('loserPickModal');
-            const waitBanner = document.getElementById('loserPickWaitBanner');
-            if (loserModal && waitBanner) {
-                if (data.roomLoserPendingChoice && data.roomLastLoserId) {
-                    if (data.roomLastLoserId === myId) {
-                        renderLoserPickList();
-                        loserModal.classList.add('show');
-                        waitBanner.style.display = 'none';
-                    } else {
-                        loserModal.classList.remove('show');
-                        waitBanner.style.display = 'block';
-                        waitBanner.textContent = `⏳ ${players[data.roomLastLoserId]?.nickname || '참가자'}님이 다음 게임을 고르는 중...`;
-                    }
+            // 🎯 대기실 컨트롤 권한: 방장이거나, 대기실로 돌아온 상태에서 직전 패배자가 본인인 경우
+            const pickTurnActive = (data.status === 'waiting' && !!data.roomLastLoserId);
+            const isMyPickTurn = pickTurnActive && data.roomLastLoserId === myId;
+            canControlLobby = isMyPickTurn || (isHost && !pickTurnActive);
+
+            const startBtn = document.getElementById('btn-start-game');
+            const waitMsg = document.getElementById('wait-message');
+            const reclaimBtn = document.getElementById('btn-host-reclaim-pick');
+            if (startBtn && waitMsg) {
+                startBtn.style.display = canControlLobby ? 'block' : 'none';
+                if (canControlLobby) {
+                    waitMsg.style.display = 'none';
                 } else {
-                    loserModal.classList.remove('show');
-                    waitBanner.style.display = 'none';
+                    waitMsg.style.display = 'block';
+                    waitMsg.textContent = pickTurnActive
+                        ? `😵 ${players[data.roomLastLoserId]?.nickname || '참가자'}님이 이번 판에 졌어요! 다음 게임을 고르는 중...`
+                        : '방장이 게임을 시작하기를 기다리는 중...';
                 }
+            }
+            if (reclaimBtn) {
+                reclaimBtn.style.display = (isHost && pickTurnActive && !isMyPickTurn) ? 'block' : 'none';
             }
 
             if (data.selectedGame) updateTabUI(data.selectedGame);
@@ -3850,6 +3819,11 @@
 
     document.getElementById('btn-start-game').addEventListener('click', () => startGameFlow(selectedGame));
 
+    document.getElementById('btn-host-reclaim-pick').addEventListener('click', () => {
+        if (!isHost) return;
+        update(ref(db, `rooms/${currentRoomCode}`), { roomLastLoserId: null });
+    });
+
     document.querySelectorAll('.btn-back-lobby').forEach(btn => {
         btn.addEventListener('click', () => {
             update(ref(db, `rooms/${currentRoomCode}`), { 
@@ -3864,8 +3838,8 @@
                 godMasterId: null, godStartId: null, godTargets: null, godNumber: null, godCurrentId: null, godStep: null, godPath: null, godLoserResult: null, godRevealed: false,
                 sonFingers: null, sonConditionIndex: null, sonAnsweredIds: null, sonRoundKey: null, sonTurnOrder: null, sonTurnIndex: null, sonConditionSetAt: null,
                 bingoBoards: null, bingoCalled: null, bingoLinesToLose: null, bingoRoundKey: null, bingoLoserId: null, bingoTurnOrder: null, bingoTurnIdx: null,
-                ladderPlayerOrder: null, ladderRungs: null, ladderPenaltyBottoms: null, ladderRevealed: null, ladderRoundKey: null,
-                roomLastLoserId: null, roomLoserPendingChoice: false
+                ladderPlayerOrder: null, ladderRungs: null, ladderPenaltyBottoms: null, ladderRevealed: null, ladderRoundKey: null
+                // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
             });
         });
     });
