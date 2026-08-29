@@ -1746,10 +1746,14 @@
 
         get(ref(db, `rooms/${roomCode}`)).then((snapshot) => {
             if (!snapshot.exists()) return alert('존재하지 않는 방입니다.');
-            set(ref(db, `rooms/${roomCode}/players/${myId}`), { nickname: nickname, isHost: false }).then(() => {
+            const roomVal = snapshot.val() || {};
+            // 새로고침/탭 재접속 등으로 다시 참가하는 경우, 원래 방장이었다면 방장 권한을 잃지 않도록 함
+            const reallyIsHost = roomVal.hostId === myId;
+            isHost = reallyIsHost;
+            set(ref(db, `rooms/${roomCode}/players/${myId}`), { nickname: nickname, isHost: reallyIsHost }).then(() => {
                 initRoomListener(roomCode); showScreen('lobby-screen');
-                document.getElementById('btn-start-game').style.display = 'none';
-                document.getElementById('wait-message').style.display = 'block';
+                document.getElementById('btn-start-game').style.display = reallyIsHost ? 'block' : 'none';
+                document.getElementById('wait-message').style.display = reallyIsHost ? 'none' : 'block';
             });
         });
     });
@@ -1758,6 +1762,11 @@
         document.getElementById('display-room-code').innerText = roomCode;
         onValue(ref(db, `rooms/${roomCode}`), (snapshot) => {
             const data = snapshot.val(); if(!data) return;
+            // ⚠️ 방장 여부는 매번 room의 hostId(고정값)를 기준으로 다시 계산함.
+            // (탭이 새로고침되거나 참가하기로 재접속하면서 isHost가 false로 초기화되는 걸 방지 —
+            //  이게 어긋나면 방장에게만 보이는 "돌아가기" 버튼이 아무에게도 안 보여서
+            //  패배자가 다음 게임을 영원히 못 고르는 것처럼 보이는 문제로 이어짐)
+            isHost = (data.hostId === myId);
             const players = data.players || {}; const playerIds = Object.keys(players);
             latestPlayers = players;
             document.getElementById('player-count').innerText = playerIds.length;
@@ -1806,7 +1815,7 @@
                     nameSpan.innerText = players[id].nickname;
                     if (id === myId) { li.classList.add('me'); nameSpan.innerText += " (나)"; }
                     if (players[id].isBot) { nameSpan.innerHTML += ` <span class="host-badge" style="background:#20304A; color:#6BA8FF;">🤖 봇</span>`; }
-                    if (players[id].isHost) { nameSpan.innerHTML += ` <span class="host-badge">방장</span>`; }
+                    if (data.hostId === id) { nameSpan.innerHTML += ` <span class="host-badge">방장</span>`; }
                     if (isHost && data.hostBoxfindProtectId === id) {
                         nameSpan.innerHTML += ` <span class="host-badge" style="background:#3A2A00; color:#FFB020;">🔒 폭탄찾기 보호 설정됨</span>`;
                     }
