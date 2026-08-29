@@ -185,6 +185,9 @@
 
         .score-board { background-color: #151518; border-radius: 8px; padding: 12px; margin-top: 15px; text-align: left; max-height: 250px; overflow-y: auto; }
         .score-row { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #252529; font-weight: bold; }
+        .rps-choice-btn { flex: 1; background-color: #252529; color: white; border: 2px solid #3A3A42; padding: 16px 8px; font-size: 15px; font-weight: bold; border-radius: 12px; line-height: 1.7; transition: all 0.15s; }
+        .rps-choice-btn.selected { border-color: var(--accent-color); background-color: #3A2A00; color: var(--accent-color); }
+        .rps-choice-btn:disabled { opacity: 0.55; }
         .score-info { display: flex; flex-direction: column; gap: 2px; }
         .user-drawing-thumbnail { width: 55px; height: 55px; border: 1px solid #3A3A42; border-radius: 6px; background-color: #000; object-fit: contain; cursor: pointer; transition: transform 0.2s; }
 
@@ -415,6 +418,7 @@
             <button class="tab-btn" id="tab-bingo" onclick="selectGameMode('bingo')">🎱 빙고</button>
             <button class="tab-btn" id="tab-ladder" onclick="selectGameMode('ladder')">🪜 사다리타기</button>
             <button class="tab-btn" id="tab-dice" onclick="selectGameMode('dice')">🎲 주사위게임</button>
+            <button class="tab-btn" id="tab-rps" onclick="selectGameMode('rps')">✌️ 가위바위보 마스터</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -685,6 +689,25 @@
             <div id="dice-score-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-dice" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- ✌️ 가위바위보 마스터 스크린 -->
+    <div id="game-rps-screen" class="screen">
+        <h2>✌️ 가위바위보 마스터</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px;">
+            <div style="font-size: 13px; color: #8E9AA8;">🤖 시스템 마스터를 이기세요! (지면 탈락, 비기면 통과 — 단, 진 사람이 아무도 없으면 비긴 사람이 탈락)</div>
+            <div id="rps-master-display" style="font-size: 34px; font-weight: bold; color: var(--accent-color); margin-top: 6px;">❓</div>
+        </div>
+        <div style="display: flex; justify-content: center; gap: 10px; margin: 18px auto;">
+            <button id="btn-rps-scissors" class="rps-choice-btn" onclick="window.chooseRps('scissors')">✌️<br>가위</button>
+            <button id="btn-rps-rock" class="rps-choice-btn" onclick="window.chooseRps('rock')">✊<br>바위</button>
+            <button id="btn-rps-paper" class="rps-choice-btn" onclick="window.chooseRps('paper')">✋<br>보</button>
+        </div>
+        <div class="score-board">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 제출 현황</div>
+            <div id="rps-score-list">대기 중...</div>
+        </div>
+        <button id="btn-back-lobby-rps" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <div id="game-roulette-screen" class="screen">
@@ -1127,6 +1150,11 @@
     let diceActiveRoundKey = null, diceLastData = null;
     let ladderMyRevealState = 'hidden'; // 'hidden' | 'animating' | 'revealed'
     let ladderMyRevealRoundKey = null;
+    const RPS_BEATS = { rock: 'scissors', scissors: 'paper', paper: 'rock' };
+    const RPS_LABELS = { rock: '✊ 바위', scissors: '✌️ 가위', paper: '✋ 보' };
+    const rpsBotChosenHandled = new Set();
+    let rpsResultTriggeredKey = null;
+    let rpsActiveRoundKey = null;
     function botDelay(min, max) { return min + Math.random() * (max - min); }
 
     // 🎱 빙고: 배열 랜덤 셔플 (Fisher-Yates)
@@ -1503,6 +1531,33 @@
             runTransaction(ref(db, path), (existing2) => {
                 if (existing2) return undefined;
                 return { d1, d2, sum, diff, rolledAt: getServerNow() };
+            });
+        });
+    }
+
+    window.chooseRps = function(hand) {
+        if (!currentRoomCode || !RPS_BEATS[hand]) return;
+        const path = `rooms/${currentRoomCode}/rpsChoices/${myId}`;
+        runTransaction(ref(db, path), (existing) => {
+            if (existing) return undefined; // 이미 제출했으면 변경 불가
+            return hand;
+        });
+        if (navigator.vibrate) navigator.vibrate(30);
+    };
+
+    function autoChooseRpsForBot(botId, expectedRoundKey) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d || d.selectedGame !== 'rps' || `${d.rpsRoundKey || ''}` !== `${expectedRoundKey}`) return;
+            if (!d.players?.[botId]?.isBot) return;
+            const existing = (d.rpsChoices || {})[botId];
+            if (existing) return;
+            const hands = ['rock', 'scissors', 'paper'];
+            const hand = hands[Math.floor(Math.random() * hands.length)];
+            const path = `rooms/${currentRoomCode}/rpsChoices/${botId}`;
+            runTransaction(ref(db, path), (existing2) => {
+                if (existing2) return undefined;
+                return hand;
             });
         });
     }
@@ -2224,6 +2279,112 @@
                             key: `dice_${data.diceRoundKey || ''}`,
                             title: '🎲 결과 발표! 💥',
                             message: `목표 ${target}에서 가장 먼 ${names}님 벌칙!`,
+                            duration: 0
+                        });
+                    }
+                }
+                else if (data.selectedGame === 'rps') {
+                    showScreen('game-rps-screen');
+                    const masterHand = data.rpsMasterHand || null;
+                    const roundKey = `${data.rpsRoundKey || ''}`;
+                    const choices = data.rpsChoices || {};
+                    const myChoice = choices[myId];
+
+                    if (rpsActiveRoundKey !== roundKey) {
+                        rpsActiveRoundKey = roundKey;
+                        document.getElementById('rps-master-display').innerText = '❓ (모두 제출하면 공개!)';
+                        ['scissors', 'rock', 'paper'].forEach(h => {
+                            const btn = document.getElementById(`btn-rps-${h}`);
+                            if (btn) { btn.disabled = false; btn.classList.remove('selected'); }
+                        });
+                    }
+                    ['scissors', 'rock', 'paper'].forEach(h => {
+                        const btn = document.getElementById(`btn-rps-${h}`);
+                        if (btn) {
+                            if (myChoice) { btn.disabled = true; btn.classList.toggle('selected', h === myChoice); }
+                        }
+                    });
+
+                    if (isHost) {
+                        const botIds = playerIds.filter((id) => players[id]?.isBot && choices[id] === undefined);
+                        botIds.forEach((botId) => {
+                            const key = `${currentRoomCode}_${roundKey}_${botId}`;
+                            if (!rpsBotChosenHandled.has(key)) {
+                                rpsBotChosenHandled.add(key);
+                                setTimeout(() => autoChooseRpsForBot(botId, roundKey), botDelay(700, 2200));
+                            }
+                        });
+                    }
+
+                    const allResponded = playerIds.length > 0 && playerIds.every(id => choices[id] !== undefined);
+
+                    // 진 사람(마스터에게 진 사람) / 비긴 사람 / 이긴 사람 분류
+                    let loseIds = [], tieIds = [];
+                    if (allResponded && masterHand) {
+                        playerIds.forEach(id => {
+                            const hand = choices[id];
+                            if (RPS_BEATS[hand] === masterHand) { /* 승 */ }
+                            else if (hand === masterHand) { tieIds.push(id); }
+                            else { loseIds.push(id); }
+                        });
+                    }
+                    const finalLoserIds = loseIds.length > 0 ? loseIds : tieIds;
+
+                    if (allResponded && masterHand) {
+                        document.getElementById('rps-master-display').innerText = `🤖 마스터: ${RPS_LABELS[masterHand]}`;
+                    }
+
+                    const rpsListEl = document.getElementById('rps-score-list');
+                    rpsListEl.innerHTML = playerIds.length === 0 ? '대기 중...' : '';
+                    playerIds.forEach(id => {
+                        const row = document.createElement('div'); row.className = 'score-row';
+                        const nickname = players[id]?.nickname || '참가자';
+                        const submitted = choices[id] !== undefined;
+                        const isLoser = finalLoserIds.includes(id);
+                        let labelHtml, color;
+                        if (allResponded && masterHand) {
+                            labelHtml = RPS_LABELS[choices[id]] || '❓';
+                            color = isLoser ? 'var(--danger-color)' : 'var(--success-color)';
+                        } else {
+                            labelHtml = submitted ? '✅ 제출완료' : '⏳ 대기중';
+                            color = submitted ? 'var(--success-color)' : '#8E9AA8';
+                        }
+                        row.innerHTML = `<span>${isLoser ? '🍺' : '👤'} ${nickname}</span><span style="color:${color};">${labelHtml}</span>`;
+                        rpsListEl.appendChild(row);
+                    });
+
+                    if (allResponded && masterHand && isHost && rpsResultTriggeredKey !== roundKey) {
+                        rpsResultTriggeredKey = roundKey;
+                        if (finalLoserIds.length > 0) {
+                            const chosenLoserId = finalLoserIds[Math.floor(Math.random() * finalLoserIds.length)];
+                            update(ref(db, `rooms/${currentRoomCode}`), {
+                                rpsLoserIds: finalLoserIds,
+                                rpsResultRevealed: true,
+                                roomLastLoserId: chosenLoserId,
+                                roomLoserPendingChoice: true
+                            });
+                        } else {
+                            // 진 사람도 비긴 사람도 없음(전원 승리) -> 마스터를 새로 뽑아 즉시 재대결
+                            const hands = ['rock', 'scissors', 'paper'];
+                            const newMasterHand = hands[Math.floor(Math.random() * hands.length)];
+                            update(ref(db, `rooms/${currentRoomCode}`), {
+                                rpsMasterHand: newMasterHand,
+                                rpsChoices: null,
+                                rpsRoundKey: getServerNow(),
+                                rpsLoserIds: null,
+                                rpsResultRevealed: false
+                            });
+                        }
+                    }
+
+                    // 결과를 볼 틈도 없이 바로 "다음 게임 고르기" 모달이 뜨는 문제 방지 —
+                    // 전체 화면 연출을 먼저 띄우고, 직접 터치해서 닫아야 그 뒤의 모달이 보이도록 함.
+                    if (data.rpsResultRevealed && data.rpsLoserIds && data.rpsLoserIds.length > 0) {
+                        const names = data.rpsLoserIds.map(id => players[id]?.nickname || '참가자').join(', ');
+                        triggerExplosionEffect({
+                            key: `rps_${data.rpsRoundKey || ''}`,
+                            title: '✌️ 결과 발표! 💥',
+                            message: `마스터는 ${RPS_LABELS[masterHand] || ''}! ${names}님 벌칙!`,
                             duration: 0
                         });
                     }
@@ -3767,6 +3928,14 @@
                 const target = 2 + Math.floor(Math.random() * 11); // 2~12
                 diceLoserTriggeredKey = null;
                 update(rRef, { status: 'playing', diceTarget: target, diceRoundKey: getServerNow(), diceResults: null, diceLoserIds: null });
+            } else if (gameId === 'rps') {
+                const hands = ['rock', 'scissors', 'paper'];
+                const masterHand = hands[Math.floor(Math.random() * hands.length)];
+                rpsResultTriggeredKey = null;
+                update(rRef, {
+                    status: 'playing', rpsMasterHand: masterHand, rpsRoundKey: getServerNow(),
+                    rpsChoices: null, rpsLoserIds: null, rpsResultRevealed: false
+                });
             } else if (gameId === 'roulette') {
                 const slotCount = 6;
                 update(rRef, {
@@ -3841,6 +4010,7 @@
                 dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null, dutchCustomActive: false, dutchRemaining: null,
                 timingTarget: null, timingStartTime: null, timingResults: null,
                 diceTarget: null, diceRoundKey: null, diceResults: null, diceLoserIds: null,
+                rpsMasterHand: null, rpsRoundKey: null, rpsChoices: null, rpsLoserIds: null, rpsResultRevealed: false,
                 rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null, rouletteHitKey: null,
                 speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null,
                 boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null, boxFindClickCount: null,
