@@ -496,6 +496,13 @@
         <button id="btn-start-game">게임 시작</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
         <button id="btn-host-reclaim-pick" class="secondary" style="display:none; margin-top:8px; font-size:12px; padding:8px;">🔧 방장이 대신 고르기 (상대방이 응답 없을 때)</button>
+        <div id="host-assign-picker-box" style="display:none; margin-top:10px; padding:12px; border-radius:10px; background:#151518; border:1px solid #2D2D34; text-align:left;">
+            <div style="font-size:12px; color:#8E9AA8; margin-bottom:8px;">👑 방장 전용: 다음 게임 선택 권한을 원하는 사람에게 직접 지정할 수 있어요. (자동 인식이 안 될 때 사용)</div>
+            <div style="display:flex; gap:8px;">
+                <select id="host-assign-picker-select" style="flex:1; padding:9px; border-radius:8px; background:#1c1c20; color:#fff; border:1px solid #3A3A42; font-size:13px;"></select>
+                <button type="button" id="btn-host-assign-picker" class="secondary" style="padding:9px 14px; font-size:13px;">지정</button>
+            </div>
+        </div>
     </div>
 
     <!-- 🤫 라이어 게임 스크린 -->
@@ -1850,6 +1857,34 @@
             }
             if (reclaimBtn) {
                 reclaimBtn.style.display = (isHost && pickTurnActive && !isMyPickTurn) ? 'block' : 'none';
+            }
+
+            // 👑 방장 전용: 다음 게임 선택 권한을 특정 참가자에게 직접 지정.
+            // (자동으로 roomLastLoserId가 세팅되지 않거나, 세팅됐는데도 해당 참가자 화면에
+            //  권한이 반영 안 되는 경우를 방장이 즉시 수동으로 고쳐줄 수 있게 하는 안전장치)
+            const assignBox = document.getElementById('host-assign-picker-box');
+            const assignSelect = document.getElementById('host-assign-picker-select');
+            if (assignBox && assignSelect) {
+                assignBox.style.display = (isHost && data.status === 'waiting') ? 'block' : 'none';
+                if (isHost && data.status === 'waiting') {
+                    const prevValue = assignSelect.value;
+                    assignSelect.innerHTML = '';
+                    const emptyOpt = document.createElement('option');
+                    emptyOpt.value = '';
+                    emptyOpt.textContent = '(권한 없음 - 방장이 바로 진행)';
+                    assignSelect.appendChild(emptyOpt);
+                    playerIds.forEach(id => {
+                        const opt = document.createElement('option');
+                        opt.value = id;
+                        opt.textContent = players[id].nickname + (id === data.hostId ? ' (방장)' : '') + (id === myId ? ' (나)' : '');
+                        assignSelect.appendChild(opt);
+                    });
+                    // 현재 지정된 선택권자가 있으면 그 사람을 기본 선택으로 표시, 없으면 방장이 고르던 값 유지
+                    const target = (data.roomLastLoserId && players[data.roomLastLoserId]) ? data.roomLastLoserId : prevValue;
+                    if (target && assignSelect.querySelector(`option[value="${CSS.escape(target)}"]`)) {
+                        assignSelect.value = target;
+                    }
+                }
             }
 
             // 🔁 패배자 전용: 대기실로 나가지 않고 방금 한 게임을 바로 다시 하기
@@ -4020,6 +4055,18 @@
     document.getElementById('btn-host-reclaim-pick').addEventListener('click', () => {
         if (!isHost) return;
         update(ref(db, `rooms/${currentRoomCode}`), { roomLastLoserId: null });
+    });
+
+    document.getElementById('btn-host-assign-picker').addEventListener('click', () => {
+        if (!isHost || !currentRoomCode) return;
+        const sel = document.getElementById('host-assign-picker-select');
+        const targetId = sel ? sel.value : '';
+        // 방장이 직접 지정한 선택권이므로, 직전 게임의 "같은 게임 다시하기" 버튼이
+        // 엉뚱하게 뜨지 않도록 roomLoserPendingChoice는 false로 둠
+        update(ref(db, `rooms/${currentRoomCode}`), {
+            roomLastLoserId: targetId || null,
+            roomLoserPendingChoice: false
+        });
     });
 
     document.querySelectorAll('.btn-back-lobby').forEach(btn => {
