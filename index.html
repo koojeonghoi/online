@@ -378,6 +378,23 @@
     </style>
 </head>
 <body>
+    <script>
+    // 매니페스트의 display:"fullscreen"을 일부 안드로이드 버전이 완전히 지키지 않는 경우를 대비한 보조 처리.
+    // 홈 화면에서 설치된 앱(standalone/fullscreen)으로 실행 중일 때, 첫 터치 시 상태표시줄까지 가리는 진짜 전체화면을 한 번 더 요청한다.
+    (function () {
+        const isInstalled = window.matchMedia('(display-mode: standalone)').matches ||
+                             window.matchMedia('(display-mode: fullscreen)').matches;
+        if (!isInstalled) return;
+        function goFullscreen() {
+            const el = document.documentElement;
+            if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+            document.removeEventListener('touchstart', goFullscreen);
+            document.removeEventListener('click', goFullscreen);
+        }
+        document.addEventListener('touchstart', goFullscreen, { once: true });
+        document.addEventListener('click', goFullscreen, { once: true });
+    })();
+    </script>
     <div id="pullRefreshIndicator" class="pull-refresh-indicator">↓ 당겨서 새로고침</div>
 
 <div class="container" id="main-container">
