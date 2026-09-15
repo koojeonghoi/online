@@ -442,6 +442,7 @@
             <button class="tab-btn" id="tab-ladder" onclick="selectGameMode('ladder')">🪜 사다리타기</button>
             <button class="tab-btn" id="tab-dice" onclick="selectGameMode('dice')">🎲 주사위게임</button>
             <button class="tab-btn" id="tab-rps" onclick="selectGameMode('rps')">✌️ 가위바위보 마스터</button>
+            <button class="tab-btn" id="tab-drink" onclick="selectGameMode('drink')">🍻 랜덤마시기</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -515,6 +516,14 @@
             <div style="font-size:13px; color:#fff; font-weight:700; margin-top:12px;">👑 참여자 성별 지정 (방장만 보여요)</div>
             <div style="font-size:11px; color:#8E9AA8; margin:4px 0 8px;">남녀 짝짓기 커맨드에 쓸 사람만 지정하면 돼요. 지정 안 하면 그 사람은 짝짓기 대상에서 빠져요.</div>
             <div id="king-gender-list"></div>
+        </div>
+        <div id="drink-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
+            <div style="color:var(--accent-color); font-size:14px; font-weight:700; margin-bottom:8px;">🍻 첫 타이머 시간</div>
+            <div class="input-wrapper" style="margin-bottom:0;">
+                <input type="number" id="drink-initial-minutes" min="1" step="1" value="3">
+                <span class="input-unit">분</span>
+            </div>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">타이머가 0이 되면 참여자 중 한 명이 랜덤으로 뽑혀 마셔요. 걸린 사람이 그 자리에서 바로 다음 타이머 시간을 정해요 (최소 1분, 상한 없음) — 대기실로 돌아갈 필요 없이 계속 진행돼요.</div>
         </div>
         <button id="btn-start-game">게임 시작</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
@@ -738,6 +747,35 @@
             <div id="rps-score-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-rps" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 🍻 랜덤 마시기 게임 스크린 -->
+    <div id="game-drink-screen" class="screen">
+        <h2>🍻 랜덤 마시기</h2>
+        <div style="background-color: #151518; border-radius: 12px; margin: 10px auto 15px; padding: 18px; border: 3px solid var(--danger-color);">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px;">⏱️ 남은 시간</div>
+            <div id="drink-timer-display" style="font-size: 48px; font-weight: bold; color: var(--danger-color);">00:00</div>
+        </div>
+        <div id="drink-status-text" style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 14px;">불러오는 중...</div>
+
+        <div id="drink-next-round-box" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:14px; margin-bottom: 14px; text-align:left;">
+            <div style="color:var(--accent-color); font-size:14px; font-weight:700; margin-bottom:10px;">⏱️ 다음 타이머 시간 정하기</div>
+            <div style="display:flex; gap:10px;">
+                <div class="input-wrapper" style="margin-bottom:0; flex:1;">
+                    <input type="number" id="drink-next-minutes" min="0" step="1" value="1">
+                    <span class="input-unit">분</span>
+                </div>
+                <div class="input-wrapper" style="margin-bottom:0; flex:1;">
+                    <input type="number" id="drink-next-seconds" min="0" max="59" step="1" value="0">
+                    <span class="input-unit">초</span>
+                </div>
+            </div>
+            <div style="font-size:11px; color:#8E9AA8; margin:7px 0 10px;">최소 1분부터 정할 수 있어요 (상한 없음).</div>
+            <button id="btn-drink-next-round" style="background-color: var(--accent-color); color:#121214; margin-bottom:0;" onclick="window.submitDrinkNextRound()">▶️ 이 시간으로 다음 라운드 시작</button>
+        </div>
+        <div id="drink-waiting-text" style="display:none; color: #8E9AA8; font-size: 14px; margin-bottom: 14px;"></div>
+
+        <button id="btn-back-lobby-drink" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <div id="game-roulette-screen" class="screen">
@@ -1187,6 +1225,12 @@
     const rpsBotChosenHandled = new Set();
     let rpsResultTriggeredKey = null;
     let rpsActiveRoundKey = null;
+    // 🍻 랜덤 마시기: 대기실로 돌아가지 않고 걸린 사람이 바로 다음 타이머를 정하는 방식이라
+    // 별도의 라운드 상태(만료 체크용 currentDrinkExpireAt, 중복 당첨 방지용 키)를 따로 둠.
+    let currentDrinkExpireAt = null;
+    let drinkExplosionAttemptKey = null;
+    let drinkActiveRoundKey = null;
+    let drinkRevealTriggeredKey = null;
     function botDelay(min, max) { return min + Math.random() * (max - min); }
 
     // 🎱 빙고: 배열 랜덤 셔플 (Fisher-Yates)
@@ -1305,6 +1349,14 @@
         if (currentBombExplodeAt) tryExplodeBombIfDue(currentBombExplodeAt);
     }, 300);
 
+    // 🍻 랜덤 마시기 타이머도 동일한 이유로 별도 폴링이 필요함 (화면 표시 갱신 + 만료 체크)
+    setInterval(() => {
+        if (currentDrinkExpireAt) {
+            renderDrinkTimer(currentDrinkExpireAt - getServerNow());
+            tryRevealDrinkLoserIfDue(currentDrinkExpireAt);
+        }
+    }, 250);
+
     // 손병호 게임: 조건이 나오고 최소 대기시간이 지나야 다음 조건을 뽑을 수 있도록 버튼 상태를
     // 0.4초마다 직접 갱신 (onValue는 새 데이터 변경이 있을 때만 실행되므로 시간 경과만으로는 갱신 안 됨).
     setInterval(() => {
@@ -1326,9 +1378,11 @@
     // 폭탄 터질 시점이 지나도 안 터지는 것처럼 보이는 원인이 됨. 화면이 다시 켜지는 순간 즉시 재확인.
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && currentBombExplodeAt) tryExplodeBombIfDue(currentBombExplodeAt);
+        if (document.visibilityState === 'visible' && currentDrinkExpireAt) tryRevealDrinkLoserIfDue(currentDrinkExpireAt);
     });
     window.addEventListener('focus', () => {
         if (currentBombExplodeAt) tryExplodeBombIfDue(currentBombExplodeAt);
+        if (currentDrinkExpireAt) tryRevealDrinkLoserIfDue(currentDrinkExpireAt);
     });
 
     function normalizeShapeIndex(index) {
@@ -1361,6 +1415,58 @@
             bombExplosionAttemptKey = null;
         });
     }
+
+    function renderDrinkTimer(remainMs) {
+        const timerEl = document.getElementById('drink-timer-display');
+        if (!timerEl) return;
+        const totalSec = Math.max(0, Math.ceil(remainMs / 1000));
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    // 🍻 랜덤 마시기 타이머 만료 체크: 누구든(호스트가 아니어도) 시간이 되면 트랜잭션으로
+    // 안전하게 랜덤 참여자 한 명을 뽑는다. bomb 게임의 tryExplodeBombIfDue와 동일한 패턴.
+    function tryRevealDrinkLoserIfDue(expireAt) {
+        if (!currentRoomCode || !expireAt) return;
+        if (drinkExplosionAttemptKey === expireAt) return;
+        if (getServerNow() < expireAt) return;
+        drinkExplosionAttemptKey = expireAt;
+        runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
+            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'drink' || roomData.drinkRevealed) return undefined;
+            if (!roomData.drinkStartAt || !roomData.drinkDurationSec) return undefined;
+            const due = roomData.drinkStartAt + roomData.drinkDurationSec * 1000;
+            if (getServerNow() < due) return undefined;
+            const pIds = Object.keys(roomData.players || {});
+            if (pIds.length === 0) return undefined;
+            roomData.drinkLoserId = pIds[Math.floor(Math.random() * pIds.length)];
+            roomData.drinkRevealed = true;
+            return roomData;
+        }).catch((error) => {
+            console.error('drink reveal transaction failed:', error);
+            drinkExplosionAttemptKey = null;
+        });
+    }
+
+    window.submitDrinkNextRound = function() {
+        if (!currentRoomCode) return;
+        const minutesEl = document.getElementById('drink-next-minutes');
+        const secondsEl = document.getElementById('drink-next-seconds');
+        let minutes = parseInt(minutesEl?.value, 10);
+        let seconds = parseInt(secondsEl?.value, 10);
+        if (!Number.isFinite(minutes) || minutes < 0) minutes = 0;
+        if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
+        let totalSec = minutes * 60 + seconds;
+        if (totalSec < 60) totalSec = 60; // 최소 시간 1분 보장
+        const startAt = getServerNow();
+        update(ref(db, `rooms/${currentRoomCode}`), {
+            drinkDurationSec: totalSec,
+            drinkStartAt: startAt,
+            drinkRoundKey: startAt,
+            drinkLoserId: null,
+            drinkRevealed: false
+        });
+    };
 
     function autoPassBombForBot(botId, expectedKey) {
         if (!currentRoomCode) return;
@@ -1789,6 +1895,8 @@
         if (bingoSettings) bingoSettings.style.display = (canControlLobby && gameMode === 'bingo') ? 'block' : 'none';
         const ladderSettings = document.getElementById('ladder-settings');
         if (ladderSettings) ladderSettings.style.display = (canControlLobby && gameMode === 'ladder') ? 'block' : 'none';
+        const drinkSettings = document.getElementById('drink-settings');
+        if (drinkSettings) drinkSettings.style.display = (canControlLobby && gameMode === 'drink') ? 'block' : 'none';
         if (kingSettings && canControlLobby && gameMode === 'king') renderKingGenderList();
     }
 
@@ -1969,6 +2077,9 @@
 
             if (data.status !== 'playing' || data.selectedGame !== 'bomb') {
                 currentBombExplodeAt = null;
+            }
+            if (data.status !== 'playing' || data.selectedGame !== 'drink') {
+                currentDrinkExpireAt = null;
             }
 
             if(data.status === 'playing') {
@@ -2455,6 +2566,59 @@
                             message: `마스터는 ${RPS_LABELS[masterHand] || ''}! ${names}님 벌칙!`,
                             duration: 0
                         });
+                    }
+                }
+                else if (data.selectedGame === 'drink') {
+                    showScreen('game-drink-screen');
+                    const durationSec = data.drinkDurationSec || 60;
+                    const startAt = data.drinkStartAt || getServerNow();
+                    const roundKey = `${data.drinkRoundKey || ''}`;
+                    const loserId = data.drinkLoserId || null;
+                    const revealed = !!data.drinkRevealed;
+                    const expireAt = startAt + durationSec * 1000;
+
+                    if (drinkActiveRoundKey !== roundKey) {
+                        drinkActiveRoundKey = roundKey;
+                        drinkExplosionAttemptKey = null;
+                        const nextM = document.getElementById('drink-next-minutes');
+                        const nextS = document.getElementById('drink-next-seconds');
+                        if (nextM) nextM.value = '1';
+                        if (nextS) nextS.value = '0';
+                    }
+
+                    const statusEl = document.getElementById('drink-status-text');
+                    const pickBox = document.getElementById('drink-next-round-box');
+                    const waitBox = document.getElementById('drink-waiting-text');
+
+                    if (!revealed) {
+                        currentDrinkExpireAt = expireAt;
+                        renderDrinkTimer(expireAt - getServerNow());
+                        if (statusEl) statusEl.innerHTML = '⏳ 타이머가 줄어들고 있어요... 0이 되면 랜덤으로 한 명이 걸려요!';
+                        if (pickBox) pickBox.style.display = 'none';
+                        if (waitBox) waitBox.style.display = 'none';
+                        tryRevealDrinkLoserIfDue(expireAt);
+                    } else {
+                        currentDrinkExpireAt = null;
+                        const timerEl = document.getElementById('drink-timer-display');
+                        if (timerEl) timerEl.textContent = '🍺';
+                        const loserNick = players[loserId]?.nickname || '참가자';
+                        if (statusEl) statusEl.innerHTML = `🍺 <b>${loserNick}</b>님 당첨! 한 잔 마시고 다음 타이머를 정해주세요.`;
+                        if (loserId === myId) {
+                            if (pickBox) pickBox.style.display = 'block';
+                            if (waitBox) waitBox.style.display = 'none';
+                        } else {
+                            if (pickBox) pickBox.style.display = 'none';
+                            if (waitBox) { waitBox.style.display = 'block'; waitBox.textContent = `⏳ ${loserNick}님이 다음 타이머 시간을 정하는 중...`; }
+                        }
+                        if (drinkRevealTriggeredKey !== roundKey) {
+                            drinkRevealTriggeredKey = roundKey;
+                            triggerExplosionEffect({
+                                key: `drink_${roundKey}`,
+                                title: '🍺 원샷!',
+                                message: `${loserNick}님 당첨!`,
+                                duration: 0
+                            });
+                        }
                     }
                 }
                 else if (data.selectedGame === 'roulette') {
@@ -3992,6 +4156,16 @@
             } else if (gameId === 'timing') {
                 const target = Math.round(Math.random() * 1000) / 100; // 0.00 ~ 10.00
                 update(rRef, { status: 'playing', timingTarget: target, timingStartTime: getServerNow(), timingResults: null });
+            } else if (gameId === 'drink') {
+                const minutesEl = document.getElementById('drink-initial-minutes');
+                let minutes = parseFloat(minutesEl?.value);
+                if (!Number.isFinite(minutes) || minutes < 1) minutes = 1;
+                const durationSec = Math.max(60, Math.round(minutes * 60));
+                const startAt = getServerNow();
+                update(rRef, {
+                    status: 'playing', drinkDurationSec: durationSec, drinkStartAt: startAt,
+                    drinkRoundKey: startAt, drinkLoserId: null, drinkRevealed: false
+                });
             } else if (gameId === 'dice') {
                 const target = 2 + Math.floor(Math.random() * 11); // 2~12
                 diceLoserTriggeredKey = null;
@@ -4107,7 +4281,8 @@
                 godMasterId: null, godStartId: null, godTargets: null, godNumber: null, godCurrentId: null, godStep: null, godPath: null, godLoserResult: null, godRevealed: false,
                 sonFingers: null, sonConditionIndex: null, sonAnsweredIds: null, sonRoundKey: null, sonTurnOrder: null, sonTurnIndex: null, sonConditionSetAt: null,
                 bingoBoards: null, bingoCalled: null, bingoLinesToLose: null, bingoRoundKey: null, bingoLoserId: null, bingoTurnOrder: null, bingoTurnIdx: null,
-                ladderPlayerOrder: null, ladderRungs: null, ladderPenaltyBottoms: null, ladderRevealed: null, ladderRoundKey: null
+                ladderPlayerOrder: null, ladderRungs: null, ladderPenaltyBottoms: null, ladderRevealed: null, ladderRoundKey: null,
+                drinkDurationSec: null, drinkStartAt: null, drinkRoundKey: null, drinkLoserId: null, drinkRevealed: false
                 // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
             });
         });
