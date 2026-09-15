@@ -879,6 +879,57 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    // 🔔 랜덤 마시기 알림용 서비스워커 등록.
+    // Android Chrome 등 일부 브라우저는 new Notification()을 페이지에서 직접 호출하면
+    // "Illegal constructor" 에러를 던지고 조용히 실패함 — 반드시 서비스워커의
+    // showNotification()을 거쳐야 안정적으로 알림이 뜸. (iOS는 홈화면 추가 + iOS 16.4+ 필요)
+    let drinkSwRegistration = null;
+    async function ensureDrinkServiceWorker() {
+        if (!('serviceWorker' in navigator)) return null;
+        if (drinkSwRegistration) return drinkSwRegistration;
+        try {
+            drinkSwRegistration = await navigator.serviceWorker.register('./sw.js');
+            return drinkSwRegistration;
+        } catch (e) {
+            console.error('알림용 서비스워커 등록 실패:', e);
+            return null;
+        }
+    }
+    ensureDrinkServiceWorker();
+
+    async function showDrinkNotification(title, body) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        try {
+            const reg = (await navigator.serviceWorker?.getRegistration()) || await ensureDrinkServiceWorker();
+            if (reg && reg.showNotification) {
+                await reg.showNotification(title, { body, tag: 'drink-round', renotify: true, vibrate: [250, 100, 250] });
+                return;
+            }
+        } catch (e) {
+            console.error('showNotification 실패, new Notification으로 재시도:', e);
+        }
+        try { new Notification(title, { body }); } catch (e) { console.error('알림 표시 실패:', e); }
+    }
+
+    // 🔒 화면 자동 꺼짐 방지 (Screen Wake Lock).
+    // 화면이 완전히 꺼지면 이 탭의 자바스크립트도 거의 멈춰서 타이머 만료 감지 자체가 안 됨 —
+    // 그래서 랜덤 마시기 화면이 떠있는 동안은 "일정 시간 조작 없으면 자동으로 꺼지는" 것만이라도 막아둠.
+    // (사용자가 직접 전원 버튼을 눌러 끄는 것까지는 브라우저 정책상 막을 수 없음)
+    let drinkWakeLock = null;
+    async function acquireDrinkWakeLock() {
+        if (drinkWakeLock || !('wakeLock' in navigator)) return;
+        try {
+            drinkWakeLock = await navigator.wakeLock.request('screen');
+            drinkWakeLock.addEventListener('release', () => { drinkWakeLock = null; });
+        } catch (e) { /* 권한 거부 등은 조용히 무시 */ }
+    }
+    function releaseDrinkWakeLock() {
+        if (drinkWakeLock) { drinkWakeLock.release().catch(() => {}); drinkWakeLock = null; }
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && currentDrinkExpireAt) acquireDrinkWakeLock();
+    });
+
     // 🔄 강제 새로고침: 서비스워커/캐시를 지우고 캐시버스팅 파라미터를 붙여 새로 불러온다
     async function forceHardRefresh() {
         try {
@@ -1465,12 +1516,16 @@
     // 🔔 랜덤 마시기: 타이머가 끝났을 때 화면을 안 보고 있어도 알림이 오도록.
     // (별도 푸시 서버 없이, 브라우저 알림 권한 기반으로 동작 — 앱 탭이 열려있는 동안만 유효)
     window.requestDrinkNotificationPermission = function() {
-        if (!('Notification' in window)) { alert('이 브라우저는 알림 기능을 지원하지 않아요.'); return; }
-        if (Notification.permission === 'granted') { updateDrinkNotifyButton(); return; }
+        if (!('Notification' in window)) { alert('이 브라우저는 알림 기능을 지원하지 않아요.\n(iOS는 홈 화면에 추가한 앱에서만 알림이 지원돼요)'); return; }
+        if (Notification.permission === 'granted') { ensureDrinkServiceWorker(); updateDrinkNotifyButton(); return; }
         Notification.requestPermission().then((perm) => {
             updateDrinkNotifyButton();
             if (perm === 'granted') {
-                try { new Notification('🍻 랜덤마시기 알림 켜짐', { body: '타이머가 끝나면 알림을 보내드릴게요!' }); } catch (e) {}
+                ensureDrinkServiceWorker().then(() => {
+                    showDrinkNotification('🍻 랜덤마시기 알림 켜짐', '타이머가 끝나면 알림을 보내드릴게요!');
+                });
+            } else if (perm === 'denied') {
+                alert('알림이 차단되었어요. 브라우저 설정에서 이 사이트의 알림 권한을 허용해주세요.');
             }
         });
     };
@@ -2118,6 +2173,7 @@
             }
             if (data.status !== 'playing' || data.selectedGame !== 'drink') {
                 currentDrinkExpireAt = null;
+                releaseDrinkWakeLock();
             }
 
             if(data.status === 'playing') {
@@ -2631,6 +2687,7 @@
 
                     if (!revealed) {
                         currentDrinkExpireAt = expireAt;
+                        acquireDrinkWakeLock();
                         renderDrinkTimer(expireAt - getServerNow());
                         if (statusEl) statusEl.innerHTML = '⏳ 타이머가 줄어들고 있어요... 0이 되면 랜덤으로 한 명이 걸려요!';
                         if (pickBox) pickBox.style.display = 'none';
@@ -2658,12 +2715,8 @@
                                 message: `${loserNick}님 당첨! ${penaltyText}`,
                                 duration: 0
                             });
-                            if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-                                try {
-                                    new Notification('🍻 랜덤마시기 결과 발표!', {
-                                        body: `${loserNick}님 당첨! ${penaltyText}`
-                                    });
-                                } catch (e) {}
+                            if ('Notification' in window && Notification.permission === 'granted') {
+                                showDrinkNotification('🍻 랜덤마시기 결과 발표!', `${loserNick}님 당첨! ${penaltyText}`);
                             }
                         }
                     }
@@ -4210,7 +4263,7 @@
                 const durationSec = Math.max(60, Math.round(minutes * 60));
                 const startAt = getServerNow();
                 if ('Notification' in window && Notification.permission === 'default') {
-                    try { Notification.requestPermission().then(updateDrinkNotifyButton); } catch (e) {}
+                    try { Notification.requestPermission().then((p) => { updateDrinkNotifyButton(); if (p === 'granted') ensureDrinkServiceWorker(); }); } catch (e) {}
                 }
                 update(rRef, {
                     status: 'playing', drinkDurationSec: durationSec, drinkStartAt: startAt,
