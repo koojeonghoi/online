@@ -1507,7 +1507,7 @@
             roomData.drinkPenaltyText = DRINK_PENALTIES[Math.floor(Math.random() * DRINK_PENALTIES.length)];
             roomData.drinkRevealed = true;
             return roomData;
-        }).catch((error) => {
+        }, { applyLocally: false }).catch((error) => {
             console.error('drink reveal transaction failed:', error);
             drinkExplosionAttemptKey = null;
         });
