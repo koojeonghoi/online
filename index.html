@@ -1474,7 +1474,7 @@
             roomData.roomLastLoserId = roomData.bombHolderId || null;
             roomData.roomLoserPendingChoice = !!roomData.bombHolderId;
             return roomData;
-        }).catch((error) => {
+        }, { applyLocally: false }).catch((error) => {
             console.error('bomb explosion transaction failed:', error);
             bombExplosionAttemptKey = null;
         });
@@ -1574,7 +1574,7 @@
             roomData.bombHolderId = pIds[(myIdx + 1) % pIds.length];
             roomData.bombPassSeq = (roomData.bombPassSeq || 0) + 1;
             return roomData;
-        }).catch((error) => console.error('bot bomb pass transaction failed:', error));
+        }, { applyLocally: false }).catch((error) => console.error('bot bomb pass transaction failed:', error));
     }
 
     // ===== ⏱️ Up & Down 타이밍 게임 =====
@@ -1641,7 +1641,7 @@
         runTransaction(ref(db, path), (existing) => {
             if (existing) return undefined;
             return { value, error, clickedAt };
-        });
+        }, { applyLocally: false });
     });
 
     function autoStopTimingForBot(botId, expectedStartTime, target) {
@@ -1662,7 +1662,7 @@
             runTransaction(ref(db, path2), (existing2) => {
                 if (existing2) return undefined;
                 return { value, error, clickedAt };
-            });
+            }, { applyLocally: false });
         });
     }
 
@@ -1741,7 +1741,7 @@
                 runTransaction(ref(db, path), (existing) => {
                     if (existing) return undefined;
                     return { d1: finalD1, d2: finalD2, sum, diff, rolledAt: getServerNow() };
-                });
+                }, { applyLocally: false });
             }
         }, 70);
         if (navigator.vibrate) navigator.vibrate(40);
@@ -1762,7 +1762,7 @@
             runTransaction(ref(db, path), (existing2) => {
                 if (existing2) return undefined;
                 return { d1, d2, sum, diff, rolledAt: getServerNow() };
-            });
+            }, { applyLocally: false });
         });
     }
 
@@ -1772,7 +1772,7 @@
         runTransaction(ref(db, path), (existing) => {
             if (existing) return undefined; // 이미 제출했으면 변경 불가
             return hand;
-        });
+        }, { applyLocally: false });
         if (navigator.vibrate) navigator.vibrate(30);
     };
 
@@ -1789,7 +1789,7 @@
             runTransaction(ref(db, path), (existing2) => {
                 if (existing2) return undefined;
                 return hand;
-            });
+            }, { applyLocally: false });
         });
     }
 
@@ -1867,7 +1867,7 @@
                 roomData.rouletteTurnIdx = nextTurnIdx;
             }
             return roomData;
-        }).catch((error) => console.error('bot roulette pull transaction failed:', error));
+        }, { applyLocally: false }).catch((error) => console.error('bot roulette pull transaction failed:', error));
     }
 
     function autoTapSpeedFingerForBot(botId, expectedSignalTime, targetSpot) {
@@ -3874,7 +3874,7 @@
                         roomData.bombHolderId = pIds[(myIdx + 1) % pIds.length];
                         roomData.bombPassSeq = (roomData.bombPassSeq || 0) + 1;
                         return roomData;
-                    }).catch((error) => console.error('bomb pass transaction failed:', error));
+                    }, { applyLocally: false }).catch((error) => console.error('bomb pass transaction failed:', error));
                 } else {
                     isPenaltyActive = true; b.classList.add('wrong-animation');
                     Array.from(box.children).forEach((btn) => { btn.disabled = true; });
@@ -3967,7 +3967,7 @@
             if (steps === turnOrder.length) return undefined; // 전원이 나감 - 처리 불가
             roomData.boxFindTurnIndex = idx;
             return roomData;
-        }).catch((error) => console.error('boxfind skip-turn transaction failed:', error))
+        }, { applyLocally: false }).catch((error) => console.error('boxfind skip-turn transaction failed:', error))
           .finally(() => { boxFindSkipAttemptKey = null; });
     }
 
@@ -4020,7 +4020,7 @@
                 roomData.boxFindTurnIndex = turnIdx + 1;
             }
             return roomData;
-        });
+        }, { applyLocally: false });
     };
 
     function autoClickBoxFindForBot(botId, expectedTurnIdx) {
@@ -4074,7 +4074,7 @@
                 roomData.boxFindTurnIndex = turnIdx + 1;
             }
             return roomData;
-        }).catch((error) => console.error('bot boxfind click transaction failed:', error));
+        }, { applyLocally: false }).catch((error) => console.error('bot boxfind click transaction failed:', error));
     }
 
     // ===== 👑 왕게임 (전원 랜덤 순서 뽑기 + 명령 카드 자동 생성) =====
