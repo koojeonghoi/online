@@ -442,6 +442,7 @@
             <button class="tab-btn" id="tab-ladder" onclick="selectGameMode('ladder')">🪜 사다리타기</button>
             <button class="tab-btn" id="tab-dice" onclick="selectGameMode('dice')">🎲 주사위게임</button>
             <button class="tab-btn" id="tab-rps" onclick="selectGameMode('rps')">✌️ 가위바위보 마스터</button>
+            <button class="tab-btn" id="tab-cham" onclick="selectGameMode('cham')">👈 참참참</button>
             <button class="tab-btn" id="tab-drink" onclick="selectGameMode('drink')">🍻 랜덤마시기</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
@@ -747,6 +748,26 @@
             <div id="rps-score-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-rps" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 👈 참참참 스크린 -->
+    <div id="game-cham-screen" class="screen">
+        <h2>👈 참참참</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px;">
+            <div style="font-size: 13px; color: #8E9AA8;">🤖 마스터와 같은 방향을 고르면 패배! (아무도 안 걸리면 다시 진행)</div>
+            <div id="cham-master-display" style="font-size: 34px; font-weight: bold; color: var(--accent-color); margin-top: 6px;">❓</div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 18px auto;">
+            <button id="btn-cham-left" class="rps-choice-btn" style="flex: 1 1 40%;" onclick="window.chooseCham('left')">⬅️<br>왼쪽</button>
+            <button id="btn-cham-right" class="rps-choice-btn" style="flex: 1 1 40%;" onclick="window.chooseCham('right')">➡️<br>오른쪽</button>
+            <button id="btn-cham-up" class="rps-choice-btn" style="flex: 1 1 40%;" onclick="window.chooseCham('up')">⬆️<br>위</button>
+            <button id="btn-cham-down" class="rps-choice-btn" style="flex: 1 1 40%;" onclick="window.chooseCham('down')">⬇️<br>아래</button>
+        </div>
+        <div class="score-board">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 제출 현황</div>
+            <div id="cham-score-list">대기 중...</div>
+        </div>
+        <button id="btn-back-lobby-cham" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <!-- 🍻 랜덤 마시기 게임 스크린 -->
@@ -1277,6 +1298,11 @@
     const rpsBotChosenHandled = new Set();
     let rpsResultTriggeredKey = null;
     let rpsActiveRoundKey = null;
+    const CHAM_DIRS = ['left', 'right', 'up', 'down'];
+    const CHAM_LABELS = { left: '⬅️ 왼쪽', right: '➡️ 오른쪽', up: '⬆️ 위', down: '⬇️ 아래' };
+    const chamBotChosenHandled = new Set();
+    let chamResultTriggeredKey = null;
+    let chamActiveRoundKey = null;
     // 🍻 랜덤 마시기: 대기실로 돌아가지 않고 걸린 사람이 바로 다음 타이머를 정하는 방식이라
     // 별도의 라운드 상태(만료 체크용 currentDrinkExpireAt, 중복 당첨 방지용 키)를 따로 둠.
     let currentDrinkExpireAt = null;
@@ -1789,6 +1815,30 @@
             runTransaction(ref(db, path), (existing2) => {
                 if (existing2) return undefined;
                 return hand;
+            }, { applyLocally: false });
+        });
+    }
+
+    window.chooseCham = function(dir) {
+        if (!currentRoomCode || !CHAM_LABELS[dir]) return;
+        const path = `rooms/${currentRoomCode}/chamChoices/${myId}`;
+        runTransaction(ref(db, path), (existing) => {
+            if (existing) return undefined; // 이미 제출했으면 변경 불가
+            return dir;
+        }, { applyLocally: false });
+        if (navigator.vibrate) navigator.vibrate(30);
+    };
+
+    function autoChooseChamForBot(botId, expectedRoundKey) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d || d.selectedGame !== 'cham' || `${d.chamRoundKey || ''}` !== `${expectedRoundKey}`) return;
+            if (!d.players?.[botId]?.isBot) return;
+            if ((d.chamChoices || {})[botId]) return;
+            const dir = CHAM_DIRS[Math.floor(Math.random() * CHAM_DIRS.length)];
+            runTransaction(ref(db, `rooms/${currentRoomCode}/chamChoices/${botId}`), (existing2) => {
+                if (existing2) return undefined;
+                return dir;
             }, { applyLocally: false });
         });
     }
@@ -2658,6 +2708,96 @@
                             key: `rps_${data.rpsRoundKey || ''}`,
                             title: '✌️ 결과 발표! 💥',
                             message: `마스터는 ${RPS_LABELS[masterHand] || ''}! ${names}님 벌칙!`,
+                            duration: 0
+                        });
+                    }
+                }
+                else if (data.selectedGame === 'cham') {
+                    showScreen('game-cham-screen');
+                    const masterDir = data.chamMasterDir || null;
+                    const roundKey = `${data.chamRoundKey || ''}`;
+                    const choices = data.chamChoices || {};
+                    const myChoice = choices[myId];
+
+                    if (chamActiveRoundKey !== roundKey) {
+                        chamActiveRoundKey = roundKey;
+                        document.getElementById('cham-master-display').innerText = '❓ (모두 제출하면 공개!)';
+                        CHAM_DIRS.forEach(dir => {
+                            const btn = document.getElementById(`btn-cham-${dir}`);
+                            if (btn) { btn.disabled = false; btn.classList.remove('selected'); }
+                        });
+                    }
+                    CHAM_DIRS.forEach(dir => {
+                        const btn = document.getElementById(`btn-cham-${dir}`);
+                        if (btn && myChoice) { btn.disabled = true; btn.classList.toggle('selected', dir === myChoice); }
+                    });
+
+                    if (isHost) {
+                        const botIds = playerIds.filter((id) => players[id]?.isBot && choices[id] === undefined);
+                        botIds.forEach((botId) => {
+                            const key = `${currentRoomCode}_${roundKey}_${botId}`;
+                            if (!chamBotChosenHandled.has(key)) {
+                                chamBotChosenHandled.add(key);
+                                setTimeout(() => autoChooseChamForBot(botId, roundKey), botDelay(700, 2200));
+                            }
+                        });
+                    }
+
+                    const allResponded = playerIds.length > 0 && playerIds.every(id => choices[id] !== undefined);
+                    // 마스터와 같은 방향을 고른 사람이 패배
+                    const finalLoserIds = (allResponded && masterDir) ? playerIds.filter(id => choices[id] === masterDir) : [];
+
+                    if (allResponded && masterDir) {
+                        document.getElementById('cham-master-display').innerText = `🤖 마스터: ${CHAM_LABELS[masterDir]}`;
+                    }
+
+                    const chamListEl = document.getElementById('cham-score-list');
+                    chamListEl.innerHTML = playerIds.length === 0 ? '대기 중...' : '';
+                    playerIds.forEach(id => {
+                        const row = document.createElement('div'); row.className = 'score-row';
+                        const nickname = players[id]?.nickname || '참가자';
+                        const submitted = choices[id] !== undefined;
+                        const isLoser = finalLoserIds.includes(id);
+                        let labelHtml, color;
+                        if (allResponded && masterDir) {
+                            labelHtml = `${CHAM_LABELS[choices[id]] || '❓'}${isLoser ? ' · 패배!' : ''}`;
+                            color = isLoser ? 'var(--danger-color)' : 'var(--success-color)';
+                        } else {
+                            labelHtml = submitted ? '✅ 제출완료' : '⏳ 대기중';
+                            color = submitted ? 'var(--success-color)' : '#8E9AA8';
+                        }
+                        row.innerHTML = `<span>${isLoser ? '🍺' : '👤'} ${nickname}</span><span style="color:${color};">${labelHtml}</span>`;
+                        chamListEl.appendChild(row);
+                    });
+
+                    if (allResponded && masterDir && isHost && chamResultTriggeredKey !== roundKey) {
+                        chamResultTriggeredKey = roundKey;
+                        if (finalLoserIds.length > 0) {
+                            const chosenLoserId = finalLoserIds[Math.floor(Math.random() * finalLoserIds.length)];
+                            update(ref(db, `rooms/${currentRoomCode}`), {
+                                chamLoserIds: finalLoserIds,
+                                chamResultRevealed: true,
+                                roomLastLoserId: chosenLoserId,
+                                roomLoserPendingChoice: true
+                            });
+                        } else {
+                            // 마스터와 같은 방향을 고른 사람이 없음 -> 마스터를 새로 뽑아 즉시 재대결
+                            update(ref(db, `rooms/${currentRoomCode}`), {
+                                chamMasterDir: CHAM_DIRS[Math.floor(Math.random() * CHAM_DIRS.length)],
+                                chamChoices: null,
+                                chamRoundKey: getServerNow(),
+                                chamLoserIds: null,
+                                chamResultRevealed: false
+                            });
+                        }
+                    }
+
+                    if (data.chamResultRevealed && data.chamLoserIds && data.chamLoserIds.length > 0) {
+                        const names = data.chamLoserIds.map(id => players[id]?.nickname || '참가자').join(', ');
+                        triggerExplosionEffect({
+                            key: `cham_${data.chamRoundKey || ''}`,
+                            title: '👈 참참참 결과 발표! 💥',
+                            message: `마스터는 ${CHAM_LABELS[masterDir] || ''}! ${names}님 벌칙!`,
                             duration: 0
                         });
                     }
@@ -4284,6 +4424,12 @@
                     status: 'playing', rpsMasterHand: masterHand, rpsRoundKey: getServerNow(),
                     rpsChoices: null, rpsLoserIds: null, rpsResultRevealed: false
                 });
+            } else if (gameId === 'cham') {
+                chamResultTriggeredKey = null;
+                update(rRef, {
+                    status: 'playing', chamMasterDir: CHAM_DIRS[Math.floor(Math.random() * CHAM_DIRS.length)], chamRoundKey: getServerNow(),
+                    chamChoices: null, chamLoserIds: null, chamResultRevealed: false
+                });
             } else if (gameId === 'roulette') {
                 const slotCount = 6;
                 update(rRef, {
@@ -4381,6 +4527,7 @@
                 timingTarget: null, timingStartTime: null, timingResults: null,
                 diceTarget: null, diceRoundKey: null, diceResults: null, diceLoserIds: null,
                 rpsMasterHand: null, rpsRoundKey: null, rpsChoices: null, rpsLoserIds: null, rpsResultRevealed: false,
+                chamMasterDir: null, chamRoundKey: null, chamChoices: null, chamLoserIds: null, chamResultRevealed: false,
                 rouletteSlotCount: null, rouletteTurnOrder: null, rouletteTurnIdx: null, rouletteChamberPos: null, rouletteBulletChamber: null, rouletteLastHitId: null, rouletteConsecutiveHits: null, rouletteResultText: null, rouletteHitKey: null,
                 speedSignalTime: null, speedTargetSpot: null, speedFingerResults: null, speedFalseStarts: null,
                 boxFindBombCount: null, boxFindBombIndexes: null, boxFindBombIndex: null, boxFindRoundKey: null, boxFindClickCount: null,
