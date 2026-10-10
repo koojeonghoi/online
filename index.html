@@ -512,7 +512,7 @@
                 <span>🔥 19금 모드</span>
                 <input type="checkbox" id="king19-toggle" style="width:20px; height:20px;">
             </label>
-            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">켜면 다소 수위 있는 커맨드도 섞여요. 두 명이 지목되는 커맨드는 항상 남녀 한 명씩만 짝지어지고, 남자만 있거나 여자만 있으면 자동으로 제외돼요.</div>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">켜면 19금 커맨드만 나와요. 두 명이 지목되는 커맨드는 항상 남녀 한 명씩만 짝지어지고, 남자만 있거나 여자만 있으면 자동으로 제외돼요.</div>
             <div style="font-size:13px; color:#fff; font-weight:700; margin-top:12px;">👑 참여자 성별 지정 (방장만 보여요)</div>
             <div style="font-size:11px; color:#8E9AA8; margin:4px 0 8px;">남녀 짝짓기 커맨드에 쓸 사람만 지정하면 돼요. 지정 안 하면 그 사람은 짝짓기 대상에서 빠져요.</div>
             <div id="king-gender-list"></div>
@@ -757,7 +757,7 @@
             <div id="drink-timer-display" style="font-size: 48px; font-weight: bold; color: var(--danger-color);">00:00</div>
         </div>
         <div id="drink-status-text" style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 14px;">불러오는 중...</div>
-        <button id="btn-drink-notify" class="secondary" style="display:none; margin-bottom: 14px; font-size:13px; padding:10px;" onclick="window.requestDrinkNotificationPermission()">🔔 알림 받기 (타이머 종료 시)</button>
+        <button id="btn-drink-notify" class="secondary" style="display:none; margin-bottom: 14px; font-size:13px; padding:10px;" onclick="window.rpZEAWYtiB6bJ16NuLbGCc6CZ6jJdKfb63()">🔔 알림 받기 (타이머 종료 시)</button>
 
         <div id="drink-next-round-box" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:14px; margin-bottom: 14px; text-align:left;">
             <div style="color:var(--accent-color); font-size:14px; font-weight:700; margin-bottom:10px;">⏱️ 다음 타이머 시간 정하기</div>
@@ -1515,7 +1515,7 @@
 
     // 🔔 랜덤 마시기: 타이머가 끝났을 때 화면을 안 보고 있어도 알림이 오도록.
     // (별도 푸시 서버 없이, 브라우저 알림 권한 기반으로 동작 — 앱 탭이 열려있는 동안만 유효)
-    window.requestDrinkNotificationPermission = function() {
+    window.rpZEAWYtiB6bJ16NuLbGCc6CZ6jJdKfb63 = function() {
         if (!('Notification' in window)) { alert('이 브라우저는 알림 기능을 지원하지 않아요.\n(iOS는 홈 화면에 추가한 앱에서만 알림이 지원돼요)'); return; }
         if (Notification.permission === 'granted') { ensureDrinkServiceWorker(); updateDrinkNotifyButton(); return; }
         Notification.requestPermission().then((perm) => {
@@ -4144,10 +4144,13 @@
         const hasMixedPair = males.length > 0 && females.length > 0;
 
         const use19 = !!document.getElementById('king19-toggle')?.checked;
-        const source = use19 ? kingCommands.concat(kingAdultCommands) : kingCommands;
+        const source = use19 ? kingAdultCommands : kingCommands;
 
         // 2인 지목 커맨드는 남녀 짝이 가능할 때만 후보에 포함 (남남/여여 매칭 방지)
-        const eligible = source.filter(c => c.slots <= playerCount && (c.slots < 2 || hasMixedPair));
+        const pickEligible = (list) => list.filter(c => c.slots <= playerCount && (c.slots < 2 || hasMixedPair));
+        let eligible = pickEligible(source);
+        // 19금 커맨드는 전부 2인(남녀) 지목형이라, 성별 지정이 없으면 후보가 비므로 일반 커맨드로 대체
+        if (eligible.length === 0) eligible = pickEligible(kingCommands);
         const tmpl = eligible[Math.floor(Math.random() * eligible.length)];
 
         const nums = [];
