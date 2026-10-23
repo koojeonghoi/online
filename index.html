@@ -973,15 +973,29 @@
     (function setupPullToRefresh() {
         const indicator = document.getElementById('pullRefreshIndicator');
         const PTR_THRESHOLD = 70;
-        let startY = null, pulling = false, currentPull = 0, triggered = false;
+        const VIEWPORT_SETTLE_MS = 1000; // 화면 회전/크기 변경 직후에는 당겨서 새로고침을 무시
+        let startY = null, pulling = false, currentPull = 0, triggered = false, lastViewportChangeAt = 0;
 
         function reset() {
             startY = null; pulling = false; currentPull = 0; triggered = false;
             if (indicator) { indicator.style.transform = 'translateY(-60px)'; indicator.style.opacity = '0'; indicator.textContent = '↓ 당겨서 새로고침'; }
         }
 
+        // 가로↔세로 전환(폴더블 펼침/접힘 포함) 중에는 터치 좌표가 튀거나 시스템 제스처와 겹쳐
+        // 당김 동작으로 오인될 수 있으므로, 진행 중이던 당김을 취소하고 잠시 동안 새로 시작하지 못하게 함
+        function onViewportChange() {
+            lastViewportChangeAt = Date.now();
+            if (!triggered) reset();
+        }
+        window.addEventListener('orientationchange', onViewportChange);
+        window.addEventListener('resize', onViewportChange);
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', onViewportChange);
+        document.addEventListener('touchcancel', () => { if (!triggered) reset(); });
+
         document.addEventListener('touchstart', (e) => {
             if (triggered || e.touches.length !== 1) return;
+            if (Date.now() - lastViewportChangeAt < VIEWPORT_SETTLE_MS) return;
+            if ((document.scrollingElement ? document.scrollingElement.scrollTop : 0) > 0) return; // 맨 위일 때만
             const y = e.touches[0].clientY;
             if (y < 80) { startY = y; pulling = true; }
         }, { passive: true });
@@ -1000,7 +1014,7 @@
 
         document.addEventListener('touchend', () => {
             if (!pulling) return;
-            if (currentPull >= PTR_THRESHOLD && !triggered) {
+            if (currentPull >= PTR_THRESHOLD && !triggered && Date.now() - lastViewportChangeAt >= VIEWPORT_SETTLE_MS) {
                 triggered = true;
                 if (indicator) { indicator.textContent = '🔄 새로고침 중...'; indicator.style.transform = 'translateY(10px)'; indicator.style.opacity = '1'; }
                 forceHardRefresh();
@@ -1051,8 +1065,6 @@
         { name: "리본 🎀", points: [{x:40,y:90},{x:140,y:130},{x:140,y:90},{x:170,y:90},{x:170,y:130},{x:240,y:90},{x:240,y:190},{x:170,y:150},{x:170,y:190},{x:140,y:190},{x:140,y:150},{x:40,y:190},{x:40,y:90}], svg: '<polygon points="40,90 140,130 140,90 170,90 170,130 240,90 240,190 170,150 170,190 140,190 140,150 40,190" />' }
     ];
 
-    const usedChosungIndices2 = new Set(); // 2글자 초성퀴즈 중복 출제 방지용
-    const usedChosungIndices3 = new Set(); // 3글자 초성퀴즈 중복 출제 방지용
     const chosungPool2 = [
         { chosung: "ㄱㅂ", answers: ["가방", "김밥", "갈비", "고부", "국밥", "가볍", "기부", "거부", "골방", "건배", "공반", "경비", "구방", "공방", "기반", "간부", "강변", "계반", "구비"] },
         { chosung: "ㄷㄹ", answers: ["다리", "도로", "도리", "드론", "대리", "도락", "두루", "대란", "단련", "달력", "도련", "동료", "달래", "다락", "동굴", "동래", "대량", "두목", "달빛"] },
@@ -1430,6 +1442,84 @@
 
     function getServerNow() {
         return Date.now() + serverTimeOffset;
+    }
+
+    // 📅 날짜별 중복 출제 방지
+    // 같은 날짜(한국시간 기준)에는 한 번 나온 내용(라이어 단어/초성/밸런스/손병호 조건)이
+    // 해당 목록을 전부 소진하기 전까지 다시 나오지 않는다.
+    // 기록은 이 기기의 localStorage와 Firebase(usedContent/날짜/게임)에 함께 남겨서,
+    // 방을 새로 만들거나 방장이 바뀌어도 이어진다. Firebase가 막혀 있거나 느리면 localStorage만으로 동작한다.
+    function getTodayKey() {
+        return new Date(getServerNow() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    }
+
+    async function takeUnusedIndex(poolKey, size, groupOf) {
+        const today = getTodayKey();
+        const lsKey = `usedContent:${today}:${poolKey}`;
+        const dbRef = ref(db, `usedContent/${today}/${poolKey}`);
+        const used = new Set();
+
+        try {
+            // 지난 날짜 기록은 정리
+            Object.keys(localStorage).forEach((k) => {
+                if (k.startsWith('usedContent:') && !k.startsWith(`usedContent:${today}:`)) localStorage.removeItem(k);
+            });
+            JSON.parse(localStorage.getItem(lsKey) || '[]').forEach((i) => used.add(Number(i)));
+        } catch (e) { /* localStorage 사용 불가 시 무시 */ }
+
+        try {
+            const snap = await Promise.race([get(dbRef), new Promise((resolve) => setTimeout(() => resolve(null), 1500))]);
+            const remote = snap && snap.val();
+            if (remote) Object.keys(remote).forEach((k) => { if (k.startsWith('i')) used.add(Number(k.slice(1))); });
+        } catch (e) { /* 읽기 실패 시 localStorage 기록만 사용 */ }
+
+        let available = [];
+        for (let i = 0; i < size; i++) if (!used.has(i)) available.push(i);
+        const wasExhausted = available.length === 0;
+        if (wasExhausted) { used.clear(); for (let i = 0; i < size; i++) available.push(i); }
+
+        let picked;
+        if (groupOf) {
+            // 그룹(카테고리)은 남은 항목이 있는 곳 중에서 균등하게 먼저 고르고, 그 안에서 항목을 고름
+            const groups = {};
+            available.forEach((i) => { (groups[groupOf(i)] = groups[groupOf(i)] || []).push(i); });
+            const names = Object.keys(groups);
+            const list = groups[names[Math.floor(Math.random() * names.length)]];
+            picked = list[Math.floor(Math.random() * list.length)];
+        } else {
+            picked = available[Math.floor(Math.random() * available.length)];
+        }
+        used.add(picked);
+
+        try { localStorage.setItem(lsKey, JSON.stringify([...used])); } catch (e) {}
+        try {
+            if (wasExhausted) await set(dbRef, { [`i${picked}`]: true });
+            else await update(dbRef, { [`i${picked}`]: true });
+        } catch (e) { /* 쓰기 실패해도 이 기기 기록으로 계속 진행 */ }
+        return picked;
+    }
+
+    // 🔁 새로고침/화면 회전 등으로 페이지가 다시 로드돼도 직전에 있던 방으로 자동 재입장
+    // (sessionStorage 기준이라 탭/앱을 완전히 닫으면 사라진다)
+    const ACTIVE_ROOM_KEY = 'partyGameActiveRoom';
+    const ACTIVE_ROOM_TTL_MS = 12 * 60 * 60 * 1000;
+    function saveActiveRoom(code, nickname) {
+        try { sessionStorage.setItem(ACTIVE_ROOM_KEY, JSON.stringify({ code, nickname, ts: Date.now() })); } catch (e) {}
+    }
+    function clearActiveRoom() {
+        try { sessionStorage.removeItem(ACTIVE_ROOM_KEY); } catch (e) {}
+    }
+    async function tryRestoreActiveRoom() {
+        let saved = null;
+        try { saved = JSON.parse(sessionStorage.getItem(ACTIVE_ROOM_KEY) || 'null'); } catch (e) {}
+        if (!saved || !saved.code || !saved.nickname || Date.now() - saved.ts > ACTIVE_ROOM_TTL_MS) { clearActiveRoom(); return; }
+        try {
+            const snap = await get(ref(db, `rooms/${saved.code}`));
+            if (!snap.exists()) { clearActiveRoom(); return; }
+            document.getElementById('nickname-input').value = saved.nickname;
+            document.getElementById('room-code-input').value = saved.code;
+            document.getElementById('btn-join-room').click();
+        } catch (e) { /* 네트워크 오류 시에는 로그인 화면 유지 */ }
     }
 
     // 폭탄 타이머는 Firebase에 새로운 변경사항(write)이 없으면 onValue가 다시 실행되지 않아
@@ -1969,6 +2059,7 @@
         setupCurrencyFormatting();
         const savedNickname = localStorage.getItem('partyGameNickname');
         if (savedNickname) document.getElementById('nickname-input').value = savedNickname;
+        tryRestoreActiveRoom();
         const shapeSelect = document.getElementById('draw-shape-select');
         if (shapeSelect) {
             shapes.forEach((s, i) => {
@@ -2066,7 +2157,7 @@
             status: 'waiting', hostId: myId, selectedGame: 'liar',
             players: { [myId]: { nickname: nickname, isHost: true } }
         }).then(() => {
-            initRoomListener(currentRoomCode); showScreen('lobby-screen');
+            initRoomListener(currentRoomCode); saveActiveRoom(currentRoomCode, nickname); showScreen('lobby-screen');
             document.getElementById('btn-start-game').style.display = 'block';
             document.getElementById('wait-message').style.display = 'none';
         });
@@ -2089,7 +2180,7 @@
             const reallyIsHost = roomVal.hostId === myId;
             isHost = reallyIsHost;
             set(ref(db, `rooms/${roomCode}/players/${myId}`), { nickname: nickname, isHost: reallyIsHost }).then(() => {
-                initRoomListener(roomCode); showScreen('lobby-screen');
+                initRoomListener(roomCode); saveActiveRoom(roomCode, nickname); showScreen('lobby-screen');
                 document.getElementById('btn-start-game').style.display = reallyIsHost ? 'block' : 'none';
                 document.getElementById('wait-message').style.display = reallyIsHost ? 'none' : 'block';
             });
@@ -2175,6 +2266,7 @@
             if (hasSeenMyselfInRoom && !players[myId]) {
                 alert('방장에 의해 강퇴되었습니다.');
                 sessionStorage.removeItem(`partyGameId_${roomCode}`);
+                clearActiveRoom();
                 window.location.reload();
                 return;
             }
@@ -3287,8 +3379,9 @@
                         : (stillWaitingForFolds
                             ? `⏳ ${Math.max(1, Math.ceil((SON_MIN_FOLD_WINDOW_MS - foldElapsed) / 1000))}초 후 뽑기 가능`
                             : '🎲 다음 조건 뽑기 (내 차례!)');
-                    nextBtn.onclick = isMyTurn ? () => {
-                        const idx = Math.floor(Math.random() * sonConditionPool.length);
+                    nextBtn.onclick = isMyTurn ? async () => {
+                        nextBtn.disabled = true; // 중복 터치 방지 (다음 화면 갱신 때 다시 계산됨)
+                        const idx = await takeUnusedIndex('son', sonConditionPool.length);
                         const newTurnIdx = turnOrder.indexOf(curTurnId) + 1;
                         update(ref(db, `rooms/${currentRoomCode}`), { sonConditionIndex: idx, sonAnsweredIds: {}, sonTurnIndex: newTurnIdx, sonConditionSetAt: getServerNow() });
                     } : null;
@@ -3619,7 +3712,7 @@
 
     function autoDrawSonConditionForBot(botId, turnOrder, expectedTurnIdx) {
         if (!currentRoomCode) return;
-        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+        get(ref(db, `rooms/${currentRoomCode}`)).then(async (snap) => {
             const d = snap.val(); if (!d || d.selectedGame !== 'sonbyungho' || d.status !== 'playing') return;
             const curTurnIdx = d.sonTurnIndex || 0;
             if (curTurnIdx !== expectedTurnIdx) return; // 이미 다른 클라이언트가 처리함
@@ -3631,7 +3724,7 @@
                 setTimeout(() => autoDrawSonConditionForBot(botId, turnOrder, expectedTurnIdx), SON_MIN_FOLD_WINDOW_MS - elapsed + 200);
                 return;
             }
-            const idx = Math.floor(Math.random() * sonConditionPool.length);
+            const idx = await takeUnusedIndex('son', sonConditionPool.length);
             const newTurnIdx = turnOrder.indexOf(botId) + 1;
             update(ref(db, `rooms/${currentRoomCode}`), { sonConditionIndex: idx, sonAnsweredIds: {}, sonTurnIndex: newTurnIdx, sonConditionSetAt: getServerNow() });
         });
@@ -4311,18 +4404,27 @@
     }
 
     function startGameFlow(gameId) {
-        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+        get(ref(db, `rooms/${currentRoomCode}`)).then(async (snap) => {
             const roomSnapVal = snap.val() || {};
             const pIds = Object.keys(roomSnapVal.players || {}); if(pIds.length < 2) return alert('최소 2명 필요합니다!');
             const prevLoserId = roomSnapVal.roomLastLoserId || null;
             const rRef = ref(db, `rooms/${currentRoomCode}`);
+
+            // 📅 날짜 기준 중복 출제 방지 (라이어 단어 / 초성 / 밸런스) — 화면 전환 전에 미리 골라둠
+            let pickedContent = null;
+            if (gameId === 'liar') {
+                const liarFlat = [];
+                Object.keys(wordList).forEach((cat) => wordList[cat].forEach((w) => liarFlat.push({ cat, w })));
+                pickedContent = liarFlat[await takeUnusedIndex('liar', liarFlat.length, (k) => liarFlat[k].cat)];
+            } else if (gameId === 'speed') {
+                const len = speedWordLength === 3 ? 3 : 2;
+                pickedContent = await takeUnusedIndex(`speed${len}`, (len === 3 ? chosungPool3 : chosungPool2).length);
+            } else if (gameId === 'balance') {
+                pickedContent = await takeUnusedIndex('balance', balancePool.length);
+            }
             update(rRef, { roomLoserPendingChoice: false, roomLastLoserId: null, selectedGame: gameId, roomLastGameId: gameId });
             if (gameId === 'liar') {
-                const categories = Object.keys(wordList);
-                const pickedCategory = categories[Math.floor(Math.random()*categories.length)];
-                const wordsInCategory = wordList[pickedCategory];
-                const pickedWord = wordsInCategory[Math.floor(Math.random()*wordsInCategory.length)];
-                update(rRef, { status: 'playing', category: pickedCategory, word: pickedWord, liarId: pickIdProtected(pIds) });
+                update(rRef, { status: 'playing', category: pickedContent.cat, word: pickedContent.w, liarId: pickIdProtected(pIds) });
             } else if (gameId === 'draw') {
                 const shapeIdx = (Number.isInteger(hostSelectedShapeIndex) && hostSelectedShapeIndex >= 0 && hostSelectedShapeIndex < shapes.length)
                     ? hostSelectedShapeIndex : pickRandomShapeIndex();
@@ -4342,13 +4444,8 @@
                     bombPassSeq: 0
                 });
             } else if (gameId === 'speed') {
-                // 이미 나온 초성은 전체 목록을 다 쓰기 전까진 다시 안 나오도록 (동일 문제 반복 방지)
                 const pool = speedWordLength === 3 ? chosungPool3 : chosungPool2;
-                const usedSet = speedWordLength === 3 ? usedChosungIndices3 : usedChosungIndices2;
-                let available = pool.map((_, i) => i).filter(i => !usedSet.has(i));
-                if (available.length === 0) { usedSet.clear(); available = pool.map((_, i) => i); }
-                const randIdx = available[Math.floor(Math.random() * available.length)];
-                usedSet.add(randIdx);
+                const randIdx = pickedContent;
                 update(rRef, {
                     status: 'playing', speedChosungIndex: randIdx, speedChosung: pool[randIdx].chosung,
                     speedWordLength: speedWordLength, speedAnswers: null, speedLoserId: null
@@ -4395,7 +4492,7 @@
                     kingRound: 1
                 });
             } else if (gameId === 'balance') {
-                update(rRef, { status: 'playing', balanceIndex: Math.floor(Math.random() * balancePool.length), balanceVotes: null, balanceRevealed: false });
+                update(rRef, { status: 'playing', balanceIndex: pickedContent, balanceVotes: null, balanceRevealed: false });
             } else if (gameId === 'timing') {
                 const target = Math.round(Math.random() * 1000) / 100; // 0.00 ~ 10.00
                 update(rRef, { status: 'playing', timingTarget: target, timingStartTime: getServerNow(), timingResults: null });
