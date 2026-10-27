@@ -4076,12 +4076,13 @@
 
     document.getElementById('btn-king-next').addEventListener('click', () => {
         if (!currentRoomCode || !isHost) return;
-        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+        get(ref(db, `rooms/${currentRoomCode}`)).then(async (snap) => {
             const roomVal = snap.val(); if (!roomVal) return;
             const playerCount = roomVal.kingPlayerCount || Object.keys(roomVal.kingNumbers || {}).length;
             if (!playerCount) return;
+            const commandText = await drawKingCommand(playerCount, roomVal.kingGenderMap || {});
             update(ref(db, `rooms/${currentRoomCode}`), {
-                kingCommandText: drawKingCommand(playerCount, roomVal.kingGenderMap || {}),
+                kingCommandText: commandText,
                 kingRound: (roomVal.kingRound || 0) + 1
             });
         });
@@ -4312,24 +4313,41 @@
 
     // ===== 👑 왕게임 (전원 랜덤 순서 뽑기 + 명령 카드 자동 생성) =====
     const kingCommands = [
-        { text: "{A}번과 {B}번, 눈 마주치고 러브샷!", slots: 2 },
-        { text: "{A}번, 지금 이 순간 왕이 시키는 대로 원샷!", slots: 1 },
-        { text: "{A}번과 {B}번, 소원 들어주기 찬스 (뭐든 하나 들어주기)", slots: 2 },
-        { text: "전원 다같이 3초 안에 하이파이브!", slots: 0 },
-        { text: "{A}번, 최근 카톡 대화 하나 큰 소리로 읽기", slots: 1 },
-        { text: "{A}번과 {B}번, 가위바위보! 진 사람 원샷", slots: 2 },
-        { text: "{A}번, 왼쪽 사람에게 애교 부리기", slots: 1 },
-        { text: "전원 3초 안에 신발 벗기, 꼴찌 원샷", slots: 0 },
-        { text: "{A}번과 {B}번, 팔짱 끼고 사진 찍기", slots: 2 },
-        { text: "{A}번, 지금부터 3턴 동안 존댓말만 쓰기", slots: 1 },
-        { text: "{A}번과 {B}번, 술잔 바꿔서 마시기", slots: 2 },
-        { text: "전원 각자 핸드폰 배터리 공개, 가장 낮은 사람 원샷", slots: 0 },
-        { text: "{A}번, 옆 사람 어깨 안마 10초", slots: 1 },
-        { text: "{A}번과 {B}번, 등 돌리고 이름 맞히기 게임, 진 사람 원샷", slots: 2 },
-        { text: "{A}번, 오늘 있었던 일 중 자랑거리 하나 말하기", slots: 1 },
-        { text: "전원 건배사 한마디씩 릴레이로 외치기", slots: 0 },
-        { text: "{A}번과 {B}번, 만세 삼창 같이 외치기", slots: 2 },
-        { text: "{A}번, 지금 심정을 이모티콘으로 표현하기", slots: 1 }
+        // 📱 폰 오픈
+        { text: "{A}번, 카톡 채팅방 목록 맨 위 대화방을 열어서 모두에게 보여주기", slots: 1 },
+        { text: "{A}번, 가장 최근에 보낸 카톡 3개를 큰 소리로 읽기", slots: 1 },
+        { text: "{A}번, 갤러리 맨 위에서 10번째 사진 공개하고 어떤 상황인지 설명", slots: 1 },
+        { text: "{A}번, 갤러리 맨 위에서 30번째 사진 공개하고 어떤 상황인지 설명", slots: 1 },
+        { text: "{A}번, 인스타 DM 맨 위 대화방을 열어서 보여주기", slots: 1 },
+        { text: "{A}번, 인스타 검색 기록 맨 위 3개 공개", slots: 1 },
+        { text: "{A}번, 포털과 유튜브의 최근 검색어 3개 공개", slots: 1 },
+        { text: "{A}번, 쇼핑앱 장바구니를 공개하고 왜 담았는지 설명", slots: 1 },
+        // 📞 전화·문자
+        { text: "{A}번, 부모님께 지금 '사랑해요' 카톡 보내고 답장 오면 공개", slots: 1 },
+        { text: "{A}번, 카톡 친구 중 가장 오래 연락 안 한 사람에게 '잘 지내?' 보내고 답장 공개", slots: 1 },
+        { text: "{A}번, 연락처 맨 위 사람에게 스피커폰으로 전화해서 노래 한 소절 불러주고 끊기", slots: 1 },
+        { text: "{A}번, 지금 이 자리에서 제일 못 나온 셀카를 찍어서 카톡 프로필에 10분간 걸어두기", slots: 1 },
+        // 🗣️ 고백·토크
+        { text: "{A}번, 첫사랑 이야기를 1분 안에 털어놓기", slots: 1 },
+        { text: "{A}번, 인생 최대 흑역사 하나 고백하기", slots: 1 },
+        { text: "{A}번, 최근 가장 민망했던 순간 말하기", slots: 1 },
+        { text: "{A}번, 지금까지 한 거짓말 중 제일 큰 거 하나 고백하기", slots: 1 },
+        { text: "{A}번, 이 자리에서 결혼하면 가장 잘 살 것 같은 사람을 지목하고 이유 말하기", slots: 1 },
+        { text: "{A}번, 이 자리에서 첫인상과 지금이 가장 다른 사람을 지목하고 이유 말하기", slots: 1 },
+        { text: "{A}번, 이 자리에서 가장 부러운 사람을 지목하고 이유 말하기", slots: 1 },
+        { text: "{A}번, 오른쪽 사람 눈을 보고 진심 어린 칭찬 3가지 해주기", slots: 1 },
+        // 🎭 연기·퍼포먼스
+        { text: "{A}번, 왼쪽 사람에게 애교 3종 세트 보여주기", slots: 1 },
+        { text: "{A}번, 드라마 이별 장면 연기하기 (20초, 대사는 마음대로)", slots: 1 },
+        { text: "{A}번, 뉴스 앵커처럼 오늘 있었던 일을 30초간 보도하기", slots: 1 },
+        { text: "{A}번, 가장 좋아하는 노래 후렴을 율동과 함께 부르기", slots: 1 },
+        { text: "{A}번, 사투리로 '사랑해' 고백하기 (왕이 만족할 때까지)", slots: 1 },
+        { text: "{A}번, 아기 말투로 자기소개 하기", slots: 1 },
+        { text: "{A}번, 이 자리에 있는 사람 한 명을 성대모사하기 (못 맞히면 한 번 더)", slots: 1 },
+        // 😳 챌린지
+        { text: "{A}번, 옆 사람과 눈 마주치고 10초 안 웃기 (웃으면 원샷)", slots: 1 },
+        { text: "전원 동시에 갤러리 맨 위 사진 공개 (3, 2, 1!)", slots: 0 },
+        { text: "전원 동시에 '지금 가장 연락하고 싶은 사람' 이름 외치기 (3, 2, 1!)", slots: 0 }
     ];
 
     // 19금 모드 전용: 스킨십을 강요하지 않는 선에서 수위만 살짝 있는 커맨드.
@@ -4367,7 +4385,7 @@
         { text: "🔥[29금] {A}번, {B}번의 상의를 살짝 들어 올리고 배에 뽀뽀.", slots: 2 }
     ];
 
-    function drawKingCommand(playerCount, genderMap) {
+    async function drawKingCommand(playerCount, genderMap) {
         genderMap = genderMap || {};
         const males = [], females = [];
         for (let n = 1; n <= playerCount; n++) {
@@ -4377,14 +4395,20 @@
         const hasMixedPair = males.length > 0 && females.length > 0;
 
         const use19 = !!document.getElementById('king19-toggle')?.checked;
-        const source = use19 ? kingAdultCommands : kingCommands;
 
         // 2인 지목 커맨드는 남녀 짝이 가능할 때만 후보에 포함 (남남/여여 매칭 방지)
         const pickEligible = (list) => list.filter(c => c.slots <= playerCount && (c.slots < 2 || hasMixedPair));
-        let eligible = pickEligible(source);
-        // 19금 커맨드는 전부 2인(남녀) 지목형이라, 성별 지정이 없으면 후보가 비므로 일반 커맨드로 대체
-        if (eligible.length === 0) eligible = pickEligible(kingCommands);
-        const tmpl = eligible[Math.floor(Math.random() * eligible.length)];
+        let tmpl = null;
+        if (use19) {
+            const eligible = pickEligible(kingAdultCommands);
+            if (eligible.length > 0) tmpl = eligible[Math.floor(Math.random() * eligible.length)];
+        }
+        // 일반 왕게임(19금 커맨드가 비는 경우 포함)은 당일 기준으로 같은 벌칙이 다시 나오지 않게 뽑는다
+        if (!tmpl) {
+            const generalPool = pickEligible(kingCommands);
+            const pickedIdx = await takeUnusedIndex('king', generalPool.length);
+            tmpl = generalPool[pickedIdx];
+        }
 
         const nums = [];
         if (tmpl.slots === 2 && hasMixedPair) {
@@ -4488,7 +4512,7 @@
                     kingNumbers: numbers,
                     kingPlayerCount: shuffledOrder.length,
                     kingGenderMap: genderMap,
-                    kingCommandText: drawKingCommand(shuffledOrder.length, genderMap),
+                    kingCommandText: await drawKingCommand(shuffledOrder.length, genderMap),
                     kingRound: 1
                 });
             } else if (gameId === 'balance') {
