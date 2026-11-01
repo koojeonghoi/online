@@ -332,6 +332,16 @@
         .balance-gauge { position: absolute; top: 0; left: 0; height: 100%; background-color: rgba(92,159,255,0.15); width: 0%; transition: width 0.5s ease-out; z-index: 1; }
         .balance-text { position: relative; z-index: 2; display: flex; justify-content: space-between; width: 100%; font-weight: bold; }
 
+        /* ⏱️ 스톱워치 저격 게임 */
+        .sw-ring { --progress: 0; width: min(220px, 60vw); height: min(220px, 60vw); border-radius: 50%; margin: 10px auto 16px; background: conic-gradient(var(--primary-color) calc(var(--progress) * 1%), #1E1E22 0); display: flex; justify-content: center; align-items: center; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+        .sw-ring.danger { background: conic-gradient(var(--danger-color) calc(var(--progress) * 1%), #1E1E22 0); }
+        .sw-ring.hidden-mode { background: #8B5CF6; animation: swHiddenPulse 1s ease-in-out infinite; }
+        @keyframes swHiddenPulse { 0%, 100% { box-shadow: 0 8px 24px rgba(139,92,246,0.35); } 50% { box-shadow: 0 10px 42px rgba(139,92,246,0.85); } }
+        .sw-inner { width: 84.5%; height: 84.5%; border-radius: 50%; background: var(--card-color); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; }
+        .sw-time { font-size: 2.3rem; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+        .sw-time.blurred { filter: blur(16px); }
+        .sw-status { font-size: 12px; color: #8E9AA8; font-weight: bold; text-align: center; padding: 0 10px; }
+
         /* 🍺 술값 몰아주기 전용 슬림 가로형 UI 스타일 */
         .dutch-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 16px; background: #151518; padding: 4px; border-radius: 8px; }
         .dutch-mode-btn { padding: 8px 5px; font-size: 13px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #8E9AA8; transition: all 0.2s; }
@@ -444,6 +454,7 @@
             <button class="tab-btn" id="tab-rps" onclick="selectGameMode('rps')">✌️ 가위바위보 마스터</button>
             <button class="tab-btn" id="tab-cham" onclick="selectGameMode('cham')">👈 참참참</button>
             <button class="tab-btn" id="tab-drink" onclick="selectGameMode('drink')">🍻 랜덤마시기</button>
+            <button class="tab-btn" id="tab-stopwatch" onclick="selectGameMode('stopwatch')">⏱️ 스톱워치 저격</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -525,6 +536,18 @@
                 <span class="input-unit">분</span>
             </div>
             <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">타이머가 0이 되면 참여자 중 한 명이 랜덤으로 뽑혀 벌칙(술 마시기)을 받아요. 걸린 사람이 그 자리에서 바로 다음 타이머 시간을 정해요 (최소 1분, 상한 없음) — 대기실로 돌아갈 필요 없이 계속 진행돼요. 벌칙 강도는 매번 랜덤으로 정해져요.</div>
+        </div>
+        <div id="stopwatch-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
+            <div style="color:var(--accent-color); font-size:14px; font-weight:700; margin-bottom:8px;">⏱️ 목표 시간</div>
+            <div class="input-wrapper" style="margin-bottom:10px;">
+                <input type="number" id="stopwatch-target-sec" min="0.1" max="120" step="0.1" value="5">
+                <span class="input-unit">초</span>
+            </div>
+            <div class="dutch-mode-tabs" style="margin-bottom:0;">
+                <button type="button" id="btn-sw-show" class="dutch-mode-btn active">👀 숫자 보이기</button>
+                <button type="button" id="btn-sw-hide" class="dutch-mode-btn">🙈 숫자 숨기기</button>
+            </div>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">각자 자기 폰에서 스톱워치를 시작하고, 목표 시간에 가깝게 멈춰요. 모두 멈추면 목표에서 가장 먼 사람이 패배! (숨기기: 시작하면 숫자가 가려져요)</div>
         </div>
         <button id="btn-start-game">게임 시작</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
@@ -768,6 +791,28 @@
             <div id="cham-score-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-cham" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- ⏱️ 스톱워치 저격 스크린 -->
+    <div id="game-stopwatch-screen" class="screen">
+        <h2>⏱️ 스톱워치 저격</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px;">
+            <div id="sw-mode-desc" style="font-size: 13px; color: #8E9AA8;">목표 시간에 가깝게 멈추세요! 가장 먼 사람이 패배</div>
+            <div style="font-size: 12px; color: #8E9AA8; margin-top: 6px;">🎯 목표 시간</div>
+            <div id="sw-target-display" style="font-size: 38px; font-weight: bold; color: var(--accent-color);">5.00초</div>
+        </div>
+        <div class="sw-ring" id="sw-ring">
+            <div class="sw-inner">
+                <div class="sw-time" id="sw-time">00.00</div>
+                <div class="sw-status" id="sw-status">대기중 · 시작을 누르세요</div>
+            </div>
+        </div>
+        <button id="btn-sw-main" style="font-size: 20px; padding: 16px; margin-bottom: 5px;">▶️ 시작</button>
+        <div class="score-board">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 제출 현황 (모두 멈추면 기록 공개)</div>
+            <div id="sw-score-list">대기 중...</div>
+        </div>
+        <button id="btn-back-lobby-stopwatch" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <!-- 🍻 랜덤 마시기 게임 스크린 -->
@@ -1315,6 +1360,12 @@
     const chamBotChosenHandled = new Set();
     let chamResultTriggeredKey = null;
     let chamActiveRoundKey = null;
+    // ⏱️ 스톱워치 저격: 각자 자기 기기에서 performance.now()로 직접 재므로 네트워크/서버 시계 오차가 기록에 끼지 않음
+    const SW_MAX_SEC = 120;
+    let swActiveRoundKey = null, swLastData = null, swRunning = false, swStartPerf = 0, swRAF = null, swElapsedMs = 0;
+    let swResultTriggeredKey = null;
+    let swSelectedShowTime = true;
+    const swBotSubmitHandled = new Set();
     // 🍻 랜덤 마시기: 대기실로 돌아가지 않고 걸린 사람이 바로 다음 타이머를 정하는 방식이라
     // 별도의 라운드 상태(만료 체크용 currentDrinkExpireAt, 중복 당첨 방지용 키)를 따로 둠.
     let currentDrinkExpireAt = null;
@@ -1782,6 +1833,76 @@
         });
     }
 
+    // ===== ⏱️ 스톱워치 저격 게임 =====
+    function swFormat(ms) { return (Math.max(0, ms) / 1000).toFixed(2).padStart(5, '0'); }
+    function swSigned(ms) { return `${ms >= 0 ? '+' : '-'}${(Math.abs(ms) / 1000).toFixed(2)}`; }
+
+    function swResetLocal() {
+        if (swRAF) cancelAnimationFrame(swRAF);
+        swRAF = null; swRunning = false; swElapsedMs = 0; swActiveRoundKey = null; swLastData = null;
+    }
+
+    function swRender() {
+        const d = swLastData; if (!d) return;
+        const ring = document.getElementById('sw-ring'), timeEl = document.getElementById('sw-time'), statusEl = document.getElementById('sw-status');
+        if (!ring || !timeEl || !statusEl) return;
+        const hideNumber = swRunning && !d.showTime;
+        ring.style.setProperty('--progress', Math.min(100, (swElapsedMs / d.targetMs) * 100));
+        ring.classList.toggle('hidden-mode', hideNumber);
+        ring.classList.toggle('danger', !hideNumber && swElapsedMs > d.targetMs);
+        timeEl.textContent = hideNumber ? '??.??' : swFormat(swElapsedMs);
+        timeEl.classList.toggle('blurred', hideNumber);
+        if (swRunning) statusEl.textContent = d.showTime ? '목표에 맞춰 정지!' : '감으로 멈춰보세요! 🤫';
+        else if (d.myResult) statusEl.textContent = `목표 대비 ${swSigned(d.myResult.diffMs)}초`;
+        else statusEl.textContent = '대기중 · 시작을 누르세요';
+    }
+
+    function swTick(now) {
+        if (!swRunning) return;
+        swElapsedMs = now - swStartPerf;
+        swRender();
+        swRAF = requestAnimationFrame(swTick);
+    }
+
+    document.getElementById('btn-sw-main').addEventListener('click', () => {
+        const btn = document.getElementById('btn-sw-main');
+        if (!swLastData || !currentRoomCode || btn.disabled) return;
+        if (!swRunning) {
+            swRunning = true; swElapsedMs = 0; swStartPerf = performance.now();
+            btn.innerText = '⏹ 정지!'; btn.style.backgroundColor = 'var(--danger-color)';
+            swRAF = requestAnimationFrame(swTick);
+        } else {
+            const elapsedMs = Math.round(performance.now() - swStartPerf);
+            swRunning = false;
+            if (swRAF) cancelAnimationFrame(swRAF);
+            swElapsedMs = elapsedMs;
+            btn.disabled = true; btn.innerText = '✅ 제출 완료!'; btn.style.backgroundColor = '';
+            const diffMs = elapsedMs - swLastData.targetMs;
+            // 서버 응답을 기다리지 않고 내 화면은 즉시 고정, 기록은 한 번만 제출
+            runTransaction(ref(db, `rooms/${currentRoomCode}/swResults/${myId}`), (existing) => {
+                if (existing) return undefined;
+                return { elapsedMs, diffMs };
+            }, { applyLocally: false });
+        }
+        swRender();
+    });
+
+    function autoSubmitSwForBot(botId, expectedRoundKey, targetMs, showTime) {
+        if (!currentRoomCode) return;
+        get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
+            const d = snap.val(); if (!d || d.selectedGame !== 'stopwatch' || `${d.swRoundKey || ''}` !== `${expectedRoundKey}`) return;
+            if (!d.players?.[botId]?.isBot) return;
+            if ((d.swResults || {})[botId]) return;
+            // 사람처럼 오차를 둠: 숫자가 보이면 정밀하게, 숨기면 크게 빗나감
+            const errMs = Math.round((Math.random() - 0.5) * 2 * (showTime ? 250 : 900));
+            const elapsedMs = Math.max(50, targetMs + errMs);
+            runTransaction(ref(db, `rooms/${currentRoomCode}/swResults/${botId}`), (existing) => {
+                if (existing) return undefined;
+                return { elapsedMs, diffMs: elapsedMs - targetMs };
+            }, { applyLocally: false });
+        });
+    }
+
     // ===== 🎲 주사위게임 =====
     const DICE_PIP_MAP = { 0: [], 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
     function renderDiceFace(container, val) {
@@ -2131,6 +2252,8 @@
         if (ladderSettings) ladderSettings.style.display = (canControlLobby && gameMode === 'ladder') ? 'block' : 'none';
         const drinkSettings = document.getElementById('drink-settings');
         if (drinkSettings) drinkSettings.style.display = (canControlLobby && gameMode === 'drink') ? 'block' : 'none';
+        const stopwatchSettings = document.getElementById('stopwatch-settings');
+        if (stopwatchSettings) stopwatchSettings.style.display = (canControlLobby && gameMode === 'stopwatch') ? 'block' : 'none';
         if (kingSettings && canControlLobby && gameMode === 'king') renderKingGenderList();
     }
 
@@ -2894,6 +3017,89 @@
                         });
                     }
                 }
+                else if (data.selectedGame === 'stopwatch') {
+                    showScreen('game-stopwatch-screen');
+                    const roundKey = `${data.swRoundKey || ''}`;
+                    const targetMs = Number(data.swTargetMs) || 5000;
+                    const showTime = data.swShowTime !== false;
+                    const results = data.swResults || {};
+                    const myResult = results[myId];
+                    swLastData = { roundKey, targetMs, showTime, myResult };
+
+                    document.getElementById('sw-target-display').innerText = `${(targetMs / 1000).toFixed(2)}초`;
+                    document.getElementById('sw-mode-desc').innerText = showTime
+                        ? '👀 숫자가 보여요! 목표에 가깝게 멈추세요 (가장 먼 사람이 패배)'
+                        : '🙈 숫자가 숨겨져요! 감으로 목표에 가깝게 멈추세요 (가장 먼 사람이 패배)';
+
+                    const swBtn = document.getElementById('btn-sw-main');
+                    if (swActiveRoundKey !== roundKey) {
+                        swActiveRoundKey = roundKey;
+                        if (swRAF) cancelAnimationFrame(swRAF);
+                        swRunning = false; swElapsedMs = 0;
+                        swBtn.disabled = false; swBtn.innerText = '▶️ 시작'; swBtn.style.backgroundColor = '';
+                    }
+                    if (myResult) {
+                        if (swRAF) cancelAnimationFrame(swRAF);
+                        swRunning = false; swElapsedMs = myResult.elapsedMs;
+                        swBtn.disabled = true; swBtn.innerText = '✅ 제출 완료!'; swBtn.style.backgroundColor = '';
+                    }
+                    swRender();
+
+                    if (isHost) {
+                        playerIds.filter((id) => players[id]?.isBot && results[id] === undefined).forEach((botId) => {
+                            const key = `${currentRoomCode}_${roundKey}_${botId}`;
+                            if (!swBotSubmitHandled.has(key)) {
+                                swBotSubmitHandled.add(key);
+                                setTimeout(() => autoSubmitSwForBot(botId, roundKey, targetMs, showTime), botDelay(1500, 5000));
+                            }
+                        });
+                    }
+
+                    const rows = playerIds.map(id => ({ id, nickname: players[id]?.nickname || '참가자', r: results[id] }));
+                    const allResponded = playerIds.length > 0 && playerIds.every(id => results[id] !== undefined);
+                    let loserIds = [];
+                    if (allResponded) {
+                        const maxDiff = Math.max(...rows.map(x => Math.abs(x.r.diffMs)));
+                        loserIds = rows.filter(x => Math.abs(x.r.diffMs) === maxDiff).map(x => x.id);
+                        rows.sort((a, b) => Math.abs(a.r.diffMs) - Math.abs(b.r.diffMs));
+                    }
+                    const swListEl = document.getElementById('sw-score-list');
+                    swListEl.innerHTML = rows.length === 0 ? '대기 중...' : '';
+                    rows.forEach(x => {
+                        const row = document.createElement('div'); row.className = 'score-row';
+                        const isLoser = loserIds.includes(x.id);
+                        let label, color;
+                        if (!allResponded) {
+                            label = x.r ? '✅ 제출 완료' : '⏳ 대기중';
+                            color = x.r ? 'var(--success-color)' : '#8E9AA8';
+                        } else {
+                            label = `${(x.r.elapsedMs / 1000).toFixed(2)}초 (${swSigned(x.r.diffMs)})${isLoser ? ' · 패배!' : ''}`;
+                            color = isLoser ? 'var(--danger-color)' : 'var(--success-color)';
+                        }
+                        row.innerHTML = `<span>${isLoser ? '🍺' : '👤'} ${x.nickname}</span><span style="color:${color};">${label}</span>`;
+                        swListEl.appendChild(row);
+                    });
+
+                    if (allResponded && isHost && swResultTriggeredKey !== roundKey) {
+                        swResultTriggeredKey = roundKey;
+                        const chosenLoserId = loserIds[Math.floor(Math.random() * loserIds.length)];
+                        update(ref(db, `rooms/${currentRoomCode}`), {
+                            swLoserIds: [...loserIds].sort(),
+                            roomLastLoserId: chosenLoserId,
+                            roomLoserPendingChoice: true
+                        });
+                    }
+
+                    if (data.swLoserIds && data.swLoserIds.length > 0) {
+                        const names = data.swLoserIds.map(id => players[id]?.nickname || '참가자').join(', ');
+                        triggerExplosionEffect({
+                            key: `sw_${roundKey}`,
+                            title: '⏱️ 결과 발표! 💥',
+                            message: `목표 ${(targetMs / 1000).toFixed(2)}초에서 가장 먼 ${names}님 벌칙!`,
+                            duration: 0
+                        });
+                    }
+                }
                 else if (data.selectedGame === 'drink') {
                     showScreen('game-drink-screen');
                     const durationSec = data.drinkDurationSec || 60;
@@ -3649,6 +3855,7 @@
             if(data.status === 'waiting') { 
                 showScreen('lobby-screen'); clearCanvas(); 
                 stopTimingLoop(); timingActiveRoundKey = null;
+                swResetLocal();
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
@@ -4427,7 +4634,7 @@
         return text;
     }
 
-    function startGameFlow(gameId) {
+    function startGameFlow(gameId, keepSettings = false) {
         get(ref(db, `rooms/${currentRoomCode}`)).then(async (snap) => {
             const roomSnapVal = snap.val() || {};
             const pIds = Object.keys(roomSnapVal.players || {}); if(pIds.length < 2) return alert('최소 2명 필요합니다!');
@@ -4520,6 +4727,22 @@
             } else if (gameId === 'timing') {
                 const target = Math.round(Math.random() * 1000) / 100; // 0.00 ~ 10.00
                 update(rRef, { status: 'playing', timingTarget: target, timingStartTime: getServerNow(), timingResults: null });
+            } else if (gameId === 'stopwatch') {
+                // "같은 게임 다시하기"는 직전 설정(목표 시간/숨김 여부)을 그대로 이어받음
+                let targetMs, showTime;
+                if (keepSettings && roomSnapVal.swLastTargetMs) {
+                    targetMs = roomSnapVal.swLastTargetMs;
+                    showTime = roomSnapVal.swLastShowTime !== false;
+                } else {
+                    const rawSec = parseFloat(document.getElementById('stopwatch-target-sec')?.value);
+                    const sec = Math.min(SW_MAX_SEC, Math.max(0.1, Number.isFinite(rawSec) ? rawSec : 5));
+                    targetMs = Math.round(sec * 1000);
+                    showTime = swSelectedShowTime;
+                }
+                update(rRef, {
+                    status: 'playing', swTargetMs: targetMs, swShowTime: showTime, swLastTargetMs: targetMs, swLastShowTime: showTime,
+                    swRoundKey: getServerNow(), swResults: null, swLoserIds: null
+                });
             } else if (gameId === 'drink') {
                 const minutesEl = document.getElementById('drink-initial-minutes');
                 let minutes = parseFloat(minutesEl?.value);
@@ -4618,7 +4841,7 @@
             const d = snap.val(); if (!d) return;
             // 서버 최신 상태 기준으로 다시 한 번 권한 확인 (버튼이 늦게 사라졌을 경우 대비)
             if (!d.roomLoserPendingChoice || d.roomLastLoserId !== myId || !d.roomLastGameId) return;
-            startGameFlow(d.roomLastGameId);
+            startGameFlow(d.roomLastGameId, true);
         });
     };
 
@@ -4626,6 +4849,14 @@
         if (!isHost) return;
         update(ref(db, `rooms/${currentRoomCode}`), { roomLastLoserId: null });
     });
+
+    function setSwShowTime(show) {
+        swSelectedShowTime = show;
+        document.getElementById('btn-sw-show').classList.toggle('active', show);
+        document.getElementById('btn-sw-hide').classList.toggle('active', !show);
+    }
+    document.getElementById('btn-sw-show').addEventListener('click', () => setSwShowTime(true));
+    document.getElementById('btn-sw-hide').addEventListener('click', () => setSwShowTime(false));
 
     document.getElementById('btn-host-assign-picker').addEventListener('click', () => {
         if (!isHost || !currentRoomCode) return;
@@ -4656,7 +4887,8 @@
                 sonFingers: null, sonConditionIndex: null, sonAnsweredIds: null, sonRoundKey: null, sonTurnOrder: null, sonTurnIndex: null, sonConditionSetAt: null,
                 bingoBoards: null, bingoCalled: null, bingoLinesToLose: null, bingoRoundKey: null, bingoLoserId: null, bingoTurnOrder: null, bingoTurnIdx: null,
                 ladderPlayerOrder: null, ladderRungs: null, ladderPenaltyBottoms: null, ladderRevealed: null, ladderRoundKey: null,
-                drinkDurationSec: null, drinkStartAt: null, drinkRoundKey: null, drinkLoserId: null, drinkPenaltyText: null, drinkRevealed: false
+                drinkDurationSec: null, drinkStartAt: null, drinkRoundKey: null, drinkLoserId: null, drinkPenaltyText: null, drinkRevealed: false,
+                swTargetMs: null, swShowTime: null, swRoundKey: null, swResults: null, swLoserIds: null
                 // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
             });
         });
