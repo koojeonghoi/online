@@ -369,6 +369,23 @@
         @keyframes pulseSlot { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
         #rouletteResultText { display: none; font-size: 16px; font-weight: bold; color: var(--danger-color); background: #3d1d1d; border: 2px solid var(--danger-color); border-radius: 10px; padding: 10px; margin: 10px 0; }
 
+        /* 🥤 물 따르기 */
+        .pour-stage { position: relative; width: 190px; height: 250px; margin: 6px auto 10px; }
+        .pour-pitcher { position: absolute; top: 0; left: 50%; transform: translateX(-50%); font-size: 34px; line-height: 1; z-index: 3; }
+        .pour-stream { position: absolute; top: 34px; left: 50%; width: 9px; height: 0; margin-left: -4.5px; border-radius: 5px; background: linear-gradient(180deg, #9bdcff, #4aa8ff); z-index: 2; transition: height 0.12s linear; }
+        .pour-stream.on { height: 200px; }
+        .pour-cup { position: absolute; bottom: 0; left: 25px; width: 140px; height: 170px; border: 4px solid #5b6470; border-top: none; border-radius: 0 0 28px 28px; background: rgba(255,255,255,0.04); overflow: hidden; }
+        .pour-water { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: linear-gradient(180deg, #7ccaff, #2f8fe6); transition: height 0.1s linear; }
+        .pour-cup.brim { border-color: var(--accent-color); animation: pourBrim 0.45s ease-in-out infinite; }
+        .pour-cup.spill { border-color: var(--danger-color); animation: pourSpill 0.5s ease-in-out 3; }
+        @keyframes pourBrim { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03, 0.98); } }
+        @keyframes pourSpill { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+        .pour-bar { height: 14px; background: #1E1E22; border-radius: 8px; overflow: hidden; margin: 6px 0 4px; }
+        .pour-bar-fill { height: 100%; width: 0%; background: var(--primary-color); }
+        .pour-bar-fill.ok { background: var(--success-color); }
+        #btn-pour-hold { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; background-color: var(--primary-color); color: #121214; font-size: 18px; padding: 22px 16px; margin: 6px 0 14px; }
+        #btn-pour-hold:disabled { opacity: 0.5; }
+
         /* 👆 스피드 손가락 */
         .speed-target-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
         .speed-target { aspect-ratio: 1; border-radius: 14px; background: #252529; border: 3px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 30px; transition: all 0.1s; cursor: pointer; }
@@ -455,6 +472,7 @@
             <button class="tab-btn" id="tab-cham" onclick="selectGameMode('cham')">👈 참참참</button>
             <button class="tab-btn" id="tab-drink" onclick="selectGameMode('drink')">🍻 랜덤마시기</button>
             <button class="tab-btn" id="tab-stopwatch" onclick="selectGameMode('stopwatch')">⏱️ 스톱워치 저격</button>
+            <button class="tab-btn" id="tab-pour" onclick="selectGameMode('pour')">🥤 물 따르기</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -813,6 +831,34 @@
             <div id="sw-score-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-stopwatch" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 🥤 물 따르기 스크린 -->
+    <div id="game-pour-screen" class="screen">
+        <h2>🥤 물 따르기</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px; text-align: left;">
+            <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
+                컵 크기는 비밀! 순서대로 버튼을 <b>꾹 눌러</b> 물을 따르고, <b>넘치게 따른 사람이 패배</b>해요.<br>
+                · 최소 0.8초는 따라야 하고, 앞사람이 오래 따랐다면 그만큼은 따라야 해요.<br>
+                · 물이 꽤 차오르면 🔥<b>서든데스</b>! 모두 동시에 버튼을 꾹 누르고 버티다가 눈치껏 손을 떼세요. 넘칠 때까지 누르고 있던 사람은 <b>전원 패배</b>, 오래 버틴 사람이 다음 순서를 먼저 따르고 먼저 뗀 사람은 뒤로 밀려요.
+            </div>
+        </div>
+        <div id="pour-status" style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; min-height: 22px;">불러오는 중...</div>
+        <div class="pour-stage">
+            <div class="pour-pitcher">🚰</div>
+            <div class="pour-stream" id="pour-stream"></div>
+            <div class="pour-cup" id="pour-cup"><div class="pour-water" id="pour-water"></div></div>
+        </div>
+        <div id="pour-min-box" style="display:none; text-align:left;">
+            <div class="pour-bar"><div class="pour-bar-fill" id="pour-min-fill"></div></div>
+            <div id="pour-min-text" style="font-size: 12px; color: #8E9AA8;"></div>
+        </div>
+        <button id="btn-pour-hold" disabled>⏳ 내 차례를 기다리는 중</button>
+        <div class="score-board">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 순서 / 상태</div>
+            <div id="pour-player-list">대기 중...</div>
+        </div>
+        <button id="btn-back-lobby-pour" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <!-- 🍻 랜덤 마시기 게임 스크린 -->
@@ -2131,6 +2177,349 @@
         }, { applyLocally: false }).catch((error) => console.error('bot roulette pull transaction failed:', error));
     }
 
+    // ===== 🥤 물 따르기 (턴제 따르기 + 서든데스 치킨게임) =====
+    // 시간(ms)이 곧 물의 양: 1ms 따르면 수위 1 증가. 컵 용량(pourCap)은 참가자에게 보이지 않음.
+    const POUR_MIN_MS = 800;               // 한 번 따를 때 최소 시간
+    const POUR_IDLE_MS = 8000;             // 내 차례에 이 시간 동안 안 누르면 최소만큼 자동으로 따라짐
+    const POUR_CHICKEN_COUNTDOWN_MS = 3000; // 서든데스 시작 전 준비 시간
+    let pourLastRaw = null, pourRAF = null, pourActiveRoundKey = null;
+    let pourPressing = false, pourPressAt = 0, pourJoinedKey = null, pourLastPollAt = 0, pourLastListHtml = '';
+    const pourBotHandled = new Set();
+
+    function pourTx(fn) {
+        if (!currentRoomCode) return Promise.resolve();
+        return runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
+            if (!room || room.status !== 'playing' || room.selectedGame !== 'pour') return undefined;
+            return fn(room) ? room : undefined;
+        }, { applyLocally: false }).catch((error) => console.error('pour transaction failed:', error));
+    }
+
+    // 서든데스에서 각자가 손을 뗀 시각 (서든데스 시작 전에 안 누른 사람은 시작 시각에 뗀 것으로 봄, 아직 누르는 중이면 Infinity)
+    function pourRelOf(room, id, start) {
+        const hold = room.pourHold || {}, rel = room.pourReleaseAt || {};
+        if (!hold[id]) return start;
+        return rel[id] !== undefined ? Math.max(rel[id], start) : Infinity;
+    }
+
+    function pourLiveLevel(room, at) {
+        const cap = Number(room.pourCap) || 9000;
+        if (room.pourPhase === 'chicken' && room.pourChickenStart) {
+            const start = room.pourChickenStart, base = room.pourChickenBase || 0;
+            if (at <= start) return base;
+            let lastRel = start;
+            Object.keys(room.players || {}).forEach((id) => { lastRel = Math.max(lastRel, pourRelOf(room, id, start)); });
+            return Math.min(cap, base + (Math.min(at, lastRel) - start));
+        }
+        let level = room.pourLevel || 0;
+        if (room.pourPhase === 'turn' && room.pourStreamId && room.pourStreamStart) level += Math.max(0, at - room.pourStreamStart);
+        return Math.min(cap, level);
+    }
+
+    function pourFinish(room, loserIds, at) {
+        room.pourPhase = 'done';
+        room.pourLoserIds = loserIds;
+        room.pourResultKey = at;
+        room.pourStreamId = null; room.pourStreamStart = null;
+        room.pourLevel = room.pourCap;
+        room.roomLastLoserId = loserIds[Math.floor(Math.random() * loserIds.length)];
+        room.roomLoserPendingChoice = true;
+    }
+
+    // 한 번의 따르기를 확정: 넘치면 패배, 아니면 서든데스 진입 또는 다음 차례로
+    function pourCommitPour(room, id, poured, at) {
+        const cap = room.pourCap;
+        const newLevel = (room.pourLevel || 0) + poured;
+        room.pourStreamId = null; room.pourStreamStart = null;
+        if (newLevel >= cap) { pourFinish(room, [id], at); return; }
+        room.pourLevel = newLevel;
+        room.pourLastPourMs = poured;
+        if (!room.pourChickenDone && newLevel >= cap * room.pourChickenAt && newLevel <= cap * 0.9) {
+            room.pourPhase = 'chicken';
+            room.pourChickenDone = true;
+            room.pourChickenStart = at + POUR_CHICKEN_COUNTDOWN_MS;
+            room.pourChickenBase = newLevel;
+            room.pourHold = null; room.pourReleaseAt = null;
+            return;
+        }
+        const order = room.pourTurnOrder || [];
+        room.pourTurnIdx = ((room.pourTurnIdx || 0) + 1) % order.length;
+        room.pourTurnStart = at;
+        room.pourMinMs = Math.max(POUR_MIN_MS, poured); // 다음 사람은 앞사람이 따른 만큼은 따라야 함
+    }
+
+    function pourPress(room, who, at) {
+        if (room.pourPhase !== 'turn' || room.pourStreamId) return false;
+        const order = room.pourTurnOrder || [];
+        if (order[room.pourTurnIdx || 0] !== who) return false;
+        room.pourStreamId = who; room.pourStreamStart = at;
+        return true;
+    }
+
+    function pourRelease(room, who, at) {
+        if (room.pourPhase !== 'turn' || room.pourStreamId !== who) return false;
+        const held = Math.max(0, at - (room.pourStreamStart ?? at));
+        pourCommitPour(room, who, Math.max(room.pourMinMs || POUR_MIN_MS, held), at);
+        return true;
+    }
+
+    // 서든데스 정산: 넘치기 전에 전원이 손을 뗐으면 턴제 재개, 넘칠 때까지 누른 사람이 있으면 그 사람들 전원 패배
+    function pourEndChicken(room, at) {
+        const start = room.pourChickenStart;
+        if (!start || at < start) return false;
+        const base = room.pourChickenBase || 0, cap = room.pourCap;
+        const ids = Object.keys(room.players || {});
+        const tOv = start + (cap - base);
+        let lastRel = start;
+        ids.forEach((id) => { lastRel = Math.max(lastRel, pourRelOf(room, id, start)); });
+        if (lastRel === Infinity && at < tOv) return false; // 아직 버티는 사람이 있고 넘치기 전
+        if (lastRel > tOv) {
+            const losers = ids.filter((id) => pourRelOf(room, id, start) > tOv);
+            pourFinish(room, losers, at);
+            return true;
+        }
+        const prev = room.pourTurnOrder || [];
+        room.pourTurnOrder = ids.slice().sort((a, b) => {
+            const diff = pourRelOf(room, b, start) - pourRelOf(room, a, start); // 오래 버틴 사람이 먼저
+            return diff !== 0 ? diff : prev.indexOf(a) - prev.indexOf(b);
+        });
+        room.pourLevel = Math.min(cap - 1, base + (lastRel - start));
+        room.pourPhase = 'turn';
+        room.pourTurnIdx = 0; room.pourTurnStart = at; room.pourMinMs = POUR_MIN_MS;
+        room.pourChickenStart = null; room.pourChickenBase = null; room.pourHold = null; room.pourReleaseAt = null;
+        return true;
+    }
+
+    // 시간이 지나면서 저절로 일어나야 하는 일(넘침 / 자리 비운 차례 / 장시간 무응답 / 서든데스 정산)
+    function pourStep(room, at) {
+        if (room.pourPhase === 'chicken') return pourEndChicken(room, at);
+        if (room.pourPhase !== 'turn') return false;
+        const order = room.pourTurnOrder || [], players = room.players || {};
+        if (room.pourStreamId) {
+            const live = (room.pourLevel || 0) + Math.max(0, at - (room.pourStreamStart ?? at));
+            if (live < room.pourCap) return false;
+            pourFinish(room, [room.pourStreamId], at);
+            return true;
+        }
+        if (!order.some((id) => players[id])) return false;
+        const cur = order[room.pourTurnIdx || 0];
+        if (!players[cur]) {
+            room.pourTurnIdx = ((room.pourTurnIdx || 0) + 1) % order.length;
+            room.pourTurnStart = at;
+            return true;
+        }
+        if (at - (room.pourTurnStart ?? at) > POUR_IDLE_MS) {
+            pourCommitPour(room, cur, room.pourMinMs || POUR_MIN_MS, at);
+            return true;
+        }
+        return false;
+    }
+
+    function pourStopLocal() {
+        pourPressing = false; pourJoinedKey = null;
+        if (pourRAF) cancelAnimationFrame(pourRAF);
+        pourRAF = null; pourLastRaw = null; pourActiveRoundKey = null; pourLastListHtml = '';
+    }
+
+    function pourHoldStart(e) {
+        if (e) e.preventDefault();
+        const d = pourLastRaw;
+        if (!d || pourPressing || !currentRoomCode) return;
+        const now = getServerNow();
+        if (d.pourPhase === 'turn') {
+            const order = d.pourTurnOrder || [];
+            if (order[d.pourTurnIdx || 0] !== myId || d.pourStreamId) return;
+            pourPressing = true; pourPressAt = now;
+            pourTx((room) => pourPress(room, myId, now));
+        } else if (d.pourPhase === 'chicken' && now < d.pourChickenStart) {
+            pourPressing = true; pourPressAt = now;
+            pourJoinedKey = `${d.pourRoundKey}_${d.pourChickenStart}`;
+            set(ref(db, `rooms/${currentRoomCode}/pourHold/${myId}`), true);
+        }
+        if (pourPressing && navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function pourHoldEnd(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (!pourPressing) return;
+        pourPressing = false;
+        const d = pourLastRaw;
+        if (!d || !currentRoomCode) return;
+        const now = getServerNow();
+        if (d.pourPhase === 'turn') {
+            pourTx((room) => pourRelease(room, myId, now));
+        } else if (d.pourPhase === 'chicken') {
+            if (now < d.pourChickenStart) {
+                pourJoinedKey = null;
+                set(ref(db, `rooms/${currentRoomCode}/pourHold/${myId}`), false);
+            } else if (pourJoinedKey === `${d.pourRoundKey}_${d.pourChickenStart}`) {
+                set(ref(db, `rooms/${currentRoomCode}/pourReleaseAt/${myId}`), now);
+            }
+        }
+    }
+
+    // 🤖 봇: 방장 화면에서만 대신 눌러줌
+    function pourScheduleBots(data) {
+        if (!isHost) return;
+        const players = data.players || {};
+        const roundKey = data.pourRoundKey;
+        if (data.pourPhase === 'turn' && !data.pourStreamId) {
+            const cur = (data.pourTurnOrder || [])[data.pourTurnIdx || 0];
+            if (!cur || !players[cur]?.isBot) return;
+            const key = `${roundKey}_turn_${data.pourTurnStart}`;
+            if (pourBotHandled.has(key)) return;
+            pourBotHandled.add(key);
+            const holdMs = (data.pourMinMs || POUR_MIN_MS) + (Math.random() < 0.3 ? botDelay(300, 1500) : botDelay(0, 150));
+            setTimeout(() => {
+                const pressAt = getServerNow();
+                pourTx((room) => pourPress(room, cur, pressAt)).then(() => {
+                    setTimeout(() => pourTx((room) => pourRelease(room, cur, getServerNow())), holdMs);
+                });
+            }, botDelay(700, 1800));
+        } else if (data.pourPhase === 'chicken') {
+            const start = data.pourChickenStart;
+            Object.keys(players).filter((id) => players[id]?.isBot).forEach((botId) => {
+                const key = `${roundKey}_chicken_${botId}`;
+                if (pourBotHandled.has(key)) return;
+                pourBotHandled.add(key);
+                if (Math.random() > 0.85) return; // 가끔은 참가 안 하는 겁쟁이 봇
+                const now = getServerNow();
+                setTimeout(() => set(ref(db, `rooms/${currentRoomCode}/pourHold/${botId}`), true), botDelay(200, Math.max(300, start - now - 500)));
+                setTimeout(() => {
+                    if (!pourLastRaw || pourLastRaw.pourPhase !== 'chicken' || `${pourLastRaw.pourRoundKey}` !== `${roundKey}`) return;
+                    set(ref(db, `rooms/${currentRoomCode}/pourReleaseAt/${botId}`), getServerNow());
+                }, Math.max(0, start - now) + botDelay(600, 4200));
+            });
+        }
+    }
+
+    function pourRender(data) {
+        const roundKey = `${data.pourRoundKey || ''}`;
+        if (pourActiveRoundKey !== roundKey) {
+            pourActiveRoundKey = roundKey;
+            pourPressing = false; pourJoinedKey = null; pourLastListHtml = '';
+            pourBotHandled.clear();
+        }
+        pourLastRaw = data;
+        pourScheduleBots(data);
+        if (data.pourPhase === 'done') {
+            const losers = Object.values(data.pourLoserIds || {});
+            if (losers.length > 0) {
+                const names = losers.map((id) => (data.players || {})[id]?.nickname || '참가자').join(', ');
+                triggerExplosionEffect({
+                    key: `pour_${data.pourResultKey || roundKey}`,
+                    title: '💦 넘쳤다! 💦',
+                    message: `${names}님 벌칙!`,
+                    duration: 0
+                });
+            }
+        }
+        if (!pourRAF) pourRAF = requestAnimationFrame(pourFrame);
+    }
+
+    function pourFrame() {
+        pourRAF = null;
+        const d = pourLastRaw;
+        const screenEl = document.getElementById('game-pour-screen');
+        if (!d || !screenEl || !screenEl.classList.contains('active')) return;
+        const now = getServerNow();
+        const phase = d.pourPhase || 'turn';
+        const players = d.players || {};
+        const cap = Number(d.pourCap) || 9000, fuzz = Number(d.pourFuzz) || 1;
+        const order = (d.pourTurnOrder || []).filter((id) => players[id]);
+        const curId = (d.pourTurnOrder || [])[d.pourTurnIdx || 0];
+        const nick = (id) => players[id]?.nickname || '참가자';
+        const start = d.pourChickenStart;
+
+        // 컵 / 물줄기
+        const level = pourLiveLevel(d, now);
+        const frac = phase === 'done' ? 1 : Math.min(1, level / (cap * fuzz));
+        document.getElementById('pour-water').style.height = `${(frac * 100).toFixed(1)}%`;
+        const cupEl = document.getElementById('pour-cup');
+        cupEl.classList.toggle('brim', phase !== 'done' && frac >= 0.9);
+        cupEl.classList.toggle('spill', phase === 'done');
+        const holders = (phase === 'chicken' && start)
+            ? Object.keys(players).filter((id) => (now < start ? (d.pourHold || {})[id] : pourRelOf(d, id, start) === Infinity))
+            : [];
+        const streaming = (phase === 'turn' && !!d.pourStreamId) || (phase === 'chicken' && now >= start && holders.length > 0);
+        document.getElementById('pour-stream').classList.toggle('on', streaming);
+
+        // 상태 문구
+        let status;
+        if (phase === 'turn') {
+            if (d.pourStreamId) status = `💧 <b>${nick(d.pourStreamId)}</b>님이 따르는 중...`;
+            else if (curId === myId) status = '🎯 내 차례! 버튼을 꾹 눌러 따르세요';
+            else status = `⏳ <b>${nick(curId)}</b>님이 따를 차례예요`;
+        } else if (phase === 'chicken') {
+            status = now < start
+                ? `🔥 서든데스! <b>${Math.max(1, Math.ceil((start - now) / 1000))}초</b> 뒤 시작 — 지금 버튼을 꾹 누르세요!`
+                : `🔥 <b>${holders.length}명</b>이 버티는 중 — 넘치기 전에 손을 떼세요!`;
+        } else {
+            const names = Object.values(d.pourLoserIds || {}).map(nick).join(', ');
+            status = `💦 <b>${names}</b>님 물이 넘쳤어요!`;
+        }
+        document.getElementById('pour-status').innerHTML = status;
+
+        // 내 버튼
+        const btn = document.getElementById('btn-pour-hold');
+        let label, disabled = true;
+        if (phase === 'turn') {
+            if (pourPressing || d.pourStreamId === myId) { label = '💧 따르는 중... 손을 떼면 끝'; disabled = false; }
+            else if (curId === myId && !d.pourStreamId) { label = '🥤 꾹 눌러서 따르기'; disabled = false; }
+            else label = '⏳ 내 차례를 기다리는 중';
+        } else if (phase === 'chicken') {
+            if (now < start) { label = pourPressing ? '✋ 좋아요! 계속 누르고 계세요' : '👇 꾹 눌러서 서든데스 참가!'; disabled = false; }
+            else if (pourPressing) { label = '🔥 버티는 중! 손을 떼면 탈출'; disabled = false; }
+            else label = '🏃 탈출 완료 (또는 불참)';
+        } else label = '💦 결과 발표!';
+        if (btn.textContent !== label) btn.textContent = label;
+        if (btn.disabled !== disabled) btn.disabled = disabled;
+
+        // 최소 따르기 시간 게이지 (내가 따를 때만)
+        const barBox = document.getElementById('pour-min-box');
+        const minMs = d.pourMinMs || POUR_MIN_MS;
+        const showBar = phase === 'turn' && curId === myId;
+        barBox.style.display = showBar ? 'block' : 'none';
+        if (showBar) {
+            const startAt = pourPressing ? pourPressAt : d.pourStreamStart;
+            const held = (pourPressing || d.pourStreamId === myId) && startAt ? Math.max(0, now - startAt) : 0;
+            const fill = document.getElementById('pour-min-fill');
+            fill.style.width = `${Math.min(100, (held / minMs) * 100).toFixed(1)}%`;
+            fill.classList.toggle('ok', held >= minMs);
+            document.getElementById('pour-min-text').textContent =
+                `⏱️ ${(held / 1000).toFixed(1)}초 / 최소 ${(minMs / 1000).toFixed(1)}초${minMs > POUR_MIN_MS ? ' (앞사람이 따른 만큼)' : ''}`;
+        }
+
+        // 순서/상태 목록 (바뀔 때만 다시 그림)
+        const loserSet = new Set(Object.values(d.pourLoserIds || {}));
+        const rows = order.map((id, i) => {
+            let icon = (phase === 'turn' && id === curId) ? '👉' : '👤';
+            let right = phase === 'turn' ? (id === curId ? '따르는 차례' : '') : '';
+            let color = '#8E9AA8';
+            if (phase === 'chicken') {
+                if (now < start) { const joined = !!(d.pourHold || {})[id]; right = joined ? '✋ 준비' : '대기'; color = joined ? 'var(--success-color)' : '#8E9AA8'; }
+                else if (pourRelOf(d, id, start) === Infinity) { icon = '🔥'; right = '버티는 중'; color = 'var(--danger-color)'; }
+                else { icon = '🏃'; right = '탈출'; color = 'var(--success-color)'; }
+            } else if (phase === 'done' && loserSet.has(id)) { icon = '💦'; right = '패배!'; color = 'var(--danger-color)'; }
+            return `<div class="score-row"><span>${icon} ${i + 1}. ${nick(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${color};">${right}</span></div>`;
+        }).join('');
+        if (rows !== pourLastListHtml) { pourLastListHtml = rows; document.getElementById('pour-player-list').innerHTML = rows || '대기 중...'; }
+
+        // 시간이 지나면 저절로 일어나야 하는 일(넘침 등)은 누구든 감지해서 처리 — 트랜잭션이 중복 처리를 막아줌
+        if (now - pourLastPollAt > 250) {
+            pourLastPollAt = now;
+            if (pourStep(JSON.parse(JSON.stringify(d)), now)) pourTx((room) => pourStep(room, getServerNow()));
+        }
+        pourRAF = requestAnimationFrame(pourFrame);
+    }
+
+    (function initPourButton() {
+        const btn = document.getElementById('btn-pour-hold');
+        btn.addEventListener('pointerdown', (e) => { try { btn.setPointerCapture(e.pointerId); } catch (_) {} pourHoldStart(e); });
+        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => btn.addEventListener(t, pourHoldEnd));
+        btn.addEventListener('contextmenu', (e) => e.preventDefault());
+        document.addEventListener('visibilitychange', () => { if (document.hidden) pourHoldEnd(); });
+    })();
+
     function autoTapSpeedFingerForBot(botId, expectedSignalTime, targetSpot) {
         if (!currentRoomCode) return;
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
@@ -3159,6 +3548,10 @@
                         }
                     }
                 }
+                else if (data.selectedGame === 'pour') {
+                    showScreen('game-pour-screen');
+                    pourRender(data);
+                }
                 else if (data.selectedGame === 'roulette') {
                     showScreen('game-roulette-screen');
                     const slotCount = data.rouletteSlotCount || 6;
@@ -3856,6 +4249,7 @@
                 showScreen('lobby-screen'); clearCanvas(); 
                 stopTimingLoop(); timingActiveRoundKey = null;
                 swResetLocal();
+                pourStopLocal();
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
@@ -4774,6 +5168,19 @@
                     status: 'playing', chamMasterDir: CHAM_DIRS[Math.floor(Math.random() * CHAM_DIRS.length)], chamRoundKey: getServerNow(),
                     chamChoices: null, chamLoserIds: null, chamResultRevealed: false
                 });
+            } else if (gameId === 'pour') {
+                const now = getServerNow();
+                update(rRef, {
+                    status: 'playing', pourRoundKey: now, pourPhase: 'turn',
+                    pourCap: 7000 + Math.floor(Math.random() * 5001),      // 컵 용량(비밀): 7~12초 분량
+                    pourFuzz: 0.85 + Math.random() * 0.3,                  // 화면에 보이는 눈대중 오차(비밀)
+                    pourChickenAt: 0.55 + Math.random() * 0.25,            // 서든데스 시작 수위(비밀)
+                    pourChickenDone: false, pourLevel: 0,
+                    pourTurnOrder: [...pIds].sort(() => Math.random() - 0.5), pourTurnIdx: 0, pourTurnStart: now, pourMinMs: POUR_MIN_MS,
+                    pourStreamId: null, pourStreamStart: null, pourLastPourMs: 0,
+                    pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null,
+                    pourLoserIds: null, pourResultKey: null
+                });
             } else if (gameId === 'roulette') {
                 const slotCount = 6;
                 update(rRef, {
@@ -4888,7 +5295,8 @@
                 bingoBoards: null, bingoCalled: null, bingoLinesToLose: null, bingoRoundKey: null, bingoLoserId: null, bingoTurnOrder: null, bingoTurnIdx: null,
                 ladderPlayerOrder: null, ladderRungs: null, ladderPenaltyBottoms: null, ladderRevealed: null, ladderRoundKey: null,
                 drinkDurationSec: null, drinkStartAt: null, drinkRoundKey: null, drinkLoserId: null, drinkPenaltyText: null, drinkRevealed: false,
-                swTargetMs: null, swShowTime: null, swRoundKey: null, swResults: null, swLoserIds: null
+                swTargetMs: null, swShowTime: null, swRoundKey: null, swResults: null, swLoserIds: null,
+                pourRoundKey: null, pourPhase: null, pourCap: null, pourFuzz: null, pourChickenAt: null, pourChickenDone: null, pourLevel: null, pourTurnOrder: null, pourTurnIdx: null, pourTurnStart: null, pourMinMs: null, pourStreamId: null, pourStreamStart: null, pourLastPourMs: null, pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null, pourLoserIds: null, pourResultKey: null
                 // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
             });
         });
