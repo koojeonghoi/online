@@ -33,6 +33,7 @@
 
         html, body {
             touch-action: manipulation;
+            overscroll-behavior-y: none; /* 끝까지 당겼을 때 화면이 출렁이거나 새로고침되는 것 방지 */
         }
 
         /* 화면을 길게 눌렀을 때 텍스트가 선택되거나 복사 팝업(iOS 돋보기 등)이 뜨는 것을 막는다.
@@ -183,12 +184,14 @@
 
         #canvas-container {
             position: relative; background-color: #151518 !important; border-radius: 12px;
-            margin: 15px auto; width: min(280px, 100%); aspect-ratio: 1 / 1; overflow: hidden; border: 3px solid var(--primary-color);
+            margin: 10px auto; width: min(280px, 100%, 38vh); aspect-ratio: 1 / 1; overflow: hidden; border: 3px solid var(--primary-color);
+            touch-action: none; /* 캔버스 위에서는 손가락 이동이 페이지 스크롤로 넘어가지 않게 */
         }
-        canvas { display: block; width: 100%; height: 100%; background-color: transparent !important; position: absolute; top: 0; left: 0; z-index: 2; cursor: crosshair; }
+        canvas { display: block; width: 100%; height: 100%; background-color: transparent !important; position: absolute; top: 0; left: 0; z-index: 2; cursor: crosshair; touch-action: none; }
         #target-shape-preview { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: .4; display: flex; justify-content: center; align-items: center; z-index: 1; }
         #preview-svg { width: 100%; height: 100%; display: block; }
 
+        #game-draw-screen .score-board { max-height: none; overflow: visible; }
         .score-board { background-color: #151518; border-radius: 8px; padding: 12px; margin-top: 15px; text-align: left; max-height: 250px; overflow-y: auto; }
         .score-row { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #252529; font-weight: bold; }
         .rps-choice-btn { flex: 1; background-color: #252529; color: white; border: 2px solid #3A3A42; padding: 16px 8px; font-size: 15px; font-weight: bold; border-radius: 12px; line-height: 1.7; transition: all 0.15s; }
@@ -975,6 +978,15 @@
 
 <button id="btn-replay-same-game" onclick="window.replaySameGame()" style="display:none; position:fixed; left:50%; transform:translateX(-50%); bottom:18px; z-index:500; background-color:var(--accent-color); color:#121214; font-weight:800; padding:14px 22px; border-radius:30px; border:none; box-shadow:0 4px 16px rgba(0,0,0,0.45); width:auto;">🔁 같은 게임 다시하기</button>
 
+<div id="leave-confirm-modal" class="image-modal" style="z-index:10001;">
+    <div class="modal-content">
+        <h3 style="margin-top:0; color:var(--accent-color);">방에서 나갈까요?</h3>
+        <p style="color:#B3B3B9; font-size:14px; line-height:1.6; margin:0 0 6px;">실수로 누르셨다면 '계속 하기'를 눌러주세요.</p>
+        <button class="modal-close" style="background:var(--primary-color); color:#121214;" onclick="window.closeLeaveConfirm()">계속 하기</button>
+        <button class="modal-close" onclick="window.confirmLeaveRoom()">나가기</button>
+    </div>
+</div>
+
 <div id="global-image-modal" class="image-modal">
     <div class="modal-content">
         <h3 id="modal-user-title" style="margin-top: 0; color: var(--primary-color);">그림 보기</h3>
@@ -1596,28 +1608,67 @@
         return picked;
     }
 
-    // 🔁 새로고침/화면 회전 등으로 페이지가 다시 로드돼도 직전에 있던 방으로 자동 재입장
-    // (sessionStorage 기준이라 탭/앱을 완전히 닫으면 사라진다)
+    // 🔁 새로고침/화면 회전/다른 앱 사용 중 브라우저가 페이지를 정리해서 다시 로드돼도 직전에 있던 방으로 자동 재입장
+    // sessionStorage는 안드로이드가 앱/탭을 메모리에서 내리면 사라지므로 localStorage에도 함께 저장한다.
+    // (내 플레이어 ID도 같이 저장해야 방장 권한과 내 기록이 그대로 이어진다)
     const ACTIVE_ROOM_KEY = 'partyGameActiveRoom';
     const ACTIVE_ROOM_TTL_MS = 12 * 60 * 60 * 1000;
+    let leavingRoom = false; // 사용자가 직접 "나가기"를 누른 경우 (강퇴 알림 등을 건너뛰기 위함)
     function saveActiveRoom(code, nickname) {
-        try { sessionStorage.setItem(ACTIVE_ROOM_KEY, JSON.stringify({ code, nickname, ts: Date.now() })); } catch (e) {}
+        const val = JSON.stringify({ code, nickname, myId, ts: Date.now() });
+        try { sessionStorage.setItem(ACTIVE_ROOM_KEY, val); } catch (e) {}
+        try { localStorage.setItem(ACTIVE_ROOM_KEY, val); } catch (e) {}
+        armBackGuard();
     }
     function clearActiveRoom() {
         try { sessionStorage.removeItem(ACTIVE_ROOM_KEY); } catch (e) {}
+        try { localStorage.removeItem(ACTIVE_ROOM_KEY); } catch (e) {}
     }
     async function tryRestoreActiveRoom() {
         let saved = null;
-        try { saved = JSON.parse(sessionStorage.getItem(ACTIVE_ROOM_KEY) || 'null'); } catch (e) {}
+        try { saved = JSON.parse(sessionStorage.getItem(ACTIVE_ROOM_KEY) || localStorage.getItem(ACTIVE_ROOM_KEY) || 'null'); } catch (e) {}
         if (!saved || !saved.code || !saved.nickname || Date.now() - saved.ts > ACTIVE_ROOM_TTL_MS) { clearActiveRoom(); return; }
         try {
             const snap = await get(ref(db, `rooms/${saved.code}`));
             if (!snap.exists()) { clearActiveRoom(); return; }
+            if (saved.myId) { try { sessionStorage.setItem(`partyGameId_${saved.code}`, saved.myId); } catch (e) {} }
             document.getElementById('nickname-input').value = saved.nickname;
             document.getElementById('room-code-input').value = saved.code;
             document.getElementById('btn-join-room').click();
         } catch (e) { /* 네트워크 오류 시에는 로그인 화면 유지 */ }
     }
+
+    // 다른 앱으로 나갈 때마다 저장 시각을 갱신해서, 오래 쓰는 중에도 만료되지 않게 한다
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && currentRoomCode && myNickname && !leavingRoom) saveActiveRoom(currentRoomCode, myNickname);
+    });
+
+    // ⬅️ 폰의 뒤로가기: 방에 있는 동안은 바로 나가지지 않고 확인 팝업을 띄운다
+    let backGuardArmed = false;
+    function armBackGuard() {
+        if (backGuardArmed) return;
+        backGuardArmed = true;
+        try { history.pushState({ partyGuard: true }, ''); } catch (e) {}
+    }
+    window.addEventListener('popstate', () => {
+        if (leavingRoom || !currentRoomCode || !backGuardArmed) return;
+        try { history.pushState({ partyGuard: true }, ''); } catch (e) {} // 다시 막아두고
+        document.getElementById('leave-confirm-modal').style.display = 'flex';
+    });
+    window.closeLeaveConfirm = function () {
+        document.getElementById('leave-confirm-modal').style.display = 'none';
+    };
+    window.confirmLeaveRoom = async function () {
+        leavingRoom = true;
+        document.getElementById('leave-confirm-modal').style.display = 'none';
+        const code = currentRoomCode;
+        clearActiveRoom();
+        // 방장은 방을 유지하고(다시 들어오면 방장 그대로), 참가자는 목록에서 빠진다
+        if (code && myId && !isHost) {
+            try { await remove(ref(db, `rooms/${code}/players/${myId}`)); } catch (e) {}
+        }
+        window.location.reload();
+    };
 
     // 폭탄 타이머는 Firebase에 새로운 변경사항(write)이 없으면 onValue가 다시 실행되지 않아
     // 폭발 시점이 지나도 자동으로 터지지 않는 문제가 있었음.
@@ -2775,7 +2826,7 @@
             if (data.selectedGame) updateTabUI(data.selectedGame);
 
             // 강퇴당했는지 확인 (예전에는 방에 있었는데 지금 목록에 내가 없는 경우)
-            if (hasSeenMyselfInRoom && !players[myId]) {
+            if (hasSeenMyselfInRoom && !players[myId] && !leavingRoom) {
                 alert('방장에 의해 강퇴되었습니다.');
                 sessionStorage.removeItem(`partyGameId_${roomCode}`);
                 clearActiveRoom();
@@ -4586,6 +4637,34 @@
         return result;
     }
 
+    // 초성대결 답안 제출 (사람/봇 공통)
+    // 여러 명이 동시에 같은 단어를 내도 한 명만 통과되도록 transaction으로 처리한다.
+    // (예전에는 읽기 → 쓰기 사이에 틈이 있어 동시에 낸 같은 단어가 모두 저장될 수 있었음)
+    async function commitSpeedAnswer(rData, playerId, word) {
+        const res = await runTransaction(ref(db, `rooms/${currentRoomCode}/speedAnswers`), (cur) => {
+            const a = cur || {};
+            if (a[playerId]) return;                          // 이미 제출함
+            if (Object.values(a).includes(word)) return;      // 이미 나온 단어
+            a[playerId] = word;
+            return a;
+        }, { applyLocally: false });
+        const answers = res.snapshot.val() || {};
+        if (!res.committed) return { ok: false, duplicate: answers[playerId] ? false : true };
+        // 한 명만 남으면 그 사람이 탈락
+        const playerIds = Object.keys(rData.players || {});
+        if (Object.keys(answers).length === playerIds.length - 1) {
+            const loserId = playerIds.find((id) => !answers[id]);
+            if (loserId) {
+                await update(ref(db), {
+                    [`rooms/${currentRoomCode}/speedLoserId`]: loserId,
+                    [`rooms/${currentRoomCode}/roomLastLoserId`]: loserId,
+                    [`rooms/${currentRoomCode}/roomLoserPendingChoice`]: true
+                });
+            }
+        }
+        return { ok: true };
+    }
+
     function autoAnswerSpeedForBot(botId, expectedChosungIndex, wordLength) {
         if (!currentRoomCode) return;
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
@@ -4600,22 +4679,16 @@
             const candidates = entry.answers.filter((w) => !used.has(w));
             if (!candidates.length) return;
             const userAns = candidates[Math.floor(Math.random() * candidates.length)];
-            const updates = {}; updates[`rooms/${currentRoomCode}/speedAnswers/${botId}`] = userAns;
-            if (Object.keys(currentAnswers).length + 1 === Object.keys(rData.players).length - 1) {
-                const loserId = Object.keys(rData.players).find((id) => id !== botId && !currentAnswers[id]);
-                if (loserId) {
-                    updates[`rooms/${currentRoomCode}/speedLoserId`] = loserId;
-                    updates[`rooms/${currentRoomCode}/roomLastLoserId`] = loserId;
-                    updates[`rooms/${currentRoomCode}/roomLoserPendingChoice`] = true;
-                }
-            }
-            update(ref(db), updates);
+            commitSpeedAnswer(rData, botId, userAns).then((r) => {
+                // 사람이 먼저 같은 단어를 냈다면 한 번 더 다른 단어로 시도
+                if (!r.ok && r.duplicate) setTimeout(() => autoAnswerSpeedForBot(botId, expectedChosungIndex, wordLength), 300);
+            });
         });
     }
 
-    
     document.getElementById('btn-submit-speed').addEventListener('click', () => {
-        const userAns = document.getElementById('speed-answer-input').value.trim().replace(/\s+/g, "");
+        const input = document.getElementById('speed-answer-input');
+        const userAns = input.value.trim().replace(/\s+/g, "");
         if (!userAns) return;
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
             const rData = snap.val(); if(!rData || rData.speedLoserId) return;
@@ -4634,16 +4707,11 @@
             }
             const currentAnswers = rData.speedAnswers || {}; if (currentAnswers[myId]) return;
             if (Object.values(currentAnswers).includes(userAns)) return alert(`이미 나온 단어예요! 다른 단어를 입력하세요. (${userAns})`);
-            const updates = {}; updates[`rooms/${currentRoomCode}/speedAnswers/${myId}`] = userAns;
-            if (Object.keys(currentAnswers).length + 1 === Object.keys(rData.players).length - 1) {
-                const loserId = Object.keys(rData.players).find(id => id !== myId && !currentAnswers[id]);
-                if(loserId) {
-                    updates[`rooms/${currentRoomCode}/speedLoserId`] = loserId;
-                    updates[`rooms/${currentRoomCode}/roomLastLoserId`] = loserId;
-                    updates[`rooms/${currentRoomCode}/roomLoserPendingChoice`] = true;
-                }
-            }
-            update(ref(db), updates).then(() => { document.getElementById('speed-answer-input').value = ''; });
+            commitSpeedAnswer(rData, myId, userAns).then((r) => {
+                if (r.ok) { input.value = ''; return; }
+                // 읽은 뒤 거의 동시에 다른 사람이 같은 단어를 먼저 낸 경우
+                if (r.duplicate) alert(`방금 다른 사람이 먼저 입력했어요! 다른 단어를 입력하세요. (${userAns})`);
+            });
         });
     });
 
