@@ -921,7 +921,7 @@
         <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px; text-align: left;">
             <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
                 순서대로 카드를 한 장씩 뒤집어요. 펼쳐진 카드들에서 <b>같은 과일이 딱 5개</b>가 되는 순간 🔔을 제일 먼저 치세요!<br>
-                · 가장 빨리 치면 깔린 카드를 전부 획득 (+장수) 하고, <b>나머지 전원은 🍺 한 모금!</b> / <b>잘못 치면 -3점</b><br>
+                · 가장 빨리 치면 깔린 카드를 전부 획득 (+장수) 하고, <b>나머지 전원은 🍺 한 모금!</b> / <b>잘못 치면 -3점 + 본인 🍺 한 모금!</b><br>
                 · 5개가 떴는데 <b>아무도 못 치고 다음 카드에 덮이면 전원 🍺 한 모금!</b><br>
                 · 각자 6장만 사용 — 카드가 다 떨어지면 끝! <b>가장 적게 모은 사람이 패배</b>
             </div>
@@ -2853,6 +2853,7 @@
         let cls = 'drink', emoji, title, sub;
         if (ev.type === 'win' && ev.who === myId) { cls = 'safe'; emoji = '🔔'; title = '내가 제일 빨랐다!'; sub = '나머지 전원이 마셔요 🍺'; }
         else if (ev.type === 'win') { emoji = '🍺'; title = '한 모금!'; sub = `${nick(ev.who)}님이 먼저 쳤어요`; }
+        else if (ev.type === 'wrong') { emoji = '🚨'; title = '오답! 한 모금!'; sub = `-${HG_WRONG_PENALTY}점 · 나만 마셔요 🍺`; }
         else { emoji = '😱'; title = '전원 한 모금!'; sub = `${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요`; }
         document.querySelectorAll('.hg-fx').forEach((el) => el.remove());
         const fx = document.createElement('div');
@@ -2915,7 +2916,7 @@
                 ? `🔔 <b>${nick(ev.who)}</b>님 ${HG_FRUITS[ev.fruit]} 성공! +${ev.n}장`
                 : (ev.type === 'miss'
                     ? `😱 ${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요!`
-                    : `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점`);
+                    : `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점 🍺`);
         } else if (!anyLeft) {
             status = '🔔 마지막 카드예요! 5개가 있는지 확인하세요';
         } else {
@@ -2948,7 +2949,8 @@
             evHtml = `😱 ${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요!<br>🍺 전원 한 모금!`;
             evDrink = true;
         } else if (ev) {
-            evHtml = `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점`;
+            evHtml = `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점<br>🍺 ${nick(ev.who)}님만 한 모금!`;
+            evDrink = true;
         }
         const evKey = `${evDrink ? 'd' : 'n'}${evHtml}`;
         if (evKey !== hgLastEventHtml) {
@@ -2959,7 +2961,8 @@
         }
         if (ev && ev.seq !== hgFxSeq) {
             hgFxSeq = ev.seq;
-            if ((ev.type === 'win' || ev.type === 'miss') && now - ev.at < 2500) hgShowFx(ev, nick);
+            const mine = ev.type === 'wrong' && ev.who === myId; // 오답은 친 본인 화면에만 이펙트
+            if ((ev.type === 'win' || ev.type === 'miss' || mine) && now - ev.at < 2500) hgShowFx(ev, nick);
         }
 
         // 내 버튼
