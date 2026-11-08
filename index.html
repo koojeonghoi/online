@@ -912,6 +912,7 @@
             <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
                 순서대로 카드를 한 장씩 뒤집어요. 펼쳐진 카드들에서 <b>같은 과일이 딱 5개</b>가 되는 순간 🔔을 제일 먼저 치세요!<br>
                 · 가장 빨리 치면 깔린 카드를 전부 획득 (+장수) 하고, <b>나머지 전원은 🍺 한 모금!</b> / <b>잘못 치면 -3점</b><br>
+                · 5개가 떴는데 <b>아무도 못 치고 다음 카드에 덮이면 전원 🍺 한 모금!</b><br>
                 · 각자 6장만 사용 — 카드가 다 떨어지면 끝! <b>가장 적게 모은 사람이 패배</b>
             </div>
         </div>
@@ -2707,13 +2708,22 @@
         room.hgTurnIdx = idx; room.hgTurnStart = at;
     }
 
+    // 5개가 떠 있는데 아무도 못 쳤으면 '놓침' 이벤트 (전원 한 모금). 놓친 5개가 있었으면 true
+    function hgMarkMissed(room, at) {
+        const fruit = hgFiveFruit(room.hgTop);
+        if (fruit < 0) return false;
+        room.hgEventSeq = (room.hgEventSeq || 0) + 1;
+        room.hgEvent = { type: 'miss', fruit, at, seq: room.hgEventSeq };
+        return true;
+    }
+
     function hgFlip(room, who, at) {
         if (room.hgPhase !== 'play') return false;
         const order = room.hgTurnOrder || [];
         if (order[room.hgTurnIdx || 0] !== who) return false;
         const deck = (room.hgDecks || {})[who] || [];
         if (deck.length === 0) { hgAdvanceTurn(room, at); return true; }
-        if (hgFiveFruit(room.hgTop) >= 0) room.hgGraceUntil = at + HG_COVER_GRACE_MS; // 놓친 5개를 덮는 순간
+        if (hgMarkMissed(room, at)) room.hgGraceUntil = at + HG_COVER_GRACE_MS; // 놓친 5개를 덮는 순간
         room.hgDecks = room.hgDecks || {};
         room.hgDecks[who] = deck.slice(1);
         room.hgTop = room.hgTop || {};
@@ -2748,6 +2758,7 @@
     }
 
     function hgFinish(room, at) {
+        hgMarkMissed(room, at); // 마지막 카드에서 5개가 떴는데 아무도 못 쳤으면 이것도 놓친 것
         const ids = Object.keys(room.players || {});
         const score = room.hgScore || {};
         const min = Math.min(...ids.map((id) => score[id] || 0));
@@ -2871,7 +2882,9 @@
         } else if (ev && now - ev.at < 2500) {
             status = ev.type === 'win'
                 ? `🔔 <b>${nick(ev.who)}</b>님 ${HG_FRUITS[ev.fruit]} 성공! +${ev.n}장`
-                : `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점`;
+                : (ev.type === 'miss'
+                    ? `😱 ${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요!`
+                    : `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점`);
         } else if (!anyLeft) {
             status = '🔔 마지막 카드예요! 5개가 있는지 확인하세요';
         } else {
@@ -2899,6 +2912,9 @@
         let evHtml = '종을 쳐서 같은 과일 5개를 맞춰보세요!', evDrink = false;
         if (ev && ev.type === 'win') {
             evHtml = `🔔 <b>${nick(ev.who)}</b>님이 제일 빨랐어요! ${HG_FRUITS[ev.fruit]} +${ev.n}장<br>🍺 나머지 전원 한 모금!`;
+            evDrink = true;
+        } else if (ev && ev.type === 'miss') {
+            evHtml = `😱 ${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요!<br>🍺 전원 한 모금!`;
             evDrink = true;
         } else if (ev) {
             evHtml = `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점`;
