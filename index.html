@@ -401,6 +401,31 @@
         #btn-hg-ring { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; background-color: var(--danger-color); color: #fff; font-size: 22px; padding: 22px 16px; margin: 4px 0 8px; }
         #btn-hg-ring:disabled, #btn-hg-flip:disabled { opacity: 0.5; }
 
+        /* 🎲 윷놀이 */
+        .yut-board { position: relative; width: 100%; max-width: 320px; aspect-ratio: 1 / 1; margin: 8px auto 10px; background: #151518; border: 2px solid #2D2D34; border-radius: 14px; }
+        .yut-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+        .yut-node { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #252529; border: 2px solid #3A3A42; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; }
+        .yut-node.big { width: 32px; height: 32px; margin: -16px 0 0 -16px; font-size: 15px; }
+        .yut-node.pen { border-color: var(--danger-color); background: #3d1d1d; font-size: 13px; }
+        .yut-pieces { position: absolute; inset: 0; pointer-events: none; }
+        .yut-piece { position: absolute; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; color: #121214; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); transition: left 0.45s ease, top 0.45s ease, margin 0.45s ease; z-index: 3; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+        .yut-piece.me { outline: 2px solid #fff; outline-offset: 1px; }
+        .yut-piece.turn { animation: yutPulse 1s ease-in-out infinite; }
+        @keyframes yutPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.7); } 50% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } }
+        .yut-sticks { display: flex; gap: 10px; justify-content: center; align-items: flex-end; height: 62px; margin: 4px 0; perspective: 300px; }
+        .yut-stick { width: 16px; height: 54px; border-radius: 8px; background: #3a3a40; border: 2px solid #4a4a52; }
+        .yut-stick.flat { background: repeating-linear-gradient(180deg, #f0dcae 0 10px, #d9bd82 10px 12px); border-color: #b8975a; }
+        .yut-stick.back { background: #6b4521; border-color: #3a2610; }
+        .yut-sticks.rolling .yut-stick { animation: yutRoll 0.75s ease-in-out; }
+        .yut-sticks.rolling .yut-stick:nth-child(2) { animation-delay: 0.04s; }
+        .yut-sticks.rolling .yut-stick:nth-child(3) { animation-delay: 0.08s; }
+        .yut-sticks.rolling .yut-stick:nth-child(4) { animation-delay: 0.12s; }
+        @keyframes yutRoll { 0% { transform: translateY(0) rotateX(0deg); } 45% { transform: translateY(-30px) rotateX(540deg); } 100% { transform: translateY(0) rotateX(1080deg); } }
+        .yut-last { min-height: 62px; background: #151518; border: 1px solid #2D2D34; border-radius: 10px; padding: 8px 10px; margin: 6px 0 10px; font-size: 13px; line-height: 1.6; color: #C9D1DA; text-align: left; }
+        .yut-last .yut-pen { color: #fff; background: #3d1d1d; border: 1px solid var(--danger-color); border-radius: 8px; padding: 4px 8px; margin-top: 4px; font-weight: 700; }
+        #btn-yut-throw { background-color: var(--primary-color); color: #121214; font-size: 18px; padding: 20px 16px; margin: 6px 0 14px; }
+        #btn-yut-throw:disabled { opacity: 0.5; }
+
         /* 👆 스피드 손가락 */
         .speed-target-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
         .speed-target { aspect-ratio: 1; border-radius: 14px; background: #252529; border: 3px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 30px; transition: all 0.1s; cursor: pointer; }
@@ -489,6 +514,7 @@
             <button class="tab-btn" id="tab-stopwatch" onclick="selectGameMode('stopwatch')">⏱️ 스톱워치 저격</button>
             <button class="tab-btn" id="tab-pour" onclick="selectGameMode('pour')">🥤 물 따르기</button>
             <button class="tab-btn" id="tab-halli" onclick="selectGameMode('halli')">🔔 할리갈리</button>
+            <button class="tab-btn" id="tab-yut" onclick="selectGameMode('yut')">🎲 윷놀이</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -892,6 +918,30 @@
         <button id="btn-hg-flip" disabled>⏳ 내 차례를 기다리는 중</button>
         <button id="btn-hg-ring" disabled>🔔 종 치기!</button>
         <button id="btn-back-lobby-halli" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 🎲 윷놀이 스크린 -->
+    <div id="game-yut-screen" class="screen">
+        <h2>🎲 윷놀이</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px; text-align: left;">
+            <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
+                한 명당 말 1개! 순서대로 윷을 던져 🏁에서 출발해 한 바퀴 돌아와요.<br>
+                · ⚡ 모서리에 <b>딱 멈추면</b> 지름길(대각선)로 질러가요<br>
+                · 🍺 칸에 <b>멈추면 즉시 벌칙!</b> (스쳐 지나가면 괜찮아요)<br>
+                · 윷·모, 상대 말 잡기(상대는 출발점으로)는 한 번 더!<br>
+                · 먼저 도착하거나 각자 8턴이 끝나면 종료 — <b>도착까지 가장 먼 사람이 패배</b>
+            </div>
+        </div>
+        <div id="yut-status" style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; min-height: 22px;">불러오는 중...</div>
+        <div class="yut-board" id="yut-board"></div>
+        <div class="yut-sticks" id="yut-sticks"><div class="yut-stick"></div><div class="yut-stick"></div><div class="yut-stick"></div><div class="yut-stick"></div></div>
+        <div class="yut-last" id="yut-last">윷을 던져보세요!</div>
+        <button id="btn-yut-throw" disabled>⏳ 내 차례를 기다리는 중</button>
+        <div class="score-board">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 순서 / 상태</div>
+            <div id="yut-player-list">대기 중...</div>
+        </div>
+        <button id="btn-back-lobby-yut" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <!-- 🍻 랜덤 마시기 게임 스크린 -->
@@ -2864,6 +2914,328 @@
         document.getElementById('btn-hg-ring').addEventListener('pointerdown', hgRingPress);
     })();
 
+    // ===== 🎲 윷놀이 (미니: 말 1개 개인전 + 지름길 1개 + 벌칙 칸) =====
+    // 칸 번호: 외곽 0~15 (0=출발/도착점, 모서리 4·8·12), 지름길 16(↗아래)·17(중앙)·18, 도착=99.
+    // 4번 모서리에 "딱 멈추면" 다음 이동에서 4→16→17→18→12 지름길을 탐 (스쳐 지나가면 외곽 그대로).
+    const YUT_FINISH = 99, YUT_D1 = 16, YUT_C = 17, YUT_D2 = 18;
+    const YUT_TURNS = 8;           // 각자 이 턴 수를 쓰면 종료 (윷·모·잡기 보너스 던지기는 턴으로 안 침)
+    const YUT_IDLE_MS = 8000;      // 내 차례에 이 시간 동안 안 던지면 자동으로 던져짐
+    const YUT_ROLL_MS = 850;       // 윷가락 굴리는 연출 시간 (이 동안 결과/말 이동 공개를 미룸)
+    const YUT_PENALTY_TILES = 3;   // 벌칙 칸 개수 (판마다 랜덤)
+    const YUT_NAMES = { 1: '도', 2: '개', 3: '걸', 4: '윷', 5: '모' };
+    const YUT_COLORS = ['#ff5a6e', '#4aa8ff', '#ffd34d', '#6fdc6f', '#b57bff', '#ff9f43', '#2ee6d6', '#ff7ac8'];
+    const YUT_PENALTY_TEXTS = ['🍺 한 모금 마시기', '🍻 옆사람과 건배하고 한 모금', '🫵 한 명 지목해서 같이 한 모금', '🎤 건배사 한마디 하고 한 모금'];
+    const YUT_XY = (() => {
+        const m = {}, lo = 8, hi = 92, st = 21;
+        m[0] = [hi, hi];
+        for (let i = 1; i <= 3; i++) m[i] = [hi, hi - st * i];
+        m[4] = [hi, lo];
+        for (let i = 5; i <= 7; i++) m[i] = [hi - st * (i - 4), lo];
+        m[8] = [lo, lo];
+        for (let i = 9; i <= 11; i++) m[i] = [lo, lo + st * (i - 8)];
+        m[12] = [lo, hi];
+        for (let i = 13; i <= 15; i++) m[i] = [lo + st * (i - 12), hi];
+        m[YUT_D1] = [71, 29]; m[YUT_C] = [50, 50]; m[YUT_D2] = [29, 71];
+        m[YUT_FINISH] = [hi, hi];
+        return m;
+    })();
+    let yutLastRaw = null, yutViewData = null, yutRAF = null, yutActiveRoundKey = null, yutShownSeq = null, yutRevealAt = 0;
+    let yutLastPollAt = 0, yutLastPressAt = 0, yutDoneKey = null, yutPieceEls = {};
+    let yutLastStatusHtml = '', yutLastBoxHtml = '', yutLastListHtml = '', yutLastSticks = '';
+    const yutBotHandled = new Set();
+
+    function yutTx(fn) {
+        if (!currentRoomCode) return Promise.resolve();
+        return runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
+            if (!room || room.status !== 'playing' || room.selectedGame !== 'yut') return undefined;
+            return fn(room) ? room : undefined;
+        }, { applyLocally: false }).catch((error) => console.error('yut transaction failed:', error));
+    }
+
+    function yutShuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+        return arr;
+    }
+
+    function yutNext(node, useShortcut) {
+        if (node === 4 && useShortcut) return YUT_D1;
+        if (node === YUT_D1) return YUT_C;
+        if (node === YUT_C) return YUT_D2;
+        if (node === YUT_D2) return 12;
+        if (node === 15) return YUT_FINISH;
+        return node + 1;
+    }
+
+    // 도착까지 남은 칸 수 (패배자 판정용)
+    function yutDist(node, sc) {
+        if (node === YUT_FINISH) return 0;
+        if (node === YUT_D1) return 7;
+        if (node === YUT_C) return 6;
+        if (node === YUT_D2) return 5;
+        if (node === 4 && sc) return 8;
+        return 16 - node;
+    }
+
+    function yutEndTurn(room, who, at) {
+        room.yutTurnsLeft = room.yutTurnsLeft || {};
+        room.yutTurnsLeft[who] = (room.yutTurnsLeft[who] || 0) - 1;
+        const order = room.yutTurnOrder || [], players = room.players || {}, n = order.length;
+        const idx = room.yutTurnIdx || 0;
+        for (let i = 1; i <= n; i++) {
+            const cand = (idx + i) % n;
+            if (players[order[cand]] && (room.yutTurnsLeft[order[cand]] || 0) > 0) {
+                room.yutTurnIdx = cand; room.yutTurnStart = at;
+                return true;
+            }
+        }
+        return false; // 모두 턴 소진
+    }
+
+    // winnerId가 있으면 도착으로 종료, 없으면 턴 소진으로 종료. 도착까지 가장 먼 사람(들)이 패배
+    function yutFinish(room, at, winnerId) {
+        const players = room.players || {};
+        const ids = Object.keys(players).filter((id) => id !== winnerId);
+        const dist = (id) => yutDist((room.yutPos || {})[id] ?? 0, !!(room.yutSc || {})[id]);
+        const max = Math.max(...ids.map(dist));
+        let losers = ids.filter((id) => dist(id) === max);
+        const allTie = !winnerId && losers.length === ids.length;
+        if (allTie) losers = [losers[Math.floor(Math.random() * losers.length)]]; // 전원 같은 거리면 랜덤 1명
+        room.yutPhase = 'done';
+        room.yutWinnerId = winnerId || null;
+        room.yutLoserIds = losers; room.yutAllTie = allTie; room.yutResultKey = at;
+        room.roomLastLoserId = losers[Math.floor(Math.random() * losers.length)];
+        room.roomLoserPendingChoice = true;
+    }
+
+    function yutThrow(room, who, at) {
+        if (room.yutPhase !== 'play') return false;
+        const order = room.yutTurnOrder || [];
+        if (order[room.yutTurnIdx || 0] !== who) return false;
+        const players = room.players || {};
+        const sticks = [0, 1, 2, 3].map(() => Math.random() < 0.5); // true = 평평한 면
+        const flat = sticks.filter(Boolean).length;
+        const steps = flat === 0 ? 5 : flat; // 0개=모(5), 1=도, 2=개, 3=걸, 4=윷
+        room.yutPos = room.yutPos || {}; room.yutSc = room.yutSc || {};
+        let cur = room.yutPos[who] ?? 0;
+        const sc = !!room.yutSc[who];
+        for (let i = 0; i < steps; i++) {
+            cur = yutNext(cur, i === 0 && sc);
+            if (cur === YUT_FINISH) break;
+        }
+        room.yutPos[who] = cur;
+        room.yutSc[who] = cur === 4; // 모서리에 딱 멈췄을 때만 지름길 자격
+
+        const captured = [];
+        let penalty = null;
+        if (cur !== YUT_FINISH && cur !== 0) {
+            Object.keys(players).forEach((id) => {
+                if (id !== who && (room.yutPos[id] ?? 0) === cur) { room.yutPos[id] = 0; room.yutSc[id] = false; captured.push(id); }
+            });
+            if ((room.yutPenalty || []).includes(cur)) penalty = YUT_PENALTY_TEXTS[Math.floor(Math.random() * YUT_PENALTY_TEXTS.length)];
+        }
+        const finished = cur === YUT_FINISH;
+        const bonus = !finished && (steps >= 4 || captured.length > 0);
+        room.yutSeq = (room.yutSeq || 0) + 1;
+        room.yutLast = { seq: room.yutSeq, who, steps, sticks, captured, penalty, bonus, finished, at };
+
+        if (finished) { yutFinish(room, at, who); return true; }
+        if (bonus) { room.yutTurnStart = at; return true; }
+        if (!yutEndTurn(room, who, at)) yutFinish(room, at, null);
+        return true;
+    }
+
+    // 시간이 지나면서 저절로 일어나야 하는 일(자리 비운 차례 건너뛰기 / 장시간 무응답 자동 던지기)
+    function yutStep(room, at) {
+        if (room.yutPhase !== 'play') return false;
+        const order = room.yutTurnOrder || [], players = room.players || {};
+        const cur = order[room.yutTurnIdx || 0];
+        if (!cur || !players[cur]) {
+            if (!yutEndTurn(room, cur, at)) yutFinish(room, at, null);
+            return true;
+        }
+        if (at - (room.yutTurnStart ?? at) > YUT_IDLE_MS) return yutThrow(room, cur, at);
+        return false;
+    }
+
+    function yutStopLocal() {
+        if (yutRAF) cancelAnimationFrame(yutRAF);
+        yutRAF = null; yutLastRaw = null; yutViewData = null; yutActiveRoundKey = null; yutShownSeq = null; yutRevealAt = 0;
+        yutDoneKey = null; yutPieceEls = {};
+        yutLastStatusHtml = ''; yutLastBoxHtml = ''; yutLastListHtml = ''; yutLastSticks = '';
+    }
+
+    function yutThrowPress() {
+        const d = yutLastRaw;
+        if (!d || d.yutPhase !== 'play') return;
+        if ((d.yutTurnOrder || [])[d.yutTurnIdx || 0] !== myId) return;
+        const now = getServerNow();
+        if (now - yutLastPressAt < 800) return; // 더블탭 방지
+        yutLastPressAt = now;
+        if (navigator.vibrate) navigator.vibrate(20);
+        yutTx((room) => yutThrow(room, myId, now));
+    }
+
+    // 🤖 봇: 방장 화면에서만 대신 던져줌
+    function yutScheduleBots(data) {
+        if (!isHost || data.yutPhase !== 'play') return;
+        const cur = (data.yutTurnOrder || [])[data.yutTurnIdx || 0];
+        if (!cur || !(data.players || {})[cur]?.isBot) return;
+        const key = `${data.yutRoundKey}_${data.yutSeq || 0}_${data.yutTurnStart}`;
+        if (yutBotHandled.has(key)) return;
+        yutBotHandled.add(key);
+        setTimeout(() => yutTx((room) => yutThrow(room, cur, getServerNow())), botDelay(1200, 2200));
+    }
+
+    function yutBuildBoard(d) {
+        const pen = new Set(Object.values(d.yutPenalty || []));
+        let html = '<svg class="yut-lines" viewBox="0 0 100 100"><path d="M92 92 L92 8 L8 8 L8 92 L92 92" fill="none" stroke="#3A3A42" stroke-width="1.6"/><path d="M92 8 L8 92" fill="none" stroke="#3A3A42" stroke-width="1.6"/></svg>';
+        for (let n = 0; n <= 18; n++) {
+            const [x, y] = YUT_XY[n];
+            const big = n === 0 || n === 4 || n === 8 || n === 12;
+            const label = n === 0 ? '🏁' : (n === 4 ? '⚡' : (pen.has(n) ? '🍺' : ''));
+            html += `<div class="yut-node${big ? ' big' : ''}${pen.has(n) ? ' pen' : ''}" style="left:${x}%;top:${y}%;">${label}</div>`;
+        }
+        return html + '<div class="yut-pieces" id="yut-pieces"></div>';
+    }
+
+    function yutUpdatePieces(v, ids, curId, playing) {
+        const layer = document.getElementById('yut-pieces');
+        if (!layer) return;
+        const pos = v.yutPos || {}, players = v.players || {}, fullOrder = v.yutTurnOrder || [];
+        const at = (id) => pos[id] ?? 0;
+        const byNode = {};
+        ids.forEach((id) => { (byNode[at(id)] = byNode[at(id)] || []).push(id); });
+        ids.forEach((id) => {
+            let el = yutPieceEls[id];
+            if (!el) { el = document.createElement('div'); layer.appendChild(el); yutPieceEls[id] = el; }
+            const group = byNode[at(id)], k = group.indexOf(id), [x, y] = YUT_XY[at(id)];
+            el.style.left = `${x}%`; el.style.top = `${y}%`;
+            el.style.marginLeft = `${(k - (group.length - 1) / 2) * 13}px`;
+            el.style.marginTop = `${group.length > 1 ? (k % 2) * 8 - 4 : 0}px`;
+            el.style.background = YUT_COLORS[Math.max(0, fullOrder.indexOf(id)) % YUT_COLORS.length];
+            el.textContent = at(id) === YUT_FINISH ? '👑' : (Array.from(players[id]?.nickname || '?')[0]);
+            el.className = 'yut-piece' + (id === myId ? ' me' : '') + (playing && id === curId ? ' turn' : '');
+        });
+        Object.keys(yutPieceEls).forEach((id) => { if (!ids.includes(id)) { yutPieceEls[id].remove(); delete yutPieceEls[id]; } });
+    }
+
+    function yutRender(data) {
+        const roundKey = `${data.yutRoundKey || ''}`;
+        if (yutActiveRoundKey !== roundKey) {
+            yutStopLocal();
+            yutActiveRoundKey = roundKey; yutBotHandled.clear();
+            document.getElementById('yut-board').innerHTML = yutBuildBoard(data);
+        }
+        yutLastRaw = data;
+        yutScheduleBots(data);
+        if (!yutRAF) yutRAF = requestAnimationFrame(yutFrame);
+    }
+
+    function yutFrame() {
+        yutRAF = null;
+        const d = yutLastRaw;
+        const screenEl = document.getElementById('game-yut-screen');
+        if (!d || !screenEl || !screenEl.classList.contains('active')) return;
+        const now = getServerNow();
+        const last = d.yutLast;
+
+        // 새 던지기가 오면 연출 시간(YUT_ROLL_MS) 동안 결과·말 이동 공개를 미룸 (이미 지난 던지기는 바로 공개)
+        if (last && yutShownSeq !== last.seq) {
+            yutShownSeq = last.seq;
+            yutRevealAt = now - last.at < 1500 ? last.at + YUT_ROLL_MS : 0;
+        }
+        const revealed = now >= yutRevealAt;
+        if (revealed || !yutViewData) yutViewData = d;
+        const v = yutViewData;
+
+        const players = v.players || {};
+        const nick = (id) => players[id]?.nickname || d.players?.[id]?.nickname || '참가자';
+        const ids = (v.yutTurnOrder || []).filter((id) => players[id]);
+        const curId = (d.yutTurnOrder || [])[d.yutTurnIdx || 0];
+        const done = d.yutPhase === 'done' && revealed;
+        const loserSet = new Set(Object.values(d.yutLoserIds || {}));
+
+        // 상태 문구
+        let status;
+        if (done) {
+            const names = [...loserSet].map(nick).join(', ');
+            status = d.yutWinnerId ? `🏁 <b>${nick(d.yutWinnerId)}</b>님 도착! 꼴찌는 <b>${names}</b>` : `⏰ 턴 종료! 가장 뒤처진 <b>${names}</b>님`;
+        } else if (!revealed && last) {
+            status = `🎲 <b>${nick(last.who)}</b>님이 윷을 던지는 중...`;
+        } else if (d.yutPhase === 'play' && curId === myId) {
+            status = last && last.who === myId && last.bonus ? '🎁 한 번 더! 윷을 던지세요' : '🎲 내 차례! 윷을 던지세요';
+        } else {
+            status = `⏳ <b>${nick(curId)}</b>님이 던질 차례예요`;
+        }
+        if (status !== yutLastStatusHtml) { yutLastStatusHtml = status; document.getElementById('yut-status').innerHTML = status; }
+
+        // 윷가락
+        let sticksState = 'idle';
+        if (last) sticksState = revealed ? last.sticks.map((b) => (b ? 'f' : 'b')).join('') : 'rolling';
+        if (sticksState !== yutLastSticks) {
+            yutLastSticks = sticksState;
+            const box = document.getElementById('yut-sticks');
+            box.classList.toggle('rolling', sticksState === 'rolling');
+            box.querySelectorAll('.yut-stick').forEach((el, i) => {
+                el.className = 'yut-stick' + (sticksState.length === 4 ? (last.sticks[i] ? ' flat' : ' back') : '');
+            });
+        }
+
+        // 최근 던지기 결과 (공개된 뒤에만)
+        let boxHtml = '윷을 던져보세요!';
+        if (last && revealed) {
+            boxHtml = `<div style="font-size:18px; font-weight:800; color:#fff;">${nick(last.who)}님 ${YUT_NAMES[last.steps]}! <span style="font-size:13px; font-weight:600; color:#8E9AA8;">${last.steps}칸${last.finished ? ' → 🏁 도착!' : ''}</span></div>`;
+            const caps = Object.values(last.captured || {});
+            if (caps.length) boxHtml += `<div>⚔️ ${caps.map(nick).join(', ')}님을 잡았어요! 출발점으로~</div>`;
+            if (last.bonus) boxHtml += '<div>🎁 한 번 더 던져요!</div>';
+            if (last.penalty) boxHtml += `<div class="yut-pen">🍺 벌칙 칸! ${nick(last.who)}님 — ${last.penalty}</div>`;
+        }
+        if (boxHtml !== yutLastBoxHtml) { yutLastBoxHtml = boxHtml; document.getElementById('yut-last').innerHTML = boxHtml; }
+
+        // 말 위치 / 순서·상태 목록
+        yutUpdatePieces(v, ids, curId, d.yutPhase === 'play');
+        const rows = ids.map((id, i) => {
+            const left = (v.yutTurnsLeft || {})[id] || 0;
+            const dist = yutDist((v.yutPos || {})[id] ?? 0, !!(v.yutSc || {})[id]);
+            let icon = d.yutPhase === 'play' && id === curId ? '👉' : '👤', right = `남은 ${left}턴 · 도착까지 ${dist}칸`, color = '#8E9AA8';
+            if (done && id === d.yutWinnerId) { icon = '👑'; right = '도착!'; color = 'var(--success-color)'; }
+            else if (done && loserSet.has(id)) { icon = '💦'; right = `패배! (${dist}칸 남음)`; color = 'var(--danger-color)'; }
+            return `<div class="score-row"><span>${icon} ${i + 1}. ${nick(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${color};">${right}</span></div>`;
+        }).join('');
+        if (rows !== yutLastListHtml) { yutLastListHtml = rows; document.getElementById('yut-player-list').innerHTML = rows || '대기 중...'; }
+
+        // 내 버튼
+        const btn = document.getElementById('btn-yut-throw');
+        const myTurn = d.yutPhase === 'play' && curId === myId && revealed;
+        const label = myTurn ? '🎲 윷 던지기!' : (d.yutPhase === 'done' ? '🏁 게임 종료' : '⏳ 내 차례를 기다리는 중');
+        if (btn.textContent !== label) btn.textContent = label;
+        if (btn.disabled !== !myTurn) btn.disabled = !myTurn;
+
+        // 결과 발표 (마지막 이동 연출이 끝난 뒤)
+        if (done && now >= yutRevealAt + 900) {
+            const key = `yut_${d.yutResultKey || d.yutRoundKey}`;
+            if (yutDoneKey !== key) {
+                yutDoneKey = key;
+                const names = [...loserSet].map(nick).join(', ');
+                triggerExplosionEffect({
+                    key,
+                    title: d.yutWinnerId ? '🎲 윷놀이 종료!' : '⏰ 윷놀이 시간 종료!',
+                    message: d.yutAllTie ? `전원 같은 거리! 랜덤으로 ${names}님 벌칙!` : `${names}님 벌칙!`,
+                    duration: 0
+                });
+            }
+        }
+
+        // 시간이 지나면 저절로 일어나야 하는 일은 누구든 감지해서 처리 — 트랜잭션이 중복 처리를 막아줌
+        if (now - yutLastPollAt > 250) {
+            yutLastPollAt = now;
+            if (yutStep(JSON.parse(JSON.stringify(d)), now)) yutTx((room) => yutStep(room, getServerNow()));
+        }
+        yutRAF = requestAnimationFrame(yutFrame);
+    }
+
+    document.getElementById('btn-yut-throw').addEventListener('click', yutThrowPress);
+
     function autoTapSpeedFingerForBot(botId, expectedSignalTime, targetSpot) {
         if (!currentRoomCode) return;
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
@@ -3896,6 +4268,10 @@
                     showScreen('game-pour-screen');
                     pourRender(data);
                 }
+                else if (data.selectedGame === 'yut') {
+                    showScreen('game-yut-screen');
+                    yutRender(data);
+                }
                 else if (data.selectedGame === 'halli') {
                     showScreen('game-halli-screen');
                     hgRender(data);
@@ -4599,6 +4975,7 @@
                 swResetLocal();
                 pourStopLocal();
                 hgStopLocal();
+                yutStopLocal();
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
@@ -5547,6 +5924,18 @@
                     pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null,
                     pourLoserIds: null, pourResultKey: null
                 });
+            } else if (gameId === 'yut') {
+                const now = getServerNow();
+                const order = yutShuffle([...pIds]);
+                const pos = {}, sc = {}, turnsLeft = {};
+                order.forEach((id) => { pos[id] = 0; sc[id] = false; turnsLeft[id] = YUT_TURNS; });
+                const candidates = [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, YUT_D1, YUT_C, YUT_D2]; // 출발점·모서리 제외
+                update(rRef, {
+                    status: 'playing', yutRoundKey: now, yutPhase: 'play', yutPos: pos, yutSc: sc,
+                    yutPenalty: yutShuffle(candidates).slice(0, YUT_PENALTY_TILES),
+                    yutTurnOrder: order, yutTurnIdx: 0, yutTurnStart: now, yutTurnsLeft: turnsLeft,
+                    yutSeq: 0, yutLast: null, yutWinnerId: null, yutLoserIds: null, yutAllTie: null, yutResultKey: null
+                });
             } else if (gameId === 'halli') {
                 const now = getServerNow();
                 const need = pIds.length * HG_CARDS_PER_PLAYER;
@@ -5680,7 +6069,8 @@
                 drinkDurationSec: null, drinkStartAt: null, drinkRoundKey: null, drinkLoserId: null, drinkPenaltyText: null, drinkRevealed: false,
                 swTargetMs: null, swShowTime: null, swRoundKey: null, swResults: null, swLoserIds: null,
                 pourRoundKey: null, pourPhase: null, pourCap: null, pourFuzz: null, pourChickenAt: null, pourChickenDone: null, pourLevel: null, pourTurnOrder: null, pourTurnIdx: null, pourTurnStart: null, pourMinMs: null, pourStreamId: null, pourStreamStart: null, pourLastPourMs: null, pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null, pourLoserIds: null, pourResultKey: null,
-                hgRoundKey: null, hgPhase: null, hgDecks: null, hgTop: null, hgTable: null, hgScore: null, hgTurnOrder: null, hgTurnIdx: null, hgTurnStart: null, hgFlipSeq: null, hgLastFlipAt: null, hgGraceUntil: null, hgEvent: null, hgEventSeq: null, hgLoserIds: null, hgAllTie: null, hgResultKey: null
+                hgRoundKey: null, hgPhase: null, hgDecks: null, hgTop: null, hgTable: null, hgScore: null, hgTurnOrder: null, hgTurnIdx: null, hgTurnStart: null, hgFlipSeq: null, hgLastFlipAt: null, hgGraceUntil: null, hgEvent: null, hgEventSeq: null, hgLoserIds: null, hgAllTie: null, hgResultKey: null,
+                yutRoundKey: null, yutPhase: null, yutPos: null, yutSc: null, yutPenalty: null, yutTurnOrder: null, yutTurnIdx: null, yutTurnStart: null, yutTurnsLeft: null, yutSeq: null, yutLast: null, yutWinnerId: null, yutLoserIds: null, yutAllTie: null, yutResultKey: null
                 // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
             });
         });
