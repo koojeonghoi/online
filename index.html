@@ -389,6 +389,18 @@
         #btn-pour-hold { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; background-color: var(--primary-color); color: #121214; font-size: 18px; padding: 22px 16px; margin: 6px 0 14px; }
         #btn-pour-hold:disabled { opacity: 0.5; }
 
+        /* 🔔 할리갈리 */
+        .hg-board { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0 12px; }
+        .hg-tile { background: #151518; border: 2px solid #2D2D34; border-radius: 12px; padding: 8px 6px; text-align: center; transition: border-color 0.15s; }
+        .hg-tile.turn { border-color: var(--accent-color); }
+        .hg-tile.loser { border-color: var(--danger-color); }
+        .hg-name { font-size: 12px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hg-card { margin: 6px auto; width: 90px; height: 72px; border-radius: 10px; background: #fff; border: 3px solid #ccc; display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 1px; font-size: 18px; line-height: 1.1; }
+        .hg-card.empty { background: #1c1c20; border-style: dashed; border-color: #3A3A42; color: #55606d; font-size: 14px; }
+        .hg-meta { font-size: 11px; color: #8E9AA8; }
+        #btn-hg-ring { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; background-color: var(--danger-color); color: #fff; font-size: 22px; padding: 22px 16px; margin: 4px 0 8px; }
+        #btn-hg-ring:disabled, #btn-hg-flip:disabled { opacity: 0.5; }
+
         /* 👆 스피드 손가락 */
         .speed-target-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
         .speed-target { aspect-ratio: 1; border-radius: 14px; background: #252529; border: 3px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 30px; transition: all 0.1s; cursor: pointer; }
@@ -476,6 +488,7 @@
             <button class="tab-btn" id="tab-drink" onclick="selectGameMode('drink')">🍻 랜덤마시기</button>
             <button class="tab-btn" id="tab-stopwatch" onclick="selectGameMode('stopwatch')">⏱️ 스톱워치 저격</button>
             <button class="tab-btn" id="tab-pour" onclick="selectGameMode('pour')">🥤 물 따르기</button>
+            <button class="tab-btn" id="tab-halli" onclick="selectGameMode('halli')">🔔 할리갈리</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -862,6 +875,23 @@
             <div id="pour-player-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-pour" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 🔔 할리갈리 스크린 -->
+    <div id="game-halli-screen" class="screen">
+        <h2>🔔 할리갈리</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px; text-align: left;">
+            <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
+                순서대로 카드를 한 장씩 뒤집어요. 펼쳐진 카드들에서 <b>같은 과일이 딱 5개</b>가 되는 순간 🔔을 제일 먼저 치세요!<br>
+                · 성공하면 깔린 카드를 전부 획득 (+장수), <b>잘못 치면 -3점</b><br>
+                · 각자 6장만 사용 — 카드가 다 떨어지면 끝! <b>가장 적게 모은 사람이 패배</b>
+            </div>
+        </div>
+        <div id="hg-status" style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; min-height: 22px;">불러오는 중...</div>
+        <div class="hg-board" id="hg-board"></div>
+        <button id="btn-hg-flip" disabled>⏳ 내 차례를 기다리는 중</button>
+        <button id="btn-hg-ring" disabled>🔔 종 치기!</button>
+        <button id="btn-back-lobby-halli" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <!-- 🍻 랜덤 마시기 게임 스크린 -->
@@ -2577,6 +2607,263 @@
         document.addEventListener('visibilitychange', () => { if (document.hidden) pourHoldEnd(); });
     })();
 
+    // ===== 🔔 할리갈리 (미니: 각자 6장) =====
+    // 카드 코드 = 과일(0~3) * 10 + 개수(1~5). 맨 위 카드들 중 같은 과일 합이 정확히 5면 종을 칠 수 있음.
+    const HG_FRUITS = ['🍓', '🍌', '🍇', '🍏'];
+    const HG_COLORS = ['#ff5a6e', '#e8b800', '#9a5cf0', '#3fb34f'];
+    const HG_COUNTS = [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5]; // 과일 1종 14장 (원본과 같은 분포)
+    const HG_CARDS_PER_PLAYER = 6;   // 한 판 길이: 인원 × 6장 (원본은 56장 전부)
+    const HG_WRONG_PENALTY = 3;      // 잘못 쳤을 때 감점
+    const HG_FLIP_IDLE_MS = 6000;    // 내 차례에 이 시간 안에 안 뒤집으면 자동으로 뒤집힘
+    const HG_END_DELAY_MS = 4000;    // 마지막 카드가 깔리고 이 시간이 지나면 종료
+    const HG_RING_GRACE_MS = 1500;   // 누군가 성공한 직후 늦게 도착한 종은 벌점 없이 무시
+    const HG_COVER_GRACE_MS = 700;   // 5개가 된 카드가 다음 카드에 덮인 직후의 종도 벌점 없이 무시
+    let hgLastRaw = null, hgRAF = null, hgActiveRoundKey = null, hgLastPollAt = 0, hgLastHtml = '', hgLastRingTapAt = 0;
+    const hgBotHandled = new Set();
+
+    function hgTx(fn) {
+        if (!currentRoomCode) return Promise.resolve();
+        return runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
+            if (!room || room.status !== 'playing' || room.selectedGame !== 'halli') return undefined;
+            return fn(room) ? room : undefined;
+        }, { applyLocally: false }).catch((error) => console.error('halli transaction failed:', error));
+    }
+
+    function hgShuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+        return arr;
+    }
+
+    // 맨 위 카드들에서 합이 정확히 5인 과일 번호 (없으면 -1)
+    function hgFiveFruit(tops) {
+        const sum = [0, 0, 0, 0];
+        Object.values(tops || {}).forEach((c) => { if (c) sum[Math.floor(c / 10)] += c % 10; });
+        return sum.findIndex((v) => v === 5);
+    }
+
+    function hgDeckLen(room, id) { return ((room.hgDecks || {})[id] || []).length; }
+
+    function hgAdvanceTurn(room, at) {
+        const order = room.hgTurnOrder || [], players = room.players || {};
+        const n = order.length;
+        let idx = room.hgTurnIdx || 0;
+        for (let i = 1; i <= n; i++) {
+            const cand = (idx + i) % n;
+            if (players[order[cand]] && hgDeckLen(room, order[cand]) > 0) { idx = cand; break; }
+        }
+        room.hgTurnIdx = idx; room.hgTurnStart = at;
+    }
+
+    function hgFlip(room, who, at) {
+        if (room.hgPhase !== 'play') return false;
+        const order = room.hgTurnOrder || [];
+        if (order[room.hgTurnIdx || 0] !== who) return false;
+        const deck = (room.hgDecks || {})[who] || [];
+        if (deck.length === 0) { hgAdvanceTurn(room, at); return true; }
+        if (hgFiveFruit(room.hgTop) >= 0) room.hgGraceUntil = at + HG_COVER_GRACE_MS; // 놓친 5개를 덮는 순간
+        room.hgDecks = room.hgDecks || {};
+        room.hgDecks[who] = deck.slice(1);
+        room.hgTop = room.hgTop || {};
+        room.hgTop[who] = deck[0];
+        room.hgTable = (room.hgTable || 0) + 1;
+        room.hgFlipSeq = (room.hgFlipSeq || 0) + 1;
+        room.hgLastFlipAt = at;
+        hgAdvanceTurn(room, at);
+        return true;
+    }
+
+    function hgRing(room, who, at) {
+        if (room.hgPhase !== 'play' || !(room.players || {})[who]) return false;
+        room.hgScore = room.hgScore || {};
+        const fruit = hgFiveFruit(room.hgTop);
+        if (fruit >= 0) {
+            const gain = room.hgTable || 0;
+            room.hgScore[who] = (room.hgScore[who] || 0) + gain;
+            room.hgTable = 0; room.hgTop = null;
+            room.hgGraceUntil = at + HG_RING_GRACE_MS;
+            room.hgEventSeq = (room.hgEventSeq || 0) + 1;
+            room.hgEvent = { type: 'win', who, n: gain, fruit, at, seq: room.hgEventSeq };
+            return true;
+        }
+        if (at < (room.hgGraceUntil || 0)) return false; // 한 발 늦은 종: 벌점 없이 무시
+        const ev = room.hgEvent;
+        if (ev && ev.type === 'wrong' && ev.who === who && at - ev.at < 600) return false; // 연타 방지
+        room.hgScore[who] = (room.hgScore[who] || 0) - HG_WRONG_PENALTY;
+        room.hgEventSeq = (room.hgEventSeq || 0) + 1;
+        room.hgEvent = { type: 'wrong', who, at, seq: room.hgEventSeq };
+        return true;
+    }
+
+    function hgFinish(room, at) {
+        const ids = Object.keys(room.players || {});
+        const score = room.hgScore || {};
+        const min = Math.min(...ids.map((id) => score[id] || 0));
+        let losers = ids.filter((id) => (score[id] || 0) === min);
+        const allTie = losers.length === ids.length;
+        if (allTie) losers = [ids[Math.floor(Math.random() * ids.length)]]; // 전원 동점이면 랜덤 1명
+        room.hgPhase = 'done';
+        room.hgLoserIds = losers; room.hgAllTie = allTie; room.hgResultKey = at;
+        room.roomLastLoserId = losers[Math.floor(Math.random() * losers.length)];
+        room.roomLoserPendingChoice = true;
+    }
+
+    // 시간이 지나면서 저절로 일어나야 하는 일(자리 비운/무응답 차례 자동 뒤집기, 종료)
+    function hgStep(room, at) {
+        if (room.hgPhase !== 'play') return false;
+        const order = room.hgTurnOrder || [], players = room.players || {};
+        if (!order.some((id) => players[id] && hgDeckLen(room, id) > 0)) {
+            if (at - (room.hgLastFlipAt || 0) > HG_END_DELAY_MS) { hgFinish(room, at); return true; }
+            return false;
+        }
+        const cur = order[room.hgTurnIdx || 0];
+        if (!players[cur] || hgDeckLen(room, cur) === 0) { hgAdvanceTurn(room, at); return true; }
+        if (at - (room.hgTurnStart ?? at) > HG_FLIP_IDLE_MS) return hgFlip(room, cur, at);
+        return false;
+    }
+
+    function hgStopLocal() {
+        if (hgRAF) cancelAnimationFrame(hgRAF);
+        hgRAF = null; hgLastRaw = null; hgActiveRoundKey = null; hgLastHtml = '';
+    }
+
+    function hgFlipPress() {
+        const d = hgLastRaw;
+        if (!d || d.hgPhase !== 'play') return;
+        if ((d.hgTurnOrder || [])[d.hgTurnIdx || 0] !== myId) return;
+        const now = getServerNow();
+        hgTx((room) => hgFlip(room, myId, now));
+    }
+
+    function hgRingPress(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        const d = hgLastRaw;
+        if (!d || d.hgPhase !== 'play') return;
+        const now = getServerNow();
+        if (now - hgLastRingTapAt < 400) return; // 실수로 두 번 눌리는 것 방지
+        hgLastRingTapAt = now;
+        if (navigator.vibrate) navigator.vibrate(30);
+        hgTx((room) => hgRing(room, myId, now));
+    }
+
+    // 🤖 봇: 방장 화면에서만 대신 뒤집고 종 쳐줌
+    function hgScheduleBots(data) {
+        if (!isHost || data.hgPhase !== 'play') return;
+        const players = data.players || {}, roundKey = data.hgRoundKey;
+        const cur = (data.hgTurnOrder || [])[data.hgTurnIdx || 0];
+        if (cur && players[cur]?.isBot) {
+            const key = `${roundKey}_flip_${data.hgFlipSeq || 0}_${data.hgTurnStart}`;
+            if (!hgBotHandled.has(key)) {
+                hgBotHandled.add(key);
+                setTimeout(() => hgTx((room) => hgFlip(room, cur, getServerNow())), botDelay(900, 1800));
+            }
+        }
+        if (hgFiveFruit(data.hgTop) >= 0) {
+            const seq = data.hgFlipSeq || 0;
+            Object.keys(players).filter((id) => players[id]?.isBot).forEach((botId) => {
+                const key = `${roundKey}_ring_${seq}_${botId}`;
+                if (hgBotHandled.has(key)) return;
+                hgBotHandled.add(key);
+                if (Math.random() > 0.7) return; // 가끔은 놓치는 봇
+                setTimeout(() => {
+                    const d = hgLastRaw;
+                    if (!d || d.hgRoundKey !== roundKey || (d.hgFlipSeq || 0) !== seq || hgFiveFruit(d.hgTop) < 0) return; // 이미 덮이거나 누가 침
+                    hgTx((room) => hgRing(room, botId, getServerNow()));
+                }, botDelay(600, 2200));
+            });
+        }
+    }
+
+    function hgRender(data) {
+        const roundKey = `${data.hgRoundKey || ''}`;
+        if (hgActiveRoundKey !== roundKey) {
+            hgActiveRoundKey = roundKey; hgLastHtml = ''; hgBotHandled.clear();
+        }
+        hgLastRaw = data;
+        hgScheduleBots(data);
+        if (data.hgPhase === 'done') {
+            const losers = Object.values(data.hgLoserIds || {});
+            if (losers.length > 0) {
+                const names = losers.map((id) => (data.players || {})[id]?.nickname || '참가자').join(', ');
+                triggerExplosionEffect({
+                    key: `halli_${data.hgResultKey || roundKey}`,
+                    title: '🔔 할리갈리 종료!',
+                    message: data.hgAllTie ? `전원 동점! 랜덤으로 ${names}님 벌칙!` : `${names}님 벌칙!`,
+                    duration: 0
+                });
+            }
+        }
+        if (!hgRAF) hgRAF = requestAnimationFrame(hgFrame);
+    }
+
+    function hgFrame() {
+        hgRAF = null;
+        const d = hgLastRaw;
+        const screenEl = document.getElementById('game-halli-screen');
+        if (!d || !screenEl || !screenEl.classList.contains('active')) return;
+        const now = getServerNow();
+        const phase = d.hgPhase || 'play';
+        const players = d.players || {};
+        const order = (d.hgTurnOrder || []).filter((id) => players[id]);
+        const curId = (d.hgTurnOrder || [])[d.hgTurnIdx || 0];
+        const nick = (id) => players[id]?.nickname || '참가자';
+        const tops = d.hgTop || {}, score = d.hgScore || {};
+        const loserSet = new Set(Object.values(d.hgLoserIds || {}));
+        const anyLeft = order.some((id) => hgDeckLen(d, id) > 0);
+
+        // 상태 문구 (최근 종 결과가 있으면 우선 표시)
+        const ev = d.hgEvent;
+        let status;
+        if (phase === 'done') {
+            status = `🔔 <b>${[...loserSet].map(nick).join(', ')}</b>님이 가장 적게 모았어요!`;
+        } else if (ev && now - ev.at < 2500) {
+            status = ev.type === 'win'
+                ? `🔔 <b>${nick(ev.who)}</b>님 ${HG_FRUITS[ev.fruit]} 성공! +${ev.n}장`
+                : `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점`;
+        } else if (!anyLeft) {
+            status = '🔔 마지막 카드예요! 5개가 있는지 확인하세요';
+        } else {
+            status = curId === myId ? '🃏 내 차례! 카드를 뒤집으세요' : `⏳ <b>${nick(curId)}</b>님이 뒤집는 중`;
+        }
+
+        // 플레이어별 카드판
+        const tiles = order.map((id) => {
+            const c = tops[id];
+            const card = c
+                ? `<div class="hg-card" style="border-color:${HG_COLORS[Math.floor(c / 10)]};">${HG_FRUITS[Math.floor(c / 10)].repeat(c % 10)}</div>`
+                : '<div class="hg-card empty">-</div>';
+            const cls = 'hg-tile' + (phase === 'play' && id === curId ? ' turn' : '') + (loserSet.has(id) ? ' loser' : '');
+            const sc = score[id] || 0;
+            return `<div class="${cls}"><div class="hg-name">${phase === 'play' && id === curId ? '👉 ' : ''}${nick(id)}${id === myId ? ' (나)' : ''}</div>${card}<div class="hg-meta">🃏 ${hgDeckLen(d, id)}장 남음 · ⭐ ${sc}</div></div>`;
+        }).join('');
+        const html = `${status}\u0001${tiles}\u0001${d.hgTable || 0}`;
+        if (html !== hgLastHtml) {
+            hgLastHtml = html;
+            document.getElementById('hg-status').innerHTML = status;
+            document.getElementById('hg-board').innerHTML = tiles;
+        }
+
+        // 내 버튼
+        const flipBtn = document.getElementById('btn-hg-flip'), ringBtn = document.getElementById('btn-hg-ring');
+        const myLeft = hgDeckLen(d, myId);
+        const myTurn = phase === 'play' && curId === myId && myLeft > 0;
+        const flipLabel = myTurn ? `🃏 카드 뒤집기 (남은 ${myLeft}장)` : (phase === 'play' && myLeft === 0 ? '🃏 내 카드는 모두 뒤집었어요' : '⏳ 내 차례를 기다리는 중');
+        if (flipBtn.textContent !== flipLabel) flipBtn.textContent = flipLabel;
+        if (flipBtn.disabled !== !myTurn) flipBtn.disabled = !myTurn;
+        if (ringBtn.disabled !== (phase !== 'play')) ringBtn.disabled = phase !== 'play';
+
+        // 시간이 지나면 저절로 일어나야 하는 일은 누구든 감지해서 처리 — 트랜잭션이 중복 처리를 막아줌
+        if (now - hgLastPollAt > 250) {
+            hgLastPollAt = now;
+            if (hgStep(JSON.parse(JSON.stringify(d)), now)) hgTx((room) => hgStep(room, getServerNow()));
+        }
+        hgRAF = requestAnimationFrame(hgFrame);
+    }
+
+    (function initHalliButtons() {
+        document.getElementById('btn-hg-flip').addEventListener('click', hgFlipPress);
+        document.getElementById('btn-hg-ring').addEventListener('pointerdown', hgRingPress);
+    })();
+
     function autoTapSpeedFingerForBot(botId, expectedSignalTime, targetSpot) {
         if (!currentRoomCode) return;
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
@@ -3609,6 +3896,10 @@
                     showScreen('game-pour-screen');
                     pourRender(data);
                 }
+                else if (data.selectedGame === 'halli') {
+                    showScreen('game-halli-screen');
+                    hgRender(data);
+                }
                 else if (data.selectedGame === 'roulette') {
                     showScreen('game-roulette-screen');
                     const slotCount = data.rouletteSlotCount || 6;
@@ -4307,6 +4598,7 @@
                 stopTimingLoop(); timingActiveRoundKey = null;
                 swResetLocal();
                 pourStopLocal();
+                hgStopLocal();
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
@@ -5255,6 +5547,23 @@
                     pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null,
                     pourLoserIds: null, pourResultKey: null
                 });
+            } else if (gameId === 'halli') {
+                const now = getServerNow();
+                const need = pIds.length * HG_CARDS_PER_PLAYER;
+                const deck = [];
+                while (deck.length < need) {
+                    const full = [];
+                    for (let f = 0; f < 4; f++) HG_COUNTS.forEach((c) => full.push(f * 10 + c));
+                    deck.push(...hgShuffle(full));
+                }
+                const order = hgShuffle([...pIds]);
+                const decks = {}, score = {};
+                order.forEach((id, i) => { decks[id] = deck.slice(i * HG_CARDS_PER_PLAYER, (i + 1) * HG_CARDS_PER_PLAYER); score[id] = 0; });
+                update(rRef, {
+                    status: 'playing', hgRoundKey: now, hgPhase: 'play', hgDecks: decks, hgTop: null, hgTable: 0, hgScore: score,
+                    hgTurnOrder: order, hgTurnIdx: 0, hgTurnStart: now, hgFlipSeq: 0, hgLastFlipAt: now, hgGraceUntil: 0,
+                    hgEvent: null, hgEventSeq: 0, hgLoserIds: null, hgAllTie: null, hgResultKey: null
+                });
             } else if (gameId === 'roulette') {
                 const slotCount = 6;
                 update(rRef, {
@@ -5370,7 +5679,8 @@
                 ladderPlayerOrder: null, ladderRungs: null, ladderPenaltyBottoms: null, ladderRevealed: null, ladderRoundKey: null,
                 drinkDurationSec: null, drinkStartAt: null, drinkRoundKey: null, drinkLoserId: null, drinkPenaltyText: null, drinkRevealed: false,
                 swTargetMs: null, swShowTime: null, swRoundKey: null, swResults: null, swLoserIds: null,
-                pourRoundKey: null, pourPhase: null, pourCap: null, pourFuzz: null, pourChickenAt: null, pourChickenDone: null, pourLevel: null, pourTurnOrder: null, pourTurnIdx: null, pourTurnStart: null, pourMinMs: null, pourStreamId: null, pourStreamStart: null, pourLastPourMs: null, pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null, pourLoserIds: null, pourResultKey: null
+                pourRoundKey: null, pourPhase: null, pourCap: null, pourFuzz: null, pourChickenAt: null, pourChickenDone: null, pourLevel: null, pourTurnOrder: null, pourTurnIdx: null, pourTurnStart: null, pourMinMs: null, pourStreamId: null, pourStreamStart: null, pourLastPourMs: null, pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null, pourLoserIds: null, pourResultKey: null,
+                hgRoundKey: null, hgPhase: null, hgDecks: null, hgTop: null, hgTable: null, hgScore: null, hgTurnOrder: null, hgTurnIdx: null, hgTurnStart: null, hgFlipSeq: null, hgLastFlipAt: null, hgGraceUntil: null, hgEvent: null, hgEventSeq: null, hgLoserIds: null, hgAllTie: null, hgResultKey: null
                 // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
             });
         });
