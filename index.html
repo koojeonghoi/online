@@ -398,6 +398,8 @@
         .hg-card { margin: 6px auto; width: 90px; height: 72px; border-radius: 10px; background: #fff; border: 3px solid #ccc; display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 1px; font-size: 18px; line-height: 1.1; }
         .hg-card.empty { background: #1c1c20; border-style: dashed; border-color: #3A3A42; color: #55606d; font-size: 14px; }
         .hg-meta { font-size: 11px; color: #8E9AA8; }
+        .hg-event { min-height: 50px; background: #151518; border: 1px solid #2D2D34; border-radius: 10px; padding: 8px 10px; margin: 0 0 8px; font-size: 13px; line-height: 1.6; color: #C9D1DA; text-align: left; }
+        .hg-event.drink { background: #3d1d1d; border-color: var(--danger-color); color: #fff; font-weight: 700; }
         #btn-hg-ring { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; background-color: var(--danger-color); color: #fff; font-size: 22px; padding: 22px 16px; margin: 4px 0 8px; }
         #btn-hg-ring:disabled, #btn-hg-flip:disabled { opacity: 0.5; }
 
@@ -909,11 +911,12 @@
         <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px; text-align: left;">
             <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
                 순서대로 카드를 한 장씩 뒤집어요. 펼쳐진 카드들에서 <b>같은 과일이 딱 5개</b>가 되는 순간 🔔을 제일 먼저 치세요!<br>
-                · 성공하면 깔린 카드를 전부 획득 (+장수), <b>잘못 치면 -3점</b><br>
+                · 가장 빨리 치면 깔린 카드를 전부 획득 (+장수) 하고, <b>나머지 전원은 🍺 한 모금!</b> / <b>잘못 치면 -3점</b><br>
                 · 각자 6장만 사용 — 카드가 다 떨어지면 끝! <b>가장 적게 모은 사람이 패배</b>
             </div>
         </div>
         <div id="hg-status" style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; min-height: 22px;">불러오는 중...</div>
+        <div class="hg-event" id="hg-event">종을 쳐서 같은 과일 5개를 맞춰보세요!</div>
         <div class="hg-board" id="hg-board"></div>
         <button id="btn-hg-flip" disabled>⏳ 내 차례를 기다리는 중</button>
         <button id="btn-hg-ring" disabled>🔔 종 치기!</button>
@@ -926,7 +929,7 @@
         <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px; text-align: left;">
             <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
                 한 명당 말 1개! 순서대로 윷을 던져 🏁에서 출발해 한 바퀴 돌아와요.<br>
-                · ⚡ 모서리에 <b>딱 멈추면</b> 지름길(대각선)로 질러가요<br>
+                · ⚡ 모서리 두 곳(↗ ↖)에 <b>딱 멈추면</b> 다음 이동에서 대각선 지름길을 타요 (중앙에 딱 멈추면 바로 출구로!)<br>
                 · 🍺 칸에 <b>멈추면 즉시 벌칙!</b> (스쳐 지나가면 괜찮아요)<br>
                 · 윷·모, 상대 말 잡기(상대는 출발점으로)는 한 번 더!<br>
                 · 먼저 도착하거나 각자 8턴이 끝나면 종료 — <b>도착까지 가장 먼 사람이 패배</b>
@@ -2668,7 +2671,7 @@
     const HG_END_DELAY_MS = 4000;    // 마지막 카드가 깔리고 이 시간이 지나면 종료
     const HG_RING_GRACE_MS = 1500;   // 누군가 성공한 직후 늦게 도착한 종은 벌점 없이 무시
     const HG_COVER_GRACE_MS = 700;   // 5개가 된 카드가 다음 카드에 덮인 직후의 종도 벌점 없이 무시
-    let hgLastRaw = null, hgRAF = null, hgActiveRoundKey = null, hgLastPollAt = 0, hgLastHtml = '', hgLastRingTapAt = 0;
+    let hgLastRaw = null, hgRAF = null, hgActiveRoundKey = null, hgLastPollAt = 0, hgLastHtml = '', hgLastRingTapAt = 0, hgLastEventHtml = '';
     const hgBotHandled = new Set();
 
     function hgTx(fn) {
@@ -2773,7 +2776,7 @@
 
     function hgStopLocal() {
         if (hgRAF) cancelAnimationFrame(hgRAF);
-        hgRAF = null; hgLastRaw = null; hgActiveRoundKey = null; hgLastHtml = '';
+        hgRAF = null; hgLastRaw = null; hgActiveRoundKey = null; hgLastHtml = ''; hgLastEventHtml = '';
     }
 
     function hgFlipPress() {
@@ -2826,7 +2829,7 @@
     function hgRender(data) {
         const roundKey = `${data.hgRoundKey || ''}`;
         if (hgActiveRoundKey !== roundKey) {
-            hgActiveRoundKey = roundKey; hgLastHtml = ''; hgBotHandled.clear();
+            hgActiveRoundKey = roundKey; hgLastHtml = ''; hgLastEventHtml = ''; hgBotHandled.clear();
         }
         hgLastRaw = data;
         hgScheduleBots(data);
@@ -2892,6 +2895,22 @@
             document.getElementById('hg-board').innerHTML = tiles;
         }
 
+        // 최근 종 결과는 다음 결과가 나올 때까지 남겨둠 — 성공이면 나머지 전원이 마시는 시간
+        let evHtml = '종을 쳐서 같은 과일 5개를 맞춰보세요!', evDrink = false;
+        if (ev && ev.type === 'win') {
+            evHtml = `🔔 <b>${nick(ev.who)}</b>님이 제일 빨랐어요! ${HG_FRUITS[ev.fruit]} +${ev.n}장<br>🍺 나머지 전원 한 모금!`;
+            evDrink = true;
+        } else if (ev) {
+            evHtml = `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점`;
+        }
+        const evKey = `${evDrink ? 'd' : 'n'}${evHtml}`;
+        if (evKey !== hgLastEventHtml) {
+            hgLastEventHtml = evKey;
+            const evEl = document.getElementById('hg-event');
+            evEl.innerHTML = evHtml;
+            evEl.classList.toggle('drink', evDrink);
+        }
+
         // 내 버튼
         const flipBtn = document.getElementById('btn-hg-flip'), ringBtn = document.getElementById('btn-hg-ring');
         const myLeft = hgDeckLen(d, myId);
@@ -2915,13 +2934,15 @@
     })();
 
     // ===== 🎲 윷놀이 (미니: 말 1개 개인전 + 지름길 1개 + 벌칙 칸) =====
-    // 칸 번호: 외곽 0~15 (0=출발/도착점, 모서리 4·8·12), 지름길 16(↗아래)·17(중앙)·18, 도착=99.
-    // 4번 모서리에 "딱 멈추면" 다음 이동에서 4→16→17→18→12 지름길을 탐 (스쳐 지나가면 외곽 그대로).
-    const YUT_FINISH = 99, YUT_D1 = 16, YUT_C = 17, YUT_D2 = 18;
+    // 칸 번호: 외곽 0~15 (0=출발/도착점, 모서리 4·8·12), 지름길 A: 16·17(중앙)·18, 지름길 B: 19·17(중앙)·20, 도착=99.
+    // 모서리 4·8에 "딱 멈추면" 다음 이동에서 지름길을 탐 (스쳐 지나가면 외곽 그대로).
+    //   A: 4 → 16 → 17 → 18 → 12      B: 8 → 19 → 17 → 20 → 도착
+    // 중앙(17)에 지나가는 중이면 가던 방향 그대로, 중앙에 "딱 멈췄다가" 출발하면 도착 쪽(20)으로 질러감.
+    const YUT_FINISH = 99, YUT_A1 = 16, YUT_C = 17, YUT_A2 = 18, YUT_B1 = 19, YUT_B2 = 20;
     const YUT_TURNS = 8;           // 각자 이 턴 수를 쓰면 종료 (윷·모·잡기 보너스 던지기는 턴으로 안 침)
     const YUT_IDLE_MS = 8000;      // 내 차례에 이 시간 동안 안 던지면 자동으로 던져짐
     const YUT_ROLL_MS = 850;       // 윷가락 굴리는 연출 시간 (이 동안 결과/말 이동 공개를 미룸)
-    const YUT_PENALTY_TILES = 3;   // 벌칙 칸 개수 (판마다 랜덤)
+    const YUT_PENALTY_TILES = 4;   // 벌칙 칸 개수 (판마다 랜덤)
     const YUT_NAMES = { 1: '도', 2: '개', 3: '걸', 4: '윷', 5: '모' };
     const YUT_COLORS = ['#ff5a6e', '#4aa8ff', '#ffd34d', '#6fdc6f', '#b57bff', '#ff9f43', '#2ee6d6', '#ff7ac8'];
     const YUT_PENALTY_TEXTS = ['🍺 한 모금 마시기', '🍻 옆사람과 건배하고 한 모금', '🫵 한 명 지목해서 같이 한 모금', '🎤 건배사 한마디 하고 한 모금'];
@@ -2935,7 +2956,7 @@
         for (let i = 9; i <= 11; i++) m[i] = [lo, lo + st * (i - 8)];
         m[12] = [lo, hi];
         for (let i = 13; i <= 15; i++) m[i] = [lo + st * (i - 12), hi];
-        m[YUT_D1] = [71, 29]; m[YUT_C] = [50, 50]; m[YUT_D2] = [29, 71];
+        m[YUT_A1] = [71, 29]; m[YUT_C] = [50, 50]; m[YUT_A2] = [29, 71]; m[YUT_B1] = [29, 29]; m[YUT_B2] = [71, 71];
         m[YUT_FINISH] = [hi, hi];
         return m;
     })();
@@ -2957,21 +2978,26 @@
         return arr;
     }
 
-    function yutNext(node, useShortcut) {
-        if (node === 4 && useShortcut) return YUT_D1;
-        if (node === YUT_D1) return YUT_C;
-        if (node === YUT_C) return YUT_D2;
-        if (node === YUT_D2) return 12;
-        if (node === 15) return YUT_FINISH;
+    // prev = 직전 칸(중앙에서 가던 방향 판단용), first = 이번 이동의 첫 걸음인지, useShortcut = 첫 걸음에 지름길 자격이 있는지
+    function yutNext(node, prev, first, useShortcut) {
+        if (useShortcut && node === 4) return YUT_A1;
+        if (useShortcut && node === 8) return YUT_B1;
+        if (node === YUT_A1 || node === YUT_B1) return YUT_C;
+        if (node === YUT_C) return first || prev === YUT_B1 ? YUT_B2 : YUT_A2;
+        if (node === YUT_A2) return 12;
+        if (node === YUT_B2 || node === 15) return YUT_FINISH;
         return node + 1;
     }
 
     // 도착까지 남은 칸 수 (패배자 판정용)
     function yutDist(node, sc) {
         if (node === YUT_FINISH) return 0;
-        if (node === YUT_D1) return 7;
-        if (node === YUT_C) return 6;
-        if (node === YUT_D2) return 5;
+        if (node === YUT_B2) return 1;
+        if (node === YUT_C) return 2;
+        if (node === YUT_B1) return 3;
+        if (node === 8 && sc) return 4;
+        if (node === YUT_A2) return 5;
+        if (node === YUT_A1) return 7;
         if (node === 4 && sc) return 8;
         return 16 - node;
     }
@@ -3018,12 +3044,14 @@
         room.yutPos = room.yutPos || {}; room.yutSc = room.yutSc || {};
         let cur = room.yutPos[who] ?? 0;
         const sc = !!room.yutSc[who];
+        let prev = null;
         for (let i = 0; i < steps; i++) {
-            cur = yutNext(cur, i === 0 && sc);
+            const nxt = yutNext(cur, prev, i === 0, i === 0 && sc);
+            prev = cur; cur = nxt;
             if (cur === YUT_FINISH) break;
         }
         room.yutPos[who] = cur;
-        room.yutSc[who] = cur === 4; // 모서리에 딱 멈췄을 때만 지름길 자격
+        room.yutSc[who] = cur === 4 || cur === 8; // 모서리에 딱 멈췄을 때만 지름길 자격
 
         const captured = [];
         let penalty = null;
@@ -3088,11 +3116,11 @@
 
     function yutBuildBoard(d) {
         const pen = new Set(Object.values(d.yutPenalty || []));
-        let html = '<svg class="yut-lines" viewBox="0 0 100 100"><path d="M92 92 L92 8 L8 8 L8 92 L92 92" fill="none" stroke="#3A3A42" stroke-width="1.6"/><path d="M92 8 L8 92" fill="none" stroke="#3A3A42" stroke-width="1.6"/></svg>';
-        for (let n = 0; n <= 18; n++) {
+        let html = '<svg class="yut-lines" viewBox="0 0 100 100"><path d="M92 92 L92 8 L8 8 L8 92 L92 92" fill="none" stroke="#3A3A42" stroke-width="1.6"/><path d="M92 8 L8 92" fill="none" stroke="#3A3A42" stroke-width="1.6"/><path d="M8 8 L92 92" fill="none" stroke="#3A3A42" stroke-width="1.6"/></svg>';
+        for (let n = 0; n <= 20; n++) {
             const [x, y] = YUT_XY[n];
             const big = n === 0 || n === 4 || n === 8 || n === 12;
-            const label = n === 0 ? '🏁' : (n === 4 ? '⚡' : (pen.has(n) ? '🍺' : ''));
+            const label = n === 0 ? '🏁' : (n === 4 || n === 8 ? '⚡' : (pen.has(n) ? '🍺' : ''));
             html += `<div class="yut-node${big ? ' big' : ''}${pen.has(n) ? ' pen' : ''}" style="left:${x}%;top:${y}%;">${label}</div>`;
         }
         return html + '<div class="yut-pieces" id="yut-pieces"></div>';
@@ -3170,14 +3198,14 @@
         if (status !== yutLastStatusHtml) { yutLastStatusHtml = status; document.getElementById('yut-status').innerHTML = status; }
 
         // 윷가락
-        let sticksState = 'idle';
-        if (last) sticksState = revealed ? last.sticks.map((b) => (b ? 'f' : 'b')).join('') : 'rolling';
+        const faces = last && revealed ? Object.values(last.sticks || {}) : null; // 공개된 윷가락 면 (true=평평)
+        const sticksState = !last ? 'none' : (faces ? faces.map((b) => (b ? 'f' : 'b')).join('') : 'rolling');
         if (sticksState !== yutLastSticks) {
             yutLastSticks = sticksState;
             const box = document.getElementById('yut-sticks');
             box.classList.toggle('rolling', sticksState === 'rolling');
             box.querySelectorAll('.yut-stick').forEach((el, i) => {
-                el.className = 'yut-stick' + (sticksState.length === 4 ? (last.sticks[i] ? ' flat' : ' back') : '');
+                el.className = 'yut-stick' + (faces ? (faces[i] ? ' flat' : ' back') : '');
             });
         }
 
@@ -5929,7 +5957,7 @@
                 const order = yutShuffle([...pIds]);
                 const pos = {}, sc = {}, turnsLeft = {};
                 order.forEach((id) => { pos[id] = 0; sc[id] = false; turnsLeft[id] = YUT_TURNS; });
-                const candidates = [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, YUT_D1, YUT_C, YUT_D2]; // 출발점·모서리 제외
+                const candidates = [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, YUT_A1, YUT_C, YUT_A2, YUT_B1, YUT_B2]; // 출발점·모서리 제외
                 update(rRef, {
                     status: 'playing', yutRoundKey: now, yutPhase: 'play', yutPos: pos, yutSc: sc,
                     yutPenalty: yutShuffle(candidates).slice(0, YUT_PENALTY_TILES),
