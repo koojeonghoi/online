@@ -438,6 +438,27 @@
         #btn-yut-throw { background-color: var(--primary-color); color: #121214; font-size: 18px; padding: 20px 16px; margin: 6px 0 14px; }
         #btn-yut-throw:disabled { opacity: 0.5; }
 
+        /* 🃏 도둑잡기 */
+        .thief-players { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 8px 0; }
+        .thief-tile { background: #151518; border: 2px solid #2D2D34; border-radius: 10px; padding: 6px; text-align: center; }
+        .thief-tile.turn { border-color: var(--accent-color); }
+        .thief-tile.target { border-color: #ff9f43; }
+        .thief-tile.pick { cursor: pointer; border-color: #55638f; }
+        .thief-tile.target { border-color: #ff9f43; background: #2a2118; }
+        .thief-tile.out { opacity: 0.55; }
+        .thief-tile.thief { border-color: var(--danger-color); background: #3d1d1d; opacity: 1; }
+        .thief-name { font-size: 12px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .thief-meta { font-size: 11px; color: #8E9AA8; margin-top: 2px; }
+        .thief-label { font-size: 13px; color: #C9D1DA; margin: 8px 0 4px; font-weight: 700; text-align: center; }
+        .thief-backs, .thief-hand { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 66px; margin-bottom: 6px; }
+        .thief-back { width: 44px; height: 64px; border-radius: 8px; border: 2px solid #55638f; background: repeating-linear-gradient(45deg, #3a4a7a 0 6px, #2d3a63 6px 12px); color: #aab6e0; font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; opacity: 0.7; }
+        .thief-back.active { opacity: 1; border-color: #ffd34d; cursor: pointer; animation: thiefPulse 1s ease-in-out infinite; }
+        @keyframes thiefPulse { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        .thief-card { width: 46px; height: 64px; border-radius: 8px; background: #fff; border: 2px solid #ccc; font-size: 26px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+        .thief-card.joker { background: #2b1b3d; border-color: var(--danger-color); }
+        .thief-last { min-height: 62px; background: #151518; border: 1px solid #2D2D34; border-radius: 10px; padding: 8px 10px; margin: 8px 0; font-size: 13px; line-height: 1.6; color: #C9D1DA; text-align: left; }
+        .thief-pairs { font-size: 12px; color: #8E9AA8; text-align: center; margin: 4px 0 8px; }
+
         /* 👆 스피드 손가락 */
         .speed-target-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
         .speed-target { aspect-ratio: 1; border-radius: 14px; background: #252529; border: 3px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 30px; transition: all 0.1s; cursor: pointer; }
@@ -527,6 +548,7 @@
             <button class="tab-btn" id="tab-pour" onclick="selectGameMode('pour')">🥤 물 따르기</button>
             <button class="tab-btn" id="tab-halli" onclick="selectGameMode('halli')">🔔 할리갈리</button>
             <button class="tab-btn" id="tab-yut" onclick="selectGameMode('yut')">🎲 윷놀이</button>
+            <button class="tab-btn" id="tab-thief" onclick="selectGameMode('thief')">🃏 도둑잡기</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -956,6 +978,27 @@
             <div id="yut-player-list">대기 중...</div>
         </div>
         <button id="btn-back-lobby-yut" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 🃏 도둑잡기 스크린 -->
+    <div id="game-thief-screen" class="screen">
+        <h2>🃏 도둑잡기</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px; text-align: left;">
+            <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
+                순서대로 <b>한 명을 골라</b> 그 사람의 카드를 <b>뒤집힌 채로 한 장</b> 뽑아요. 같은 그림이 2장이면 자동으로 버려져요!<br>
+                · 카드를 모두 버리면 탈출 ✅ — 마지막까지 <b>🃏 조커</b>를 든 사람(도둑)이 패배!<br>
+                · 짝 몇 쌍과 조커만 써서 한 판이 짧아요 · 10초 안에 안 뽑으면 자동으로 뽑혀요
+            </div>
+        </div>
+        <div id="thief-status" style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; min-height: 22px;">불러오는 중...</div>
+        <div class="thief-players" id="thief-players"></div>
+        <div class="thief-label" id="thief-target-label"></div>
+        <div class="thief-backs" id="thief-backs"></div>
+        <div class="thief-last" id="thief-last">첫 카드를 뽑아보세요!</div>
+        <div class="thief-label" id="thief-hand-label">내 카드</div>
+        <div class="thief-hand" id="thief-hand"></div>
+        <div class="thief-pairs" id="thief-pairs"></div>
+        <button id="btn-back-lobby-thief" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
     <!-- 🍻 랜덤 마시기 게임 스크린 -->
@@ -3318,6 +3361,286 @@
 
     document.getElementById('btn-yut-throw').addEventListener('click', yutThrowPress);
 
+    // ===== 🃏 도둑잡기 (미니: 짝 max(5, 인원)쌍 + 조커 1장) =====
+    // 카드 = 그림 번호(0~13, 같은 번호 2장이 한 쌍) 또는 조커(99). 짝이 맞으면 자동으로 버림.
+    // 순서대로 카드가 남은 사람 중 한 명을 골라 그 사람의 카드를 뒤집힌 채 한 장 뽑음(기본값은 다음 사람). 마지막까지 조커를 든 사람이 패배.
+    // 옆 사람 고정이면 인원이 늘수록 판이 급격히 길어져서(8명 약 70번) 자유 선택으로 함(8명 약 30번).
+    const THIEF_SYMS = ['🍎', '🍌', '🍇', '🍓', '🍑', '🍒', '🍋', '🥝', '🍉', '🍍', '🥥', '🍐', '🍊', '🫐'];
+    const THIEF_JOKER = 99;
+    const THIEF_IDLE_MS = 10000;   // 이 시간 안에 안 뽑으면 자동으로 뽑힘
+    let thiefLastRaw = null, thiefRAF = null, thiefActiveRoundKey = null, thiefLastPollAt = 0, thiefLastPressAt = 0, thiefDoneKey = null, thiefWasMyTurn = false, thiefSelTarget = null, thiefSelKey = '';
+    const thiefCache = {};
+    const thiefBotHandled = new Set();
+
+    function thiefTx(fn) {
+        if (!currentRoomCode) return Promise.resolve();
+        return runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
+            if (!room || room.status !== 'playing' || room.selectedGame !== 'thief') return undefined;
+            return fn(room) ? room : undefined;
+        }, { applyLocally: false }).catch((error) => console.error('thief transaction failed:', error));
+    }
+
+    function thiefShuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+        return arr;
+    }
+
+    function thiefHand(room, id) { return Object.values((room.thiefHands || {})[id] || []); }
+
+    // 손패에서 짝을 모두 버림 (버린 그림은 pairsOut에 추가)
+    function thiefRemovePairs(hand, pairsOut) {
+        const cnt = {};
+        hand.forEach((c) => { cnt[c] = (cnt[c] || 0) + 1; });
+        const out = [];
+        Object.keys(cnt).forEach((k) => {
+            const c = Number(k);
+            if (c === THIEF_JOKER) { for (let i = 0; i < cnt[k]; i++) out.push(c); return; }
+            for (let i = 0; i < Math.floor(cnt[k] / 2); i++) pairsOut.push(c);
+            if (cnt[k] % 2 === 1) out.push(c);
+        });
+        return thiefShuffle(out);
+    }
+
+    function thiefJokerHeld(room) {
+        const players = room.players || {};
+        return Object.keys(players).some((id) => thiefHand(room, id).includes(THIEF_JOKER));
+    }
+
+    // idx 다음으로 카드가 남아 있는 사람의 자리 (없으면 -1). 자기 자신까지 돌아오면 자기 자리를 반환
+    function thiefNextAliveIdx(room, idx) {
+        const order = room.thiefOrder || [], players = room.players || {}, n = order.length;
+        for (let i = 1; i <= n; i++) {
+            const cand = (idx + i) % n;
+            if (players[order[cand]] && thiefHand(room, order[cand]).length > 0) return cand;
+        }
+        return -1;
+    }
+
+    function thiefTargetIdx(room, idx) {
+        const t = thiefNextAliveIdx(room, idx);
+        return t === idx ? -1 : t; // 나 혼자 남았으면 뽑을 상대가 없음
+    }
+
+    // who를 제외하고 카드가 남은 사람들
+    function thiefOthersAlive(room, who) {
+        const players = room.players || {};
+        return (room.thiefOrder || []).filter((id) => id !== who && players[id] && thiefHand(room, id).length > 0);
+    }
+
+    function thiefFinish(room, at) {
+        const ids = Object.keys(room.players || {});
+        const holder = ids.find((id) => thiefHand(room, id).includes(THIEF_JOKER)) || null; // 조커 든 사람이 나갔으면 null(무효)
+        room.thiefPhase = 'done'; room.thiefLoserId = holder; room.thiefResultKey = at;
+        room.roomLastLoserId = holder || ids[Math.floor(Math.random() * ids.length)];
+        room.roomLoserPendingChoice = true;
+    }
+
+    // targetId: 뽑을 사람 (없거나 올바르지 않으면 다음 사람). k: 그 사람의 뒤집힌 카드 중 위치
+    function thiefDraw(room, who, targetId, k, at) {
+        if (room.thiefPhase !== 'play') return false;
+        const order = room.thiefOrder || [], idx = room.thiefTurnIdx || 0;
+        if (order[idx] !== who) return false;
+        const tIdx = thiefTargetIdx(room, idx);
+        if (tIdx < 0) { thiefFinish(room, at); return true; }
+        const valid = targetId && targetId !== who && (room.players || {})[targetId] && thiefHand(room, targetId).length > 0;
+        const target = valid ? targetId : order[tIdx];
+        const theirs = thiefHand(room, target);
+        if (theirs.length === 0) return false;
+        const pick = Math.min(Math.max(parseInt(k, 10) || 0, 0), theirs.length - 1);
+        const card = theirs.splice(pick, 1)[0];
+        const mine = thiefHand(room, who);
+        let matched = -1;
+        const j = card === THIEF_JOKER ? -1 : mine.indexOf(card);
+        if (j >= 0) { mine.splice(j, 1); matched = card; room.thiefPairs = [...Object.values(room.thiefPairs || []), card]; }
+        else mine.push(card);
+        room.thiefHands = room.thiefHands || {};
+        room.thiefHands[who] = thiefShuffle(mine);   // 뽑은 뒤 섞어서 위치로 카드를 기억하지 못하게
+        room.thiefHands[target] = thiefShuffle(theirs);
+        const outFrom = mine.length === 0, outTo = theirs.length === 0;
+        const out = Object.values(room.thiefOut || []);
+        if (outFrom) out.push(who);
+        if (outTo) out.push(target);
+        room.thiefOut = out;
+        room.thiefSeq = (room.thiefSeq || 0) + 1;
+        room.thiefLast = { seq: room.thiefSeq, from: who, to: target, matched, outFrom, outTo, at };
+        const alive = order.filter((id) => (room.players || {})[id] && thiefHand(room, id).length > 0);
+        if (alive.length <= 1 || !thiefJokerHeld(room)) { thiefFinish(room, at); return true; }
+        room.thiefTurnIdx = thiefNextAliveIdx(room, idx); room.thiefTurnStart = at;
+        return true;
+    }
+
+    // 시간이 지나면 저절로 일어나야 하는 일: 나간 사람 건너뛰기, 장시간 무응답 자동 뽑기, 조커가 사라졌을 때 종료
+    function thiefStep(room, at) {
+        if (room.thiefPhase !== 'play') return false;
+        const order = room.thiefOrder || [], players = room.players || {};
+        if (!thiefJokerHeld(room)) { thiefFinish(room, at); return true; }
+        const idx = room.thiefTurnIdx || 0, cur = order[idx];
+        if (!players[cur] || thiefHand(room, cur).length === 0) {
+            const nxt = thiefNextAliveIdx(room, idx);
+            if (nxt < 0) { thiefFinish(room, at); return true; }
+            room.thiefTurnIdx = nxt; room.thiefTurnStart = at;
+            return true;
+        }
+        if (at - (room.thiefTurnStart ?? at) > THIEF_IDLE_MS) {
+            const others = thiefOthersAlive(room, cur);
+            if (others.length === 0) { thiefFinish(room, at); return true; }
+            const tgt = others[Math.floor(Math.random() * others.length)];
+            return thiefDraw(room, cur, tgt, Math.floor(Math.random() * thiefHand(room, tgt).length), at);
+        }
+        return false;
+    }
+
+    function thiefSet(id, html) {
+        if (thiefCache[id] === html) return;
+        thiefCache[id] = html;
+        document.getElementById(id).innerHTML = html;
+    }
+
+    function thiefStopLocal() {
+        if (thiefRAF) cancelAnimationFrame(thiefRAF);
+        thiefRAF = null; thiefLastRaw = null; thiefActiveRoundKey = null; thiefDoneKey = null; thiefWasMyTurn = false; thiefSelTarget = null; thiefSelKey = '';
+        Object.keys(thiefCache).forEach((k) => delete thiefCache[k]);
+    }
+
+    function thiefDrawPress(targetId, k) {
+        const d = thiefLastRaw;
+        if (!d || d.thiefPhase !== 'play' || (d.thiefOrder || [])[d.thiefTurnIdx || 0] !== myId) return;
+        const now = getServerNow();
+        if (now - thiefLastPressAt < 600) return; // 더블탭 방지
+        thiefLastPressAt = now;
+        if (navigator.vibrate) navigator.vibrate(20);
+        thiefTx((room) => thiefDraw(room, myId, targetId, k, now));
+    }
+
+    // 🤖 봇: 방장 화면에서만 대신 뽑아줌
+    function thiefScheduleBots(data) {
+        if (!isHost || data.thiefPhase !== 'play') return;
+        const cur = (data.thiefOrder || [])[data.thiefTurnIdx || 0];
+        if (!cur || !(data.players || {})[cur]?.isBot) return;
+        const key = `${data.thiefRoundKey}_${data.thiefSeq || 0}_${data.thiefTurnStart}`;
+        if (thiefBotHandled.has(key)) return;
+        thiefBotHandled.add(key);
+        setTimeout(() => thiefTx((room) => {
+            const idx = room.thiefTurnIdx || 0;
+            if ((room.thiefOrder || [])[idx] !== cur) return false;
+            const others = thiefOthersAlive(room, cur);
+            if (others.length === 0) return false;
+            const tgt = others[Math.floor(Math.random() * others.length)];
+            return thiefDraw(room, cur, tgt, Math.floor(Math.random() * thiefHand(room, tgt).length), getServerNow());
+        }), botDelay(1200, 2400));
+    }
+
+    function thiefRender(data) {
+        const roundKey = `${data.thiefRoundKey || ''}`;
+        if (thiefActiveRoundKey !== roundKey) {
+            thiefStopLocal();
+            thiefActiveRoundKey = roundKey; thiefBotHandled.clear();
+        }
+        thiefLastRaw = data;
+        thiefScheduleBots(data);
+        if (!thiefRAF) thiefRAF = requestAnimationFrame(thiefFrame);
+    }
+
+    function thiefFrame() {
+        thiefRAF = null;
+        const d = thiefLastRaw;
+        const screenEl = document.getElementById('game-thief-screen');
+        if (!d || !screenEl || !screenEl.classList.contains('active')) return;
+        const now = getServerNow();
+        const players = d.players || {};
+        const fullOrder = d.thiefOrder || [];
+        const order = fullOrder.filter((id) => players[id]);
+        const nick = (id) => players[id]?.nickname || '참가자';
+        const done = d.thiefPhase === 'done';
+        const idx = d.thiefTurnIdx || 0, curId = fullOrder[idx];
+        const others = !done && curId === myId ? thiefOthersAlive(d, myId) : [];
+        const myTurn = others.length > 0;
+        const outList = Object.values(d.thiefOut || []);
+        const last = d.thiefLast;
+
+        // 내 차례마다 뽑을 사람을 기본값(다음 사람)으로 되돌리고, 타일을 눌러 바꿀 수 있음
+        const turnKey = `${d.thiefRoundKey}_${d.thiefSeq || 0}_${d.thiefTurnStart}`;
+        if (myTurn) {
+            if (thiefSelKey !== turnKey) { thiefSelKey = turnKey; thiefSelTarget = null; }
+            if (!thiefSelTarget || !others.includes(thiefSelTarget)) thiefSelTarget = fullOrder[thiefNextAliveIdx(d, idx)];
+        } else thiefSelTarget = null;
+        const targetId = myTurn ? thiefSelTarget : null;
+
+        // 상태 문구
+        let status;
+        if (done) status = d.thiefLoserId ? `👺 도둑은 <b>${nick(d.thiefLoserId)}</b>님!` : '🃏 조커를 든 사람이 나가서 무효예요';
+        else if (myTurn) status = '🃏 내 차례! 뽑을 사람을 고르고 카드를 한 장 뽑으세요';
+        else status = `⏳ <b>${nick(curId)}</b>님이 카드를 뽑는 중`;
+        thiefSet('thief-status', status);
+
+        // 플레이어 목록 (앉은 순서)
+        thiefSet('thief-players', order.map((id) => {
+            const rank = outList.indexOf(id);
+            const isThief = done && id === d.thiefLoserId;
+            const tag = isThief ? '👺 도둑!' : (rank >= 0 ? `✅ 탈출 ${rank + 1}등` : `🃏 ${thiefHand(d, id).length}장`);
+            const cls = 'thief-tile' + (!done && id === curId ? ' turn' : '') + (id === targetId ? ' target' : '') + (myTurn && others.includes(id) ? ' pick' : '') + (rank >= 0 && !isThief ? ' out' : '') + (isThief ? ' thief' : '');
+            return `<div class="${cls}" data-id="${id}"><div class="thief-name">${!done && id === curId ? '👉 ' : ''}${nick(id)}${id === myId ? ' (나)' : ''}</div><div class="thief-meta">${tag}</div></div>`;
+        }).join(''));
+
+        // 뽑을 카드(내가 고른 사람의 손패, 뒤집힌 채) — 내 차례에만 보임
+        if (!targetId) { thiefSet('thief-target-label', ''); thiefSet('thief-backs', ''); }
+        else {
+            const n = thiefHand(d, targetId).length;
+            thiefSet('thief-target-label', `👆 <b>${nick(targetId)}</b>님의 카드 (${n}장) — 한 장을 눌러 뽑으세요 <span style="color:#8E9AA8; font-weight:400;">(다른 사람을 누르면 바꿀 수 있어요)</span>`);
+            thiefSet('thief-backs', Array.from({ length: n }, (_, i) => `<div class="thief-back active" data-id="${targetId}" data-k="${i}">?</div>`).join(''));
+        }
+
+        // 최근 결과 (뽑은 카드는 짝이 맞아 버려졌을 때만 공개)
+        let lastHtml = '첫 카드를 뽑아보세요!';
+        if (last) {
+            lastHtml = `<b>${nick(last.from)}</b>님이 <b>${nick(last.to)}</b>님의 카드를 뽑았어요`;
+            lastHtml += last.matched >= 0 ? `<br>✨ ${THIEF_SYMS[last.matched]}${THIEF_SYMS[last.matched]} 짝이 맞아서 버렸어요!` : '<br>짝이 없어서 그대로 들고 있어요';
+            if (last.outFrom) lastHtml += `<br>✅ <b>${nick(last.from)}</b>님 탈출!`;
+            if (last.outTo) lastHtml += `<br>✅ <b>${nick(last.to)}</b>님 탈출!`;
+        }
+        thiefSet('thief-last', lastHtml);
+
+        // 내 카드 (나에게만 보임)
+        const mine = thiefHand(d, myId).sort((a, b) => a - b);
+        thiefSet('thief-hand-label', mine.length ? `내 카드 (${mine.length}장)` : (outList.includes(myId) ? '✅ 탈출! 구경하세요 😎' : '내 카드'));
+        thiefSet('thief-hand', mine.map((c) => `<div class="thief-card${c === THIEF_JOKER ? ' joker' : ''}">${c === THIEF_JOKER ? '🃏' : THIEF_SYMS[c]}</div>`).join(''));
+
+        const pairs = Object.values(d.thiefPairs || []);
+        thiefSet('thief-pairs', `🗑️ 버려진 짝 ${pairs.length}쌍${pairs.length ? ': ' + pairs.map((c) => THIEF_SYMS[c]).join(' ') : ''}`);
+
+        if (myTurn && !thiefWasMyTurn && navigator.vibrate) navigator.vibrate(30); // 내 차례가 되면 살짝 진동
+        thiefWasMyTurn = myTurn;
+
+        // 결과 발표
+        if (done) {
+            const key = `thief_${d.thiefResultKey || d.thiefRoundKey}`;
+            if (thiefDoneKey !== key) {
+                thiefDoneKey = key;
+                triggerExplosionEffect({
+                    key,
+                    title: '🃏 도둑잡기 종료!',
+                    message: d.thiefLoserId ? `👺 도둑은 ${nick(d.thiefLoserId)}님! 벌칙!` : '조커를 든 사람이 나가서 무효예요!',
+                    duration: 0
+                });
+            }
+        }
+
+        if (now - thiefLastPollAt > 250) {
+            thiefLastPollAt = now;
+            if (thiefStep(JSON.parse(JSON.stringify(d)), now)) thiefTx((room) => thiefStep(room, getServerNow()));
+        }
+        thiefRAF = requestAnimationFrame(thiefFrame);
+    }
+
+    document.getElementById('thief-players').addEventListener('click', (e) => {
+        const el = e.target.closest('.thief-tile');
+        if (el && el.classList.contains('pick')) thiefSelTarget = el.dataset.id; // 뽑을 사람 바꾸기
+    });
+    document.getElementById('thief-backs').addEventListener('click', (e) => {
+        const el = e.target.closest('.thief-back');
+        if (el && el.classList.contains('active')) thiefDrawPress(el.dataset.id, Number(el.dataset.k));
+    });
+
     function autoTapSpeedFingerForBot(botId, expectedSignalTime, targetSpot) {
         if (!currentRoomCode) return;
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
@@ -4350,6 +4673,10 @@
                     showScreen('game-pour-screen');
                     pourRender(data);
                 }
+                else if (data.selectedGame === 'thief') {
+                    showScreen('game-thief-screen');
+                    thiefRender(data);
+                }
                 else if (data.selectedGame === 'yut') {
                     showScreen('game-yut-screen');
                     yutRender(data);
@@ -5058,6 +5385,7 @@
                 pourStopLocal();
                 hgStopLocal();
                 yutStopLocal();
+                thiefStopLocal();
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
@@ -6006,6 +6334,29 @@
                     pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null,
                     pourLoserIds: null, pourResultKey: null
                 });
+            } else if (gameId === 'thief') {
+                const now = getServerNow();
+                const order = thiefShuffle([...pIds]);
+                const n = order.length;
+                const pairCount = Math.min(Math.max(5, n), THIEF_SYMS.length);
+                let hands = {}, pairs = [];
+                for (let tries = 0; tries < 50; tries++) {
+                    const deck = [THIEF_JOKER];
+                    for (let i = 0; i < pairCount; i++) deck.push(i, i);
+                    thiefShuffle(deck);
+                    hands = {}; pairs = [];
+                    order.forEach((id) => { hands[id] = []; });
+                    deck.forEach((c, i) => hands[order[i % n]].push(c));
+                    order.forEach((id) => { hands[id] = thiefRemovePairs(hands[id], pairs); }); // 처음 받은 짝은 바로 버림
+                    if (order.filter((id) => hands[id].length > 0).length >= 2) break;          // 시작하자마자 끝나지 않게
+                }
+                const startIdx = Math.max(0, order.findIndex((id) => hands[id].length > 0));
+                const out = order.filter((id) => hands[id].length === 0);
+                update(rRef, {
+                    status: 'playing', thiefRoundKey: now, thiefPhase: 'play', thiefHands: hands, thiefOrder: order,
+                    thiefTurnIdx: startIdx, thiefTurnStart: now, thiefPairs: pairs, thiefOut: out,
+                    thiefSeq: 0, thiefLast: null, thiefLoserId: null, thiefResultKey: null
+                });
             } else if (gameId === 'yut') {
                 const now = getServerNow();
                 const order = yutShuffle([...pIds]);
@@ -6152,7 +6503,8 @@
                 swTargetMs: null, swShowTime: null, swRoundKey: null, swResults: null, swLoserIds: null,
                 pourRoundKey: null, pourPhase: null, pourCap: null, pourFuzz: null, pourChickenAt: null, pourChickenDone: null, pourLevel: null, pourTurnOrder: null, pourTurnIdx: null, pourTurnStart: null, pourMinMs: null, pourStreamId: null, pourStreamStart: null, pourLastPourMs: null, pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null, pourLoserIds: null, pourResultKey: null,
                 hgRoundKey: null, hgPhase: null, hgDecks: null, hgTop: null, hgTable: null, hgScore: null, hgTurnOrder: null, hgTurnIdx: null, hgTurnStart: null, hgFlipSeq: null, hgLastFlipAt: null, hgGraceUntil: null, hgEvent: null, hgEventSeq: null, hgLoserIds: null, hgAllTie: null, hgResultKey: null,
-                yutRoundKey: null, yutPhase: null, yutPos: null, yutSc: null, yutPenalty: null, yutTurnOrder: null, yutTurnIdx: null, yutTurnStart: null, yutTurnsLeft: null, yutSeq: null, yutLast: null, yutWinnerId: null, yutLoserIds: null, yutAllTie: null, yutResultKey: null
+                yutRoundKey: null, yutPhase: null, yutPos: null, yutSc: null, yutPenalty: null, yutTurnOrder: null, yutTurnIdx: null, yutTurnStart: null, yutTurnsLeft: null, yutSeq: null, yutLast: null, yutWinnerId: null, yutLoserIds: null, yutAllTie: null, yutResultKey: null,
+                thiefRoundKey: null, thiefPhase: null, thiefHands: null, thiefOrder: null, thiefTurnIdx: null, thiefTurnStart: null, thiefPairs: null, thiefOut: null, thiefSeq: null, thiefLast: null, thiefLoserId: null, thiefResultKey: null
                 // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
             });
         });
