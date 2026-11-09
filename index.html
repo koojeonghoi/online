@@ -2721,7 +2721,6 @@
     const HG_COUNTS = [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5]; // 과일 1종 14장 (원본과 같은 분포)
     const HG_CARDS_PER_PLAYER = 6;   // 한 판 길이: 인원 × 6장 (원본은 56장 전부)
     const HG_WRONG_PENALTY = 3;      // 잘못 쳤을 때 감점
-    const HG_FLIP_IDLE_MS = 6000;    // 내 차례에 이 시간 안에 안 뒤집으면 자동으로 뒤집힘
     const HG_END_DELAY_MS = 4000;    // 마지막 카드가 깔리고 이 시간이 지나면 종료
     const HG_RING_GRACE_MS = 1500;   // 누군가 성공한 직후 늦게 도착한 종은 벌점 없이 무시
     const HG_COVER_GRACE_MS = 700;   // 5개가 된 카드가 다음 카드에 덮인 직후의 종도 벌점 없이 무시
@@ -2824,7 +2823,7 @@
         room.roomLoserPendingChoice = true;
     }
 
-    // 시간이 지나면서 저절로 일어나야 하는 일(자리 비운/무응답 차례 자동 뒤집기, 종료)
+    // 시간이 지나면서 저절로 일어나야 하는 일(자리 비운 사람 건너뛰기, 종료). 카드는 차례인 사람이 직접 뒤집을 때만 넘어감
     function hgStep(room, at) {
         if (room.hgPhase !== 'play') return false;
         const order = room.hgTurnOrder || [], players = room.players || {};
@@ -2834,7 +2833,6 @@
         }
         const cur = order[room.hgTurnIdx || 0];
         if (!players[cur] || hgDeckLen(room, cur) === 0) { hgAdvanceTurn(room, at); return true; }
-        if (at - (room.hgTurnStart ?? at) > HG_FLIP_IDLE_MS) return hgFlip(room, cur, at);
         return false;
     }
 
