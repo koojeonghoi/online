@@ -402,6 +402,7 @@
         .hg-event.drink { background: #3d1d1d; border-color: var(--danger-color); color: #fff; font-weight: 700; }
         .hg-fx { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; animation: hgFxLife 2.3s ease-out forwards; }
         .hg-fx.drink { background: radial-gradient(circle, rgba(255,70,70,0.55), rgba(110,0,0,0.8)); }
+        .hg-fx.urgent { background: radial-gradient(circle, rgba(255,205,50,0.5), rgba(120,70,0,0.78)); animation-duration: 1.3s; }
         .hg-fx.safe { background: radial-gradient(circle, rgba(70,225,130,0.4), rgba(0,80,40,0.7)); }
         .hg-fx-emoji { font-size: 110px; line-height: 1; animation: hgFxPop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1); }
         .hg-fx-title { font-size: 36px; font-weight: 900; color: #fff; margin-top: 8px; text-shadow: 0 2px 14px rgba(0,0,0,0.6); }
@@ -943,7 +944,8 @@
         <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 12px; margin-bottom: 10px; text-align: left;">
             <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
                 순서대로 카드를 한 장씩 뒤집어요. 펼쳐진 카드들에서 <b>같은 과일이 딱 5개</b>가 되는 순간 🔔을 제일 먼저 치세요!<br>
-                · 가장 빨리 치면 깔린 카드를 전부 획득 (+장수) 하고, <b>나머지 전원은 🍺 한 모금!</b> / <b>잘못 치면 -3점 + 본인 🍺 한 모금!</b><br>
+                · 가장 빨리 치면 깔린 카드를 전부 획득 (+장수) + 안전! 그 뒤 3초 안에 나머지가 종을 눌러야 해요 — <b>못 누른 사람(모두 눌렀다면 제일 늦은 사람)만 🍺 한 모금!</b><br>
+                · <b>잘못 치면 -3점 + 본인 🍺 한 모금!</b><br>
                 · 5개가 떴는데 <b>아무도 못 치고 다음 카드에 덮이면 전원 🍺 한 모금!</b><br>
                 · 각자 6장만 사용 — 카드가 다 떨어지면 끝! <b>가장 적게 모은 사람이 패배</b>
             </div>
@@ -2722,7 +2724,8 @@
     const HG_CARDS_PER_PLAYER = 6;   // 한 판 길이: 인원 × 6장 (원본은 56장 전부)
     const HG_WRONG_PENALTY = 3;      // 잘못 쳤을 때 감점
     const HG_END_DELAY_MS = 4000;    // 마지막 카드가 깔리고 이 시간이 지나면 종료
-    const HG_RING_GRACE_MS = 1500;   // 누군가 성공한 직후 늦게 도착한 종은 벌점 없이 무시
+    const HG_WINDOW_MS = 3000;       // 누군가 먼저 친 뒤, 나머지가 종을 누를 수 있는 시간 (못 누르면 한 모금)
+    const HG_RING_GRACE_MS = 1500;   // 종 정리가 끝난 직후 늦게 도착한 종은 벌점 없이 무시
     const HG_COVER_GRACE_MS = 700;   // 5개가 된 카드가 다음 카드에 덮인 직후의 종도 벌점 없이 무시
     let hgLastRaw = null, hgRAF = null, hgActiveRoundKey = null, hgLastPollAt = 0, hgLastHtml = '', hgLastRingTapAt = 0, hgLastEventHtml = '', hgFxSeq = null;
     const hgBotHandled = new Set();
@@ -2773,6 +2776,7 @@
         if (room.hgPhase !== 'play') return false;
         const order = room.hgTurnOrder || [];
         if (order[room.hgTurnIdx || 0] !== who) return false;
+        if (room.hgWin) return false; // 종 정리 중에는 새 카드를 뒤집을 수 없음
         const deck = (room.hgDecks || {})[who] || [];
         if (deck.length === 0) { hgAdvanceTurn(room, at); return true; }
         if (hgMarkMissed(room, at)) room.hgGraceUntil = at + HG_COVER_GRACE_MS; // 놓친 5개를 덮는 순간
@@ -2787,17 +2791,50 @@
         return true;
     }
 
+    // 종 정리: 1등은 안전. 못 누른 사람이 있으면 그 사람들이, 모두 눌렀다면 제일 늦게 누른 사람이 한 모금
+    function hgResolveWindow(room, at) {
+        const win = room.hgWin;
+        if (!win) return false;
+        const players = room.players || {};
+        const others = Object.keys(players).filter((id) => id !== win.who);
+        const pressed = Object.values(room.hgRingOrder || []).filter((id) => players[id] && id !== win.who);
+        const missed = others.filter((id) => !pressed.includes(id));
+        let losers = [], reason = '';
+        if (others.length > 0) {
+            if (missed.length > 0) { losers = missed; reason = 'miss'; }
+            else { losers = [pressed[pressed.length - 1]]; reason = 'slow'; }
+        }
+        room.hgWin = null; room.hgRingOrder = null;
+        room.hgGraceUntil = at + HG_RING_GRACE_MS;
+        if (losers.length > 0) {
+            room.hgEventSeq = (room.hgEventSeq || 0) + 1;
+            room.hgEvent = { type: 'drink', who: losers, reason, fruit: win.fruit, winner: win.who, n: win.n, at, seq: room.hgEventSeq };
+        }
+        return true;
+    }
+
     function hgRing(room, who, at) {
         if (room.hgPhase !== 'play' || !(room.players || {})[who]) return false;
         room.hgScore = room.hgScore || {};
+        // 누군가 이미 쳐서 정리 중: 나머지는 눌린 순서만 기록 (오답 아님)
+        if (room.hgWin) {
+            const pressed = Object.values(room.hgRingOrder || []);
+            if (who === room.hgWin.who || pressed.includes(who)) return false;
+            pressed.push(who); room.hgRingOrder = pressed;
+            const others = Object.keys(room.players || {}).filter((id) => id !== room.hgWin.who);
+            if (others.every((id) => pressed.includes(id))) hgResolveWindow(room, at); // 전원이 눌렀으면 바로 정리
+            return true;
+        }
         const fruit = hgFiveFruit(room.hgTop);
         if (fruit >= 0) {
             const gain = room.hgTable || 0;
             room.hgScore[who] = (room.hgScore[who] || 0) + gain;
             room.hgTable = 0; room.hgTop = null;
-            room.hgGraceUntil = at + HG_RING_GRACE_MS;
             room.hgEventSeq = (room.hgEventSeq || 0) + 1;
             room.hgEvent = { type: 'win', who, n: gain, fruit, at, seq: room.hgEventSeq };
+            room.hgWin = { who, fruit, n: gain, startAt: at, endAt: at + HG_WINDOW_MS };
+            room.hgRingOrder = null;
+            if (Object.keys(room.players || {}).every((id) => id === who)) hgResolveWindow(room, at); // 혼자면 바로 정리
             return true;
         }
         if (at < (room.hgGraceUntil || 0)) return false; // 한 발 늦은 종: 벌점 없이 무시
@@ -2826,6 +2863,7 @@
     // 시간이 지나면서 저절로 일어나야 하는 일(자리 비운 사람 건너뛰기, 종료). 카드는 차례인 사람이 직접 뒤집을 때만 넘어감
     function hgStep(room, at) {
         if (room.hgPhase !== 'play') return false;
+        if (room.hgWin && at >= room.hgWin.endAt) { hgResolveWindow(room, at); return true; } // 못 누른 사람 확정
         const order = room.hgTurnOrder || [], players = room.players || {};
         if (!order.some((id) => players[id] && hgDeckLen(room, id) > 0)) {
             if (at - (room.hgLastFlipAt || 0) > HG_END_DELAY_MS) { hgFinish(room, at); return true; }
@@ -2866,23 +2904,29 @@
         if (!isHost || data.hgPhase !== 'play') return;
         const players = data.players || {}, roundKey = data.hgRoundKey;
         const cur = (data.hgTurnOrder || [])[data.hgTurnIdx || 0];
-        if (cur && players[cur]?.isBot) {
+        if (cur && players[cur]?.isBot && !data.hgWin) { // 종 정리 중에는 뒤집지 않음 (정리 끝나면 다시 예약됨)
             const key = `${roundKey}_flip_${data.hgFlipSeq || 0}_${data.hgTurnStart}`;
             if (!hgBotHandled.has(key)) {
                 hgBotHandled.add(key);
                 setTimeout(() => hgTx((room) => hgFlip(room, cur, getServerNow())), botDelay(900, 1800));
             }
         }
-        if (hgFiveFruit(data.hgTop) >= 0) {
-            const seq = data.hgFlipSeq || 0;
+        // 5개가 떠 있거나 누가 먼저 쳐서 정리 중이면 봇도 반응 (가끔은 놓치는 봇)
+        const win = data.hgWin;
+        if (hgFiveFruit(data.hgTop) >= 0 || win) {
+            const seq = data.hgFlipSeq || 0, winKey = win ? win.startAt : 0;
+            const pressed = Object.values(data.hgRingOrder || []);
             Object.keys(players).filter((id) => players[id]?.isBot).forEach((botId) => {
-                const key = `${roundKey}_ring_${seq}_${botId}`;
+                if (win && (win.who === botId || pressed.includes(botId))) return;
+                if (win && hgBotHandled.has(`${roundKey}_ring_${seq}_0_${botId}`)) return; // 5개가 보였을 때 이미 정해둔 봇은 다시 고민하지 않음
+                const key = `${roundKey}_ring_${seq}_${winKey}_${botId}`;
                 if (hgBotHandled.has(key)) return;
                 hgBotHandled.add(key);
-                if (Math.random() > 0.7) return; // 가끔은 놓치는 봇
+                if (Math.random() > 0.7) return;
                 setTimeout(() => {
                     const d = hgLastRaw;
-                    if (!d || d.hgRoundKey !== roundKey || (d.hgFlipSeq || 0) !== seq || hgFiveFruit(d.hgTop) < 0) return; // 이미 덮이거나 누가 침
+                    if (!d || d.hgRoundKey !== roundKey) return;
+                    if (!((hgFiveFruit(d.hgTop) >= 0 && (d.hgFlipSeq || 0) === seq) || d.hgWin)) return; // 이미 덮였고 정리도 끝남
                     hgTx((room) => hgRing(room, botId, getServerNow()));
                 }, botDelay(600, 2200));
             });
@@ -2891,9 +2935,10 @@
 
     // 한 모금이 걸린 순간의 전체 화면 이펙트 (터치는 막지 않음). 면제된 사람(가장 빨리 친 사람)에게는 초록 "안전!"
     function hgShowFx(ev, nick) {
-        let cls = 'drink', emoji, title, sub;
-        if (ev.type === 'win' && ev.who === myId) { cls = 'safe'; emoji = '🔔'; title = '내가 제일 빨랐다!'; sub = '나머지 전원이 마셔요 🍺'; }
-        else if (ev.type === 'win') { emoji = '🍺'; title = '한 모금!'; sub = `${nick(ev.who)}님이 먼저 쳤어요`; }
+        let cls = 'drink', emoji, title, sub, ms = 2400;
+        if (ev.type === 'win' && ev.who === myId) { cls = 'safe'; emoji = '🔔'; title = '내가 제일 빨랐다!'; sub = '못 누른 사람(제일 늦은 사람)이 마셔요 🍺'; }
+        else if (ev.type === 'win') { cls = 'urgent'; emoji = '🔔'; title = '눌러!!'; sub = `${nick(ev.who)}님이 먼저 쳤어요`; ms = 1300; }
+        else if (ev.type === 'drink') { emoji = '🍺'; title = '한 모금!'; sub = ev.reason === 'miss' ? '종을 못 눌렀어요' : '제일 늦게 눌렀어요'; }
         else if (ev.type === 'wrong') { emoji = '🚨'; title = '오답! 한 모금!'; sub = `-${HG_WRONG_PENALTY}점 · 나만 마셔요 🍺`; }
         else { emoji = '😱'; title = '전원 한 모금!'; sub = `${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요`; }
         document.querySelectorAll('.hg-fx').forEach((el) => el.remove());
@@ -2901,7 +2946,7 @@
         fx.className = `hg-fx ${cls}`;
         fx.innerHTML = `<div class="hg-fx-emoji">${emoji}</div><div class="hg-fx-title">${title}</div><div class="hg-fx-sub">${sub}</div>`;
         document.body.appendChild(fx);
-        setTimeout(() => fx.remove(), 2400);
+        setTimeout(() => fx.remove(), ms);
         if (cls === 'drink') {
             const scr = document.getElementById('game-halli-screen');
             scr.classList.remove('shake'); void scr.offsetWidth; scr.classList.add('shake');
@@ -2949,15 +2994,21 @@
 
         // 상태 문구 (최근 종 결과가 있으면 우선 표시)
         const ev = d.hgEvent;
+        const win = d.hgWin, pressedList = Object.values(d.hgRingOrder || []);
         let status;
         if (phase === 'done') {
             status = `🔔 <b>${[...loserSet].map(nick).join(', ')}</b>님이 가장 적게 모았어요!`;
+        } else if (win) {
+            status = win.who === myId ? '🔔 제일 빨랐어요! 나머지가 누르는 중...'
+                : (pressedList.includes(myId) ? '✅ 눌렀어요! 결과를 기다리는 중...' : `🔔 <b>${nick(win.who)}</b>님이 먼저 쳤어요! 얼른 누르세요!!`);
         } else if (ev && now - ev.at < 2500) {
             status = ev.type === 'win'
                 ? `🔔 <b>${nick(ev.who)}</b>님 ${HG_FRUITS[ev.fruit]} 성공! +${ev.n}장`
                 : (ev.type === 'miss'
                     ? `😱 ${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요!`
-                    : `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점 🍺`);
+                    : (ev.type === 'drink'
+                        ? `🍺 <b>${Object.values(ev.who).map(nick).join(', ')}</b>님 한 모금!`
+                        : `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점 🍺`));
         } else if (!anyLeft) {
             status = '🔔 마지막 카드예요! 5개가 있는지 확인하세요';
         } else {
@@ -2984,7 +3035,9 @@
         // 최근 종 결과는 다음 결과가 나올 때까지 남겨둠 — 성공이면 나머지 전원이 마시는 시간
         let evHtml = '종을 쳐서 같은 과일 5개를 맞춰보세요!', evDrink = false;
         if (ev && ev.type === 'win') {
-            evHtml = `🔔 <b>${nick(ev.who)}</b>님이 제일 빨랐어요! ${HG_FRUITS[ev.fruit]} +${ev.n}장<br>🍺 나머지 전원 한 모금!`;
+            evHtml = `🔔 <b>${nick(ev.who)}</b>님이 제일 빨랐어요! ${HG_FRUITS[ev.fruit]} +${ev.n}장<br>⏳ 나머지는 얼른 종을 누르세요! (못 누른 사람 / 제일 늦은 사람이 🍺)`;
+        } else if (ev && ev.type === 'drink') {
+            evHtml = `🍺 <b>${Object.values(ev.who).map(nick).join(', ')}</b>님 한 모금! (${ev.reason === 'miss' ? '종을 못 눌렀어요' : '제일 늦게 눌렀어요'})<br>🔔 ${nick(ev.winner)}님 ${HG_FRUITS[ev.fruit]} +${ev.n}장`;
             evDrink = true;
         } else if (ev && ev.type === 'miss') {
             evHtml = `😱 ${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요!<br>🍺 전원 한 모금!`;
@@ -3003,17 +3056,19 @@
         if (ev && ev.seq !== hgFxSeq) {
             hgFxSeq = ev.seq;
             const mine = ev.type === 'wrong' && ev.who === myId; // 오답은 친 본인 화면에만 이펙트
-            if ((ev.type === 'win' || ev.type === 'miss' || mine) && now - ev.at < 2500) hgShowFx(ev, nick);
+            const iLose = ev.type === 'drink' && Object.values(ev.who).includes(myId); // 한 모금은 걸린 사람 화면에만
+            if ((ev.type === 'win' || ev.type === 'miss' || mine || iLose) && now - ev.at < 2500) hgShowFx(ev, nick);
         }
 
         // 내 버튼
         const flipBtn = document.getElementById('btn-hg-flip'), ringBtn = document.getElementById('btn-hg-ring');
         const myLeft = hgDeckLen(d, myId);
-        const myTurn = phase === 'play' && curId === myId && myLeft > 0;
-        const flipLabel = myTurn ? `🃏 카드 뒤집기 (남은 ${myLeft}장)` : (phase === 'play' && myLeft === 0 ? '🃏 내 카드는 모두 뒤집었어요' : '⏳ 내 차례를 기다리는 중');
+        const myTurn = phase === 'play' && curId === myId && myLeft > 0 && !win;
+        const flipLabel = win ? '🔔 종 정리 중...' : (myTurn ? `🃏 카드 뒤집기 (남은 ${myLeft}장)` : (phase === 'play' && myLeft === 0 ? '🃏 내 카드는 모두 뒤집었어요' : '⏳ 내 차례를 기다리는 중'));
         if (flipBtn.textContent !== flipLabel) flipBtn.textContent = flipLabel;
         if (flipBtn.disabled !== !myTurn) flipBtn.disabled = !myTurn;
-        if (ringBtn.disabled !== (phase !== 'play')) ringBtn.disabled = phase !== 'play';
+        const ringOff = phase !== 'play' || (!!win && (win.who === myId || pressedList.includes(myId))); // 이미 눌렀거나 1등이면 비활성
+        if (ringBtn.disabled !== ringOff) ringBtn.disabled = ringOff;
 
         // 시간이 지나면 저절로 일어나야 하는 일은 누구든 감지해서 처리 — 트랜잭션이 중복 처리를 막아줌
         if (now - hgLastPollAt > 250) {
@@ -6382,7 +6437,7 @@
                 update(rRef, {
                     status: 'playing', hgRoundKey: now, hgPhase: 'play', hgDecks: decks, hgTop: null, hgTable: 0, hgScore: score,
                     hgTurnOrder: order, hgTurnIdx: 0, hgTurnStart: now, hgFlipSeq: 0, hgLastFlipAt: now, hgGraceUntil: 0,
-                    hgEvent: null, hgEventSeq: 0, hgLoserIds: null, hgAllTie: null, hgResultKey: null
+                    hgEvent: null, hgEventSeq: 0, hgWin: null, hgRingOrder: null, hgLoserIds: null, hgAllTie: null, hgResultKey: null
                 });
             } else if (gameId === 'roulette') {
                 const slotCount = 6;
@@ -6500,7 +6555,7 @@
                 drinkDurationSec: null, drinkStartAt: null, drinkRoundKey: null, drinkLoserId: null, drinkPenaltyText: null, drinkRevealed: false,
                 swTargetMs: null, swShowTime: null, swRoundKey: null, swResults: null, swLoserIds: null,
                 pourRoundKey: null, pourPhase: null, pourCap: null, pourFuzz: null, pourChickenAt: null, pourChickenDone: null, pourLevel: null, pourTurnOrder: null, pourTurnIdx: null, pourTurnStart: null, pourMinMs: null, pourStreamId: null, pourStreamStart: null, pourLastPourMs: null, pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null, pourLoserIds: null, pourResultKey: null,
-                hgRoundKey: null, hgPhase: null, hgDecks: null, hgTop: null, hgTable: null, hgScore: null, hgTurnOrder: null, hgTurnIdx: null, hgTurnStart: null, hgFlipSeq: null, hgLastFlipAt: null, hgGraceUntil: null, hgEvent: null, hgEventSeq: null, hgLoserIds: null, hgAllTie: null, hgResultKey: null,
+                hgRoundKey: null, hgPhase: null, hgDecks: null, hgTop: null, hgTable: null, hgScore: null, hgTurnOrder: null, hgTurnIdx: null, hgTurnStart: null, hgFlipSeq: null, hgLastFlipAt: null, hgGraceUntil: null, hgEvent: null, hgEventSeq: null, hgWin: null, hgRingOrder: null, hgLoserIds: null, hgAllTie: null, hgResultKey: null,
                 yutRoundKey: null, yutPhase: null, yutPos: null, yutSc: null, yutPenalty: null, yutTurnOrder: null, yutTurnIdx: null, yutTurnStart: null, yutTurnsLeft: null, yutSeq: null, yutLast: null, yutWinnerId: null, yutLoserIds: null, yutAllTie: null, yutResultKey: null,
                 thiefRoundKey: null, thiefPhase: null, thiefHands: null, thiefOrder: null, thiefTurnIdx: null, thiefTurnStart: null, thiefPairs: null, thiefOut: null, thiefSeq: null, thiefLast: null, thiefLoserId: null, thiefResultKey: null
                 // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
