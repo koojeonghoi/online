@@ -460,6 +460,41 @@
         .thief-last { min-height: 62px; background: #151518; border: 1px solid #2D2D34; border-radius: 10px; padding: 8px 10px; margin: 8px 0; font-size: 13px; line-height: 1.6; color: #C9D1DA; text-align: left; }
         .thief-pairs { font-size: 12px; color: #8E9AA8; text-align: center; margin: 4px 0 8px; }
 
+        /* 🎨 그림 맞추기 */
+        body.sketch-wide { padding: 6px; }
+        #main-container.sketch-wide { max-width: 720px; padding: 14px 6px; }
+        #sketch-canvas-wrap { width: 100%; display: flex; justify-content: center; margin: 6px 0 8px; }
+        #sketch-canvas { background: #fff; border-radius: 10px; border: 2px solid #2D2D34; display: block; }
+        #sketch-canvas.can-draw { touch-action: none; cursor: crosshair; border-color: var(--accent-color); }
+        .sketch-time { font-size: 38px; font-weight: 900; color: #fff; line-height: 1.1; }
+        .sketch-time.low { color: var(--danger-color); }
+        .sketch-bar { height: 8px; background: #2D2D34; border-radius: 4px; overflow: hidden; margin: 4px 8px 6px; }
+        #sketch-bar-fill { height: 100%; width: 100%; background: var(--accent-color); transition: width 0.25s linear; }
+        .sketch-cat { font-size: 13px; color: #8E9AA8; margin: 2px 0 4px; min-height: 18px; }
+        .sketch-word-box { background: #151518; border: 2px solid var(--accent-color); border-radius: 12px; padding: 10px; margin: 6px 8px; }
+        .sketch-word { font-size: 30px; font-weight: 900; color: #fff; margin: 2px 0 8px; }
+        .sketch-word-sm { font-size: 14px; color: #C9D1DA; }
+        .sketch-btn-row { display: flex; gap: 8px; }
+        .sketch-btn-row button { margin-bottom: 0; padding: 12px 6px; font-size: 15px; }
+        .sketch-colors { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 4px 0; }
+        .sketch-sw { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #2D2D34; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; }
+        .sketch-sw.on { border-color: #fff; box-shadow: 0 0 0 2px var(--accent-color); }
+        .sketch-wd { width: 40px; height: 34px; border-radius: 8px; border: 2px solid #2D2D34; background: #151518; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .sketch-wd i { display: block; background: #fff; border-radius: 50%; }
+        .sketch-wd.on { border-color: var(--accent-color); }
+        .sketch-act { padding: 0 12px; height: 34px; border-radius: 8px; border: 2px solid #2D2D34; background: #151518; color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .sketch-guess-row { display: flex; gap: 8px; margin: 6px 8px 0; }
+        .sketch-guess-row input { margin: 0; flex: 1; }
+        .sketch-guess-row button { margin: 0; width: 84px; padding: 12px 4px; }
+        #sketch-guess-fb { min-height: 22px; font-size: 13px; margin: 6px 8px 8px; color: #C9D1DA; }
+        .sketch-review { background: #151518; border: 1px solid #2D2D34; border-radius: 12px; padding: 10px; margin: 8px 8px; text-align: left; }
+        .sketch-review-title { font-size: 15px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+        .sketch-row { border-top: 1px solid #2D2D34; padding: 6px 0; font-size: 13px; color: #C9D1DA; }
+        .sketch-row:first-child { border-top: none; }
+        .sketch-guesses { color: #8E9AA8; word-break: break-all; margin-top: 2px; }
+        .sketch-ack { width: auto !important; padding: 6px 12px !important; margin: 6px 0 0 0 !important; font-size: 13px !important; }
+        .sketch-result-line { font-size: 14px; margin: 4px 0; color: #fff; }
+
         /* 👆 스피드 손가락 */
         .speed-target-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
         .speed-target { aspect-ratio: 1; border-radius: 14px; background: #252529; border: 3px solid #3a3a40; display: flex; align-items: center; justify-content: center; font-size: 30px; transition: all 0.1s; cursor: pointer; }
@@ -550,6 +585,7 @@
             <button class="tab-btn" id="tab-halli" onclick="selectGameMode('halli')">🔔 할리갈리</button>
             <button class="tab-btn" id="tab-yut" onclick="selectGameMode('yut')">🎲 윷놀이</button>
             <button class="tab-btn" id="tab-thief" onclick="selectGameMode('thief')">🃏 도둑잡기</button>
+            <button class="tab-btn" id="tab-sketch" onclick="selectGameMode('sketch')">🎨 그림 맞추기</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -1003,6 +1039,47 @@
         <button id="btn-back-lobby-thief" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
+    <!-- 🎨 그림 맞추기 스크린 -->
+    <div id="game-sketch-screen" class="screen">
+        <h2>🎨 그림 맞추기</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: var(--success-bg); padding: 10px; margin: 0 8px 8px; text-align: left;">
+            <div style="font-size: 12px; color: #8E9AA8; line-height: 1.6;">
+                랜덤으로 뽑힌 출제자가 <b>1분 동안 제시어를 그림으로</b> 그려요 (글자·숫자 금지). 나머지는 그림을 보며 <b>정답을 입력</b>해요 — 다른 사람의 답은 안 보여요!<br>
+                · 못 맞힌 사람은 🍺 / <b>아무도 못 맞히면 출제자만 🍺</b> / 전원이 맞히면 아무도 안 마셔요
+            </div>
+        </div>
+        <div id="sketch-status" style="font-size: 15px; font-weight: 700; color: #fff; margin: 0 8px 4px; min-height: 22px;">불러오는 중...</div>
+        <div id="sketch-timer-wrap" style="display: none;">
+            <div class="sketch-time" id="sketch-time">60</div>
+            <div class="sketch-bar"><div id="sketch-bar-fill"></div></div>
+        </div>
+        <div class="sketch-cat" id="sketch-cat"></div>
+        <div class="sketch-word-box" id="sketch-word-box" style="display: none;"></div>
+        <div id="sketch-canvas-wrap"><canvas id="sketch-canvas"></canvas></div>
+        <div id="sketch-tools" style="display: none;">
+            <div class="sketch-colors" id="sketch-colors"></div>
+            <div class="sketch-colors" id="sketch-tool-row"></div>
+        </div>
+        <div id="sketch-guess-box" style="display: none;">
+            <div class="sketch-guess-row">
+                <input id="sketch-guess" type="text" placeholder="정답을 입력하세요" maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false">
+                <button id="btn-sketch-guess">제출</button>
+            </div>
+            <div id="sketch-guess-fb"></div>
+        </div>
+        <div class="score-board" style="margin: 8px 8px 0;">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">👥 맞히는 사람들</div>
+            <div id="sketch-players">대기 중...</div>
+        </div>
+        <div class="sketch-review" id="sketch-review" style="display: none;">
+            <div class="sketch-review-title" id="sketch-review-title"></div>
+            <div id="sketch-review-list"></div>
+            <div id="sketch-result-box"></div>
+            <button id="btn-sketch-finalize" style="display: none; margin: 10px 0 0 0;">결과 확정</button>
+        </div>
+        <button id="btn-back-lobby-sketch" class="secondary btn-back-lobby" style="margin: 15px 8px 0; width: calc(100% - 16px);">대기실로 돌아가기</button>
+    </div>
+
     <!-- 🍻 랜덤 마시기 게임 스크린 -->
     <div id="game-drink-screen" class="screen">
         <h2>🍻 랜덤 마시기</h2>
@@ -1136,7 +1213,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, update, get, runTransaction, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, set, onValue, update, get, runTransaction, remove, goOffline, goOnline, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = { databaseURL: "https://roulette-d9a12-default-rtdb.asia-southeast1.firebasedatabase.app/" };
     const app = initializeApp(firebaseConfig);
@@ -1840,6 +1917,54 @@
                 : '🎲 다음 조건 뽑기 (내 차례!)';
         }
     }, 400);
+
+    // 📶 연결 관리 — 화면이 꺼졌다 켜지거나 앱을 전환/네트워크가 바뀐 뒤에 Firebase 연결이 끊긴 채로 남으면
+    // 그 사람 화면만 오래된 상태로 멈춰서 "폭탄이 안 넘어간 것처럼" 보인다(서버 값은 이미 바뀐 상태).
+    // 연결이 끊겼으면 배너로 알리고, 앱으로 돌아오거나 네트워크가 바뀌면 연결을 강제로 껐다 켜서 최신 상태를 다시 받는다.
+    const CONN_BANNER_DELAY_MS = 2000;       // 잠깐의 끊김은 표시하지 않음
+    const CONN_RESUME_MIN_HIDDEN_MS = 3000;  // 이 시간 이상 앱을 떠났다 돌아오면 재연결
+    const CONN_RECONNECT_GAP_MS = 300;       // goOffline → goOnline 사이 간격
+    let connBannerTimer = null, connHiddenAt = 0, connReconnecting = false;
+
+    function setConnBanner(show) {
+        let el = document.getElementById('conn-banner');
+        if (!show) { if (el) el.style.display = 'none'; return; }
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'conn-banner';
+            el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10001;background:#b3261e;color:#fff;font-size:13px;font-weight:700;text-align:center;padding:calc(6px + env(safe-area-inset-top, 0px)) 8px 6px;pointer-events:none;';
+            el.textContent = '📶 연결이 끊겼어요. 다시 연결하는 중... (계속 안 바뀌면 화면을 아래로 당겨 새로고침)';
+            document.body.appendChild(el);
+        }
+        el.style.display = 'block';
+    }
+
+    onValue(ref(db, '.info/connected'), (snap) => {
+        if (snap.val() === true) {
+            if (connBannerTimer) { clearTimeout(connBannerTimer); connBannerTimer = null; }
+            setConnBanner(false);
+        } else if (!connBannerTimer) {
+            connBannerTimer = setTimeout(() => { connBannerTimer = null; if (currentRoomCode) setConnBanner(true); }, CONN_BANNER_DELAY_MS);
+        }
+    });
+
+    function forceFirebaseReconnect() {
+        if (connReconnecting || !currentRoomCode) return; // 방에 들어가 있을 때만, 동시에 두 번은 하지 않음
+        connReconnecting = true;
+        try { goOffline(db); } catch (e) { /* 무시 */ }
+        setTimeout(() => {
+            try { goOnline(db); } catch (e) { /* 무시 */ }
+            connReconnecting = false;
+        }, CONN_RECONNECT_GAP_MS);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') { connHiddenAt = Date.now(); return; }
+        if (connHiddenAt && Date.now() - connHiddenAt >= CONN_RESUME_MIN_HIDDEN_MS) forceFirebaseReconnect();
+        connHiddenAt = 0;
+    });
+    window.addEventListener('pageshow', (e) => { if (e.persisted) forceFirebaseReconnect(); }); // 뒤로가기 캐시에서 복원된 경우
+    window.addEventListener('online', forceFirebaseReconnect);                                   // Wi-Fi ↔ LTE 전환 등
 
     // 모바일 브라우저는 화면이 꺼지거나 탭이 백그라운드로 가면 setInterval을 강하게 스로틀링/정지시켜서
     // 폭탄 터질 시점이 지나도 안 터지는 것처럼 보이는 원인이 됨. 화면이 다시 켜지는 순간 즉시 재확인.
@@ -3694,6 +3819,634 @@
         if (el && el.classList.contains('active')) thiefDrawPress(el.dataset.id, Number(el.dataset.k));
     });
 
+    // ===== 🎨 그림 맞추기 (실시간 스케치 + 비공개 정답 입력) =====
+    // 흐름: prep(출제자가 제시어 확인) → draw(1분, 실시간 그림) → review(공개·정답 인정) → done(술 판정)
+    // · 그림(획)과 입력한 답은 방 데이터와 분리된 sketchLive/방코드/라운드/ 에 저장한다. 방 데이터에 넣으면 획이 올 때마다
+    //   모든 화면이 방 전체를 다시 그리게 되고, 다른 사람의 답이 모든 기기에 내려가 버린다. (답은 결과 확인 때만 한 번 읽음)
+    // · 제시어는 방에 해시로만 저장하고 평문은 출제자 화면에만 둔다. 정답 판정은 입력 글자의 부분 문자열 해시와 비교한다.
+    //   (코드에 단어 목록이 있어서 완전한 보안은 아님 — 개발자 도구로 슬쩍 보는 것을 막는 정도)
+    // · 출제자는 랜덤(사람 중). 아무도 못 맞히면 출제자만, 일부만 맞히면 못 맞힌 사람이 마신다. 전원 정답이면 아무도 안 마신다.
+    const SKETCH_DRAW_MS = 60000;          // 그리는 시간
+    const SKETCH_REVIEW_MS = 20000;        // 결과 확인(정답 인정) 시간
+    const SKETCH_PREP_MAX_MS = 90000;      // 출제자가 이 시간 안에 시작하지 않으면 무효
+    const SKETCH_GUESS_COOLDOWN_MS = 1200; // 연속 입력 간격
+    const SKETCH_MAX_GUESSES = 15;
+    const SKETCH_W = 800, SKETCH_H = 1000; // 논리 좌표 (4:5 세로 캔버스). 모든 기기에서 같은 그림이 되도록 좌표를 이 범위로 저장
+    const SKETCH_COLORS = ['#111111', '#e53935', '#1e88e5', '#43a047', '#fdd835', '#fb8c00', '#8e24aa'];
+    const SKETCH_WIDTHS = [6, 12, 24];
+    const SKETCH_ERASER = 7, SKETCH_ERASER_W = 40; // 색 번호 7 = 지우개(흰색 굵은 선)
+    const SKETCH_FLUSH_MS = 150;           // 그리는 동안 이 간격으로 점을 묶어서 전송
+
+    // [카테고리, 제시어, 인정할 다른 답(쉼표)] — 한 글자 답은 입력이 그 글자 하나일 때만 인정.
+    // 답 앞에 '='를 붙이면 입력 전체가 정확히 같을 때만 인정 (예: '=요리'는 "요리사"를 정답으로 치지 않음)
+    const SKETCH_WORDS = [
+        ['동물','고양이','냥이,야옹이,고냥이'],['동물','강아지','멍멍이,댕댕이,개'],['동물','토끼',''],['동물','코끼리',''],['동물','기린',''],['동물','펭귄',''],
+        ['동물','거북이','거북'],['동물','고래',''],['동물','상어',''],['동물','문어',''],['동물','원숭이',''],['동물','사자',''],['동물','호랑이','범'],
+        ['동물','곰','곰돌이'],['동물','돼지','꿀꿀이'],['동물','오리',''],['동물','개구리',''],['동물','뱀',''],['동물','나비',''],['동물','거미',''],
+        ['동물','달팽이',''],['동물','악어',''],['동물','캥거루',''],['동물','판다','팬더,판다곰'],['동물','낙타',''],['동물','하마',''],['동물','박쥐',''],
+        ['동물','꿀벌','벌,말벌'],['동물','고슴도치',''],['동물','다람쥐',''],['동물','공룡','티라노,티라노사우르스'],
+        ['음식','치킨','닭튀김,후라이드,프라이드치킨'],['음식','피자',''],['음식','햄버거','버거'],['음식','라면',''],['음식','김밥',''],['음식','떡볶이','떡볶기'],
+        ['음식','삼겹살',''],['음식','짜장면','자장면,짜장'],['음식','짬뽕',''],['음식','계란후라이','달걀후라이,계란프라이,달걀프라이,=후라이,계란,달걀'],
+        ['음식','수박',''],['음식','바나나',''],['음식','딸기',''],['음식','포도',''],['음식','사과',''],['음식','파인애플',''],['음식','당근',''],['음식','옥수수',''],
+        ['음식','아이스크림','아이스,콘'],['음식','케이크',''],['음식','도넛','도너츠,도너트'],['음식','샌드위치',''],['음식','핫도그',''],['음식','팝콘',''],
+        ['음식','초콜릿','초콜렛,초코'],['음식','만두',''],['음식','김치',''],['음식','비빔밥',''],['음식','순대',''],['음식','족발',''],['음식','붕어빵',''],
+        ['음식','호떡',''],['음식','치즈',''],['음식','식빵','토스트'],
+        ['사물','안경',''],['사물','우산',''],['사물','시계',''],['사물','열쇠','키,열쇠고리'],['사물','가위',''],['사물','연필',''],['사물','지우개',''],
+        ['사물','의자',''],['사물','침대',''],['사물','냉장고',''],['사물','세탁기',''],['사물','텔레비전','티비,tv,텔레비젼,티브이'],
+        ['사물','휴대폰','핸드폰,스마트폰,폰'],['사물','노트북','랩탑'],['사물','마우스',''],['사물','키보드',''],['사물','카메라',''],['사물','자전거',''],
+        ['사물','비행기',''],['사물','자동차','차,승용차'],['사물','버스',''],['사물','기차','열차'],['사물','오토바이',''],['사물','로켓','우주선'],
+        ['사물','헬리콥터','헬기'],['사물','지갑',''],['사물','가방','백팩'],['사물','모자',''],['사물','장갑',''],['사물','양말',''],['사물','신발','운동화,구두'],
+        ['사물','넥타이',''],['사물','반지',''],['사물','왕관',''],['사물','풍선',''],['사물','전구',''],['사물','선풍기',''],['사물','에어컨',''],
+        ['사물','청소기',''],['사물','칫솔',''],['사물','거울',''],['사물','달력',''],['사물','계단',''],['사물','사다리',''],['사물','망치',''],['사물','톱',''],
+        ['사물','텐트',''],['사물','기타',''],['사물','피아노',''],['사물','마이크',''],
+        ['장소·자연','학교',''],['장소·자연','병원',''],['장소·자연','편의점',''],['장소·자연','놀이공원',''],['장소·자연','해변','바다,해수욕장,바닷가'],
+        ['장소·자연','등산','산'],['장소·자연','폭포',''],['장소·자연','화산',''],['장소·자연','무지개',''],['장소·자연','눈사람',''],['장소·자연','번개',''],
+        ['장소·자연','구름',''],['장소·자연','태양','해,햇님,해님'],['장소·자연','보름달','달,달님'],['장소·자연','별똥별','유성,별똥'],['장소·자연','사막',''],
+        ['장소·자연','무인도','섬'],['장소·자연','에펠탑',''],['장소·자연','피라미드',''],['장소·자연','자유의여신상','여신상'],
+        ['장소·자연','집','주택,하우스'],['장소·자연','성','성곽,캐슬'],
+        ['사람·캐릭터','경찰','경찰관'],['사람·캐릭터','소방관','소방수'],['사람·캐릭터','의사',''],['사람·캐릭터','요리사','셰프'],['사람·캐릭터','산타클로스','산타'],
+        ['사람·캐릭터','해적',''],['사람·캐릭터','마술사','마법사'],['사람·캐릭터','우주인','우주비행사'],['사람·캐릭터','로봇',''],['사람·캐릭터','유령','귀신'],
+        ['사람·캐릭터','좀비',''],['사람·캐릭터','외계인',''],['사람·캐릭터','도둑',''],['사람·캐릭터','군인',''],['사람·캐릭터','간호사',''],['사람·캐릭터','탐정',''],
+        ['사람·캐릭터','천사',''],['사람·캐릭터','악마',''],
+        ['행동','수영',''],['행동','낚시',''],['행동','샤워',''],['행동','줄다리기',''],['행동','달리기','조깅,마라톤'],['행동','스키',''],['행동','줄넘기',''],
+        ['행동','캠핑',''],['행동','요가',''],['행동','볼링',''],['행동','축구',''],['행동','야구',''],['행동','농구',''],['행동','골프',''],['행동','테니스',''],
+        ['행동','권투','복싱'],['행동','양치질','양치,이닦기'],['행동','잠자기','잠,수면,취침'],['행동','춤추기','춤,댄스'],['행동','노래하기','노래'],
+        ['행동','=요리','쿠킹'],['행동','=청소',''],['행동','독서','책읽기'],
+        ['술자리','소주',''],['술자리','맥주',''],['술자리','막걸리',''],['술자리','건배',''],['술자리','치맥',''],['술자리','소맥',''],['술자리','폭탄주',''],
+        ['술자리','안주',''],['술자리','숙취','=해장'],['술자리','해장국',''],['술자리','대리운전','대리'],['술자리','파전',''],['술자리','포장마차','포차'],
+        ['술자리','얼음',''],['술자리','와인',''],['술자리','양주','']
+    ];
+
+    // 입력 정규화: 공백/기호 제거, 소문자
+    function sketchNorm(str) {
+        return String(str || '').normalize('NFC').toLowerCase().replace(/[\s\-_.,!?~'"`·ㆍ…()\[\]{}<>:;\/\\|*&^%$#@+=]/g, '');
+    }
+    // 가벼운 53비트 해시(cyrb53) — 라운드 번호를 섞어서 판마다 값이 달라지게 함
+    function sketchHash(salt, text) {
+        const str = `${salt}:${text}`;
+        let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+        for (let i = 0, ch; i < str.length; i++) {
+            ch = str.charCodeAt(i);
+            h1 = Math.imul(h1 ^ ch, 2654435761);
+            h2 = Math.imul(h2 ^ ch, 1597334677);
+        }
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+    }
+    function sketchHashesFor(roundKey, accepted) {
+        const out = new Set();
+        accepted.forEach((a) => {
+            const exact = String(a).startsWith('='), n = sketchNorm(exact ? String(a).slice(1) : a);
+            if (n) out.add(sketchHash(roundKey, exact ? `=${n}` : n)); // 정확히 일치용은 '='를 붙여 따로 해시
+        });
+        return [...out];
+    }
+    // 입력 전체가 인정 답과 같거나, 입력 속에 (2글자 이상인) 인정 답이 들어 있으면 정답 ("귀여운 고양이" → 고양이)
+    function sketchCheckGuess(roundKey, guess, hashes) {
+        const g = sketchNorm(guess);
+        if (!g) return false;
+        const set = new Set(Object.values(hashes || {}));
+        if (set.has(sketchHash(roundKey, g)) || set.has(sketchHash(roundKey, `=${g}`))) return true;
+        for (let len = 2; len < g.length && len <= 12; len++) {
+            for (let i = 0; i + len <= g.length; i++) if (set.has(sketchHash(roundKey, g.substr(i, len)))) return true;
+        }
+        return false;
+    }
+
+    // ── 방 상태 전이 (트랜잭션 안에서 실행되는 순수 함수들) ──
+    function sketchGuessers(room) {
+        const players = room.players || {};
+        return Object.keys(players).filter((id) => id !== room.sketchDrawerId);
+    }
+    function sketchUnsolved(room) {
+        const solved = room.sketchSolved || {};
+        return sketchGuessers(room).filter((id) => !solved[id]);
+    }
+    function sketchPrepare(room, who, category, hashes, isReroll) {
+        if (room.sketchPhase !== 'prep' || room.sketchDrawerId !== who) return false;
+        if (isReroll) { if ((room.sketchRerolls || 0) >= 1) return false; room.sketchRerolls = 1; }
+        room.sketchCategory = category; room.sketchAnswers = hashes;
+        return true;
+    }
+    function sketchStart(room, who, at) {
+        if (room.sketchPhase !== 'prep' || room.sketchDrawerId !== who || !room.sketchAnswers) return false;
+        room.sketchPhase = 'draw'; room.sketchStartAt = at; room.sketchEndAt = at + SKETCH_DRAW_MS;
+        return true;
+    }
+    function sketchFinalize(room, at, voidReason) {
+        const players = room.players || {}, drawer = room.sketchDrawerId;
+        const guessers = sketchGuessers(room), solved = room.sketchSolved || {};
+        let losers = [], reason;
+        if (voidReason) reason = voidReason;
+        else if (guessers.length === 0) reason = 'void';
+        else if (guessers.filter((id) => solved[id]).length === 0) { losers = players[drawer] ? [drawer] : []; reason = 'nobody'; } // 아무도 못 맞힘 → 출제자만
+        else { losers = guessers.filter((id) => !solved[id]); reason = losers.length ? 'miss' : 'all'; }
+        room.sketchPhase = 'done'; room.sketchLoserIds = losers; room.sketchReason = reason; room.sketchResultKey = at;
+        const ids = Object.keys(players);
+        room.roomLastLoserId = losers.length ? losers[Math.floor(Math.random() * losers.length)] : (players[drawer] ? drawer : ids[Math.floor(Math.random() * ids.length)]);
+        room.roomLoserPendingChoice = true;
+    }
+    function sketchEndDraw(room, at) {
+        if (sketchUnsolved(room).length === 0) { sketchFinalize(room, at); return; } // 전원 정답이면 확인할 것이 없음
+        room.sketchPhase = 'review'; room.sketchReviewEndAt = at + SKETCH_REVIEW_MS;
+    }
+    function sketchSolve(room, id, at) {
+        if (room.sketchPhase !== 'draw' || id === room.sketchDrawerId || !(room.players || {})[id]) return false;
+        room.sketchSolved = room.sketchSolved || {};
+        if (room.sketchSolved[id]) return false;
+        room.sketchSolved[id] = at;
+        if (sketchUnsolved(room).length === 0) sketchEndDraw(room, at); // 전원이 맞히면 바로 종료
+        return true;
+    }
+    // 출제자가 결과 확인 단계에서 억울한 오답을 정답으로 인정
+    function sketchAck(room, who, target, at) {
+        if (room.sketchPhase !== 'review' || room.sketchDrawerId !== who || target === who || !(room.players || {})[target]) return false;
+        room.sketchSolved = room.sketchSolved || {};
+        if (room.sketchSolved[target]) return false;
+        room.sketchSolved[target] = at;
+        room.sketchAcked = { ...(room.sketchAcked || {}), [target]: true };
+        if (sketchUnsolved(room).length === 0) sketchFinalize(room, at);
+        return true;
+    }
+    function sketchReveal(room, who, word) {
+        if (!['review', 'done'].includes(room.sketchPhase) || room.sketchDrawerId !== who || room.sketchWordReveal) return false;
+        room.sketchWordReveal = word;
+        return true;
+    }
+    // 시간이 지나면서 저절로 일어나야 하는 일 (누구 화면이든 감지해서 처리 — 트랜잭션이 중복을 막아줌)
+    function sketchStep(room, at) {
+        const players = room.players || {}, drawerHere = !!players[room.sketchDrawerId];
+        if (room.sketchPhase === 'prep') {
+            if (!drawerHere || at - (room.sketchPrepAt ?? at) > SKETCH_PREP_MAX_MS) { sketchFinalize(room, at, 'void'); return true; }
+        } else if (room.sketchPhase === 'draw') {
+            if (!drawerHere) { sketchFinalize(room, at, 'void'); return true; }
+            if (at >= room.sketchEndAt) { sketchEndDraw(room, at); return true; }
+        } else if (room.sketchPhase === 'review') {
+            if (!drawerHere || at >= room.sketchReviewEndAt) { sketchFinalize(room, at); return true; }
+        }
+        return false;
+    }
+
+    function sketchTx(fn) {
+        if (!currentRoomCode) return Promise.resolve(null);
+        return runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
+            if (!room || room.status !== 'playing' || room.selectedGame !== 'sketch') return undefined;
+            return fn(room) ? room : undefined;
+        }, { applyLocally: false }).catch((error) => { console.error('sketch transaction failed:', error); return null; });
+    }
+
+    // ── 화면/그림 상태 ──
+    let sketchLastRaw = null, sketchRAF = null, sketchActiveRoundKey = null, sketchLastPollAt = 0, sketchLiveDirty = false;
+    let sketchStrokes = [], sketchCanvas = null, sketchCtx = null, sketchLastCw = 0, sketchLayoutW = 0;
+    let sketchUnsubOps = null, sketchOpSeq = 0, sketchStrokeSeq = 0, sketchOutQueue = [], sketchPending = [], sketchFlushTimer = null;
+    let sketchDrawing = false, sketchCurStroke = 0, sketchLastPt = null, sketchTool = { color: 0, width: 1 };
+    let sketchMyWord = null, sketchPreparing = false, sketchRevealing = false;
+    let sketchLastGuessAt = 0, sketchMyGuessCount = 0, sketchGuessesAll = null, sketchGuessesKey = null, sketchDoneKey = null;
+    const sketchCache = {};
+    const sketchBotHandled = new Set();
+
+    function sketchSetHtml(id, html) {
+        if (sketchCache[id] === html) return;
+        sketchCache[id] = html;
+        document.getElementById(id).innerHTML = html;
+    }
+    function sketchSetStyle(id, prop, val) {
+        const el = document.getElementById(id);
+        if (el.style[prop] !== val) el.style[prop] = val;
+    }
+
+    function sketchStopLocal() {
+        if (sketchRAF) cancelAnimationFrame(sketchRAF);
+        if (sketchFlushTimer) clearInterval(sketchFlushTimer);
+        if (sketchUnsubOps) { try { sketchUnsubOps(); } catch (e) { /* 무시 */ } }
+        sketchRAF = null; sketchFlushTimer = null; sketchUnsubOps = null; sketchLastRaw = null; sketchActiveRoundKey = null;
+        sketchStrokes = []; sketchOpSeq = 0; sketchStrokeSeq = 0; sketchOutQueue = []; sketchPending = []; sketchDrawing = false; sketchLastPt = null;
+        sketchMyWord = null; sketchPreparing = false; sketchRevealing = false; sketchMyGuessCount = 0; sketchLastGuessAt = 0;
+        sketchGuessesAll = null; sketchGuessesKey = null; sketchDoneKey = null; sketchLastCw = 0;
+        Object.keys(sketchCache).forEach((k) => delete sketchCache[k]);
+    }
+
+    // ── 캔버스 ──
+    function sketchLayout() {
+        sketchCanvas = sketchCanvas || document.getElementById('sketch-canvas');
+        const wrap = document.getElementById('sketch-canvas-wrap');
+        const cw = wrap.clientWidth;
+        if (!cw) return false;
+        sketchLastCw = cw;
+        const maxH = Math.max(window.innerHeight, 560) * 0.7; // 키보드가 올라와 화면이 줄어도 그림판이 쪼그라들지 않게 최소값을 둠
+        const w = Math.max(240, Math.min(cw, 600, Math.floor(maxH / 1.25)));
+        const h = Math.round(w * SKETCH_H / SKETCH_W);
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        sketchCanvas.style.width = `${w}px`; sketchCanvas.style.height = `${h}px`;
+        sketchCanvas.width = Math.round(w * dpr); sketchCanvas.height = Math.round(h * dpr);
+        sketchLayoutW = w;
+        sketchCtx = sketchCanvas.getContext('2d');
+        sketchRedrawAll();
+        return true;
+    }
+    function sketchRedrawAll() {
+        const ctx = sketchCtx;
+        if (!ctx || !sketchCanvas) return;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, sketchCanvas.width, sketchCanvas.height);
+        const sc = sketchCanvas.width / SKETCH_W;
+        ctx.setTransform(sc, 0, 0, sc, 0, 0);
+        sketchStrokes.forEach((st) => sketchDrawStroke(st, 0));
+    }
+    // 획의 fromLen번째 좌표부터 이어서 그림 (실시간으로 점이 도착할 때마다 새 부분만 그림)
+    function sketchDrawStroke(st, fromLen) {
+        const ctx = sketchCtx, p = st.pts;
+        if (!ctx || p.length < 2) return;
+        const eraser = st.c === SKETCH_ERASER;
+        const color = eraser ? '#ffffff' : (SKETCH_COLORS[st.c] || '#111111');
+        const width = eraser ? SKETCH_ERASER_W : (SKETCH_WIDTHS[st.w] || 12);
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+        if (fromLen === 0) { ctx.beginPath(); ctx.arc(p[0], p[1], width / 2, 0, Math.PI * 2); ctx.fill(); } // 점 하나만 찍어도 보이게
+        let i = fromLen >= 2 ? fromLen - 2 : 0; // 직전 마지막 점부터 이어 그리기
+        ctx.beginPath(); ctx.moveTo(p[i], p[i + 1]);
+        for (i += 2; i + 1 < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
+        ctx.stroke();
+    }
+    function sketchFindStroke(id) {
+        for (let i = sketchStrokes.length - 1; i >= 0; i--) if (sketchStrokes[i].id === id) return sketchStrokes[i];
+        return null;
+    }
+    // 그림 이벤트: b=획 시작(id,c,w) / p=점 추가(id,p:[x,y,...]) / u=되돌리기 / c=전체 지우기
+    function sketchApplyOp(op) {
+        if (!op) return;
+        if (op.t === 'b') {
+            sketchStrokeSeq = Math.max(sketchStrokeSeq, op.id || 0);
+            sketchStrokes.push({ id: op.id, c: op.c, w: op.w, pts: [] });
+        } else if (op.t === 'p') {
+            const st = sketchFindStroke(op.id);
+            if (!st) return;
+            const add = Object.values(op.p || {}), from = st.pts.length;
+            for (let i = 0; i < add.length; i++) st.pts.push(add[i]);
+            sketchDrawStroke(st, from);
+        } else if (op.t === 'c') { sketchStrokes = []; sketchRedrawAll(); }
+        else if (op.t === 'u') { sketchStrokes.pop(); sketchRedrawAll(); }
+    }
+    // 출제자: 내 화면에는 바로 그리고, 전송 대기열에 넣음
+    function sketchEmit(op) { sketchApplyOp(op); sketchOutQueue.push(op); }
+    function sketchSendQueue() {
+        if (!sketchOutQueue.length || !currentRoomCode || !sketchActiveRoundKey) return;
+        const updates = {}, base = `sketchLive/${currentRoomCode}/${sketchActiveRoundKey}/ops/`;
+        sketchOutQueue.forEach((op) => { updates[base + String(sketchOpSeq++).padStart(6, '0')] = op; });
+        sketchOutQueue = [];
+        update(ref(db), updates).catch((e) => console.error('sketch send failed:', e));
+    }
+    function sketchFlushPending() {
+        if (sketchPending.length) { sketchOutQueue.push({ t: 'p', id: sketchCurStroke, p: sketchPending }); sketchPending = []; }
+        sketchSendQueue();
+    }
+    function sketchSubscribeOps(roundKey) {
+        if (sketchUnsubOps) { try { sketchUnsubOps(); } catch (e) { /* 무시 */ } sketchUnsubOps = null; }
+        sketchUnsubOps = onChildAdded(ref(db, `sketchLive/${currentRoomCode}/${roundKey}/ops`), (snap) => {
+            const seq = parseInt(snap.key, 10);
+            if (!Number.isFinite(seq)) return;
+            if (sketchLastRaw && sketchLastRaw.sketchDrawerId === myId) { // 출제자: 내가 보낸 것은 이미 그렸으니 건너뛰고, 새로고침 뒤에는 이어서 복원
+                if (seq < sketchOpSeq) return;
+                sketchOpSeq = seq + 1;
+            }
+            sketchApplyOp(snap.val());
+        });
+    }
+
+    function sketchCanDraw() {
+        const d = sketchLastRaw;
+        return !!d && d.sketchPhase === 'draw' && d.sketchDrawerId === myId && getServerNow() < d.sketchEndAt + 300;
+    }
+    function sketchPointerPos(e) {
+        const r = sketchCanvas.getBoundingClientRect();
+        const x = Math.round(Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1) * SKETCH_W);
+        const y = Math.round(Math.min(Math.max((e.clientY - r.top) / r.height, 0), 1) * SKETCH_H);
+        return [x, y];
+    }
+    function sketchPushPoint(x, y) {
+        const last = sketchLastPt;
+        if (last && Math.abs(x - last[0]) + Math.abs(y - last[1]) < 3) return; // 너무 가까운 점은 생략
+        sketchLastPt = [x, y];
+        sketchApplyOp({ t: 'p', id: sketchCurStroke, p: [x, y] });
+        sketchPending.push(x, y);
+    }
+    function sketchPointerDown(e) {
+        if (!sketchCanDraw()) return;
+        e.preventDefault();
+        try { sketchCanvas.setPointerCapture(e.pointerId); } catch (err) { /* 무시 */ }
+        sketchDrawing = true;
+        sketchCurStroke = sketchStrokeSeq + 1;
+        sketchLastPt = null; sketchPending = [];
+        sketchEmit({ t: 'b', id: sketchCurStroke, c: sketchTool.color, w: sketchTool.width });
+        const [x, y] = sketchPointerPos(e);
+        sketchPushPoint(x, y);
+        if (sketchFlushTimer) clearInterval(sketchFlushTimer);
+        sketchFlushTimer = setInterval(sketchFlushPending, SKETCH_FLUSH_MS);
+    }
+    function sketchPointerMove(e) {
+        if (!sketchDrawing) return;
+        if (!sketchCanDraw()) { sketchPointerUp(); return; }
+        e.preventDefault();
+        const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+        (evs && evs.length ? evs : [e]).forEach((ev) => { const [x, y] = sketchPointerPos(ev); sketchPushPoint(x, y); });
+    }
+    function sketchPointerUp() {
+        if (!sketchDrawing) return;
+        sketchDrawing = false;
+        if (sketchFlushTimer) { clearInterval(sketchFlushTimer); sketchFlushTimer = null; }
+        sketchFlushPending();
+    }
+
+    // ── 출제자: 제시어 ──
+    async function sketchPickWord() {
+        const idx = await takeUnusedIndex('sketch', SKETCH_WORDS.length, (k) => SKETCH_WORDS[k][0]); // 오늘 이미 나온 제시어는 제외
+        const [cat, word, syn] = SKETCH_WORDS[idx];
+        return { idx, cat, word: word.replace(/^=/, ''), accepted: [word, ...(syn ? syn.split(',') : [])] };
+    }
+    function sketchWordKey(roundKey) { return `sketchWord:${currentRoomCode}:${roundKey}`; }
+    function sketchSaveWord(roundKey, w) {
+        sketchMyWord = { ...w, roundKey };
+        try {
+            Object.keys(localStorage).forEach((k) => { if (k.startsWith('sketchWord:')) localStorage.removeItem(k); });
+            localStorage.setItem(sketchWordKey(roundKey), JSON.stringify(sketchMyWord));
+        } catch (e) { /* 저장 못 해도 이 화면에서는 계속 진행 */ }
+    }
+    async function sketchEnsurePrepared(d) {
+        if (sketchPreparing) return;
+        sketchPreparing = true;
+        try {
+            if (!sketchMyWord || sketchMyWord.roundKey !== d.sketchRoundKey) {
+                try { const saved = JSON.parse(localStorage.getItem(sketchWordKey(d.sketchRoundKey)) || 'null'); if (saved) sketchMyWord = saved; } catch (e) { /* 무시 */ }
+            }
+            if (d.sketchAnswers && sketchMyWord) return; // 이미 준비됨 (새로고침 후 복원 포함)
+            const w = await sketchPickWord();            // 처음이거나, 새로고침으로 제시어를 잃은 경우 새로 뽑음
+            sketchSaveWord(d.sketchRoundKey, w);
+            await sketchTx((room) => sketchPrepare(room, myId, w.cat, sketchHashesFor(d.sketchRoundKey, w.accepted), false));
+        } finally { sketchPreparing = false; }
+    }
+    async function sketchRerollPress() {
+        const d = sketchLastRaw;
+        if (!d || d.sketchPhase !== 'prep' || d.sketchDrawerId !== myId || (d.sketchRerolls || 0) >= 1 || sketchPreparing) return;
+        sketchPreparing = true;
+        try {
+            const w = await sketchPickWord();
+            const res = await sketchTx((room) => sketchPrepare(room, myId, w.cat, sketchHashesFor(d.sketchRoundKey, w.accepted), true));
+            if (res && res.committed) sketchSaveWord(d.sketchRoundKey, w);
+        } finally { sketchPreparing = false; }
+    }
+    function sketchStartPress() {
+        const d = sketchLastRaw;
+        if (!d || d.sketchPhase !== 'prep' || d.sketchDrawerId !== myId || !d.sketchAnswers || !sketchMyWord) return;
+        const now = getServerNow();
+        sketchTx((room) => sketchStart(room, myId, now));
+    }
+
+    // ── 맞히는 사람: 정답 입력 ──
+    function sketchSetFeedback(text) { sketchCache['sketch-guess-fb'] = text; document.getElementById('sketch-guess-fb').textContent = text; }
+    function sketchSubmitGuess() {
+        const d = sketchLastRaw;
+        if (!d || d.sketchPhase !== 'draw' || d.sketchDrawerId === myId || (d.sketchSolved || {})[myId]) return;
+        const input = document.getElementById('sketch-guess');
+        const text = input.value.trim();
+        if (!text) return;
+        const now = getServerNow();
+        if (now - sketchLastGuessAt < SKETCH_GUESS_COOLDOWN_MS) { sketchSetFeedback('⏱ 너무 빨라요! 잠깐만요'); return; }
+        if (sketchMyGuessCount >= SKETCH_MAX_GUESSES) { sketchSetFeedback('입력 횟수를 모두 썼어요'); return; }
+        sketchLastGuessAt = now; sketchMyGuessCount++; input.value = '';
+        const correct = sketchCheckGuess(d.sketchRoundKey, text, d.sketchAnswers);
+        // 입력한 답은 결과 확인 때 공개하려고 방 데이터와 분리된 경로에 저장 (정답이어도 기록)
+        set(ref(db, `sketchLive/${currentRoomCode}/${d.sketchRoundKey}/guesses/${myId}/${String(sketchMyGuessCount).padStart(2, '0')}`), text.slice(0, 30)).catch((e) => console.error(e));
+        if (correct) {
+            sketchSetFeedback('🎉 정답이에요!');
+            sketchTx((room) => sketchSolve(room, myId, getServerNow()));
+        } else {
+            sketchSetFeedback(`❌ 아니에요! 다시 생각해 보세요 (${sketchMyGuessCount}/${SKETCH_MAX_GUESSES})`);
+            input.focus();
+        }
+    }
+
+    // ── 결과 확인 ──
+    async function sketchLoadGuesses(d) {
+        sketchGuessesKey = d.sketchRoundKey;
+        try {
+            const snap = await get(ref(db, `sketchLive/${currentRoomCode}/${d.sketchRoundKey}/guesses`));
+            const raw = snap.val() || {}, out = {};
+            Object.keys(raw).forEach((id) => { out[id] = Object.keys(raw[id] || {}).sort().map((k) => raw[id][k]); });
+            sketchGuessesAll = out;
+        } catch (e) { sketchGuessesAll = {}; }
+    }
+    function sketchAckPress(target) {
+        const now = getServerNow();
+        sketchTx((room) => sketchAck(room, myId, target, now));
+    }
+    function sketchFinalizePress() {
+        const d = sketchLastRaw;
+        if (!d || d.sketchPhase !== 'review' || d.sketchDrawerId !== myId) return;
+        const now = getServerNow();
+        sketchTx((room) => (room.sketchPhase === 'review' && room.sketchDrawerId === myId) ? (sketchFinalize(room, now), true) : false);
+    }
+
+    // 🤖 봇: 방장 화면에서만, 봇이 맞히는 사람일 때 확률적으로(약 60%) 무작위 시점에 정답 처리
+    function sketchScheduleBots(d) {
+        if (!isHost || d.sketchPhase !== 'draw') return;
+        const players = d.players || {}, now = getServerNow(), elapsed = Math.max(0, now - d.sketchStartAt);
+        sketchGuessers(d).filter((id) => players[id]?.isBot).forEach((botId) => {
+            const key = `${d.sketchRoundKey}_${botId}`;
+            if (sketchBotHandled.has(key)) return;
+            sketchBotHandled.add(key);
+            if (Math.random() > 0.6) return;
+            const delay = Math.max(800, 10000 + Math.random() * 42000 - elapsed);
+            setTimeout(() => sketchTx((room) => sketchSolve(room, botId, getServerNow())), delay);
+        });
+    }
+
+    function sketchRender(data) {
+        const roundKey = `${data.sketchRoundKey || ''}`;
+        if (sketchActiveRoundKey !== roundKey) {
+            sketchStopLocal();
+            sketchActiveRoundKey = roundKey; sketchLiveDirty = true; sketchBotHandled.clear();
+            sketchCanvas = document.getElementById('sketch-canvas');
+            sketchLayout();
+            sketchSubscribeOps(roundKey);
+        }
+        sketchLastRaw = data;
+        if (data.sketchDrawerId === myId && (!sketchMyWord || sketchMyWord.roundKey !== data.sketchRoundKey)) {
+            try { const saved = JSON.parse(localStorage.getItem(sketchWordKey(data.sketchRoundKey)) || 'null'); if (saved) sketchMyWord = saved; } catch (e) { /* 무시 */ }
+        }
+        if (data.sketchDrawerId === myId && data.sketchPhase === 'prep' && (!data.sketchAnswers || !sketchMyWord)) sketchEnsurePrepared(data);
+        sketchScheduleBots(data);
+        if (!sketchRAF) sketchRAF = requestAnimationFrame(sketchFrame);
+    }
+
+    function sketchBuildTools() {
+        let html = SKETCH_COLORS.map((c, i) => `<div class="sketch-sw" data-c="${i}" style="background:${c};"></div>`).join('');
+        html += `<div class="sketch-sw" data-c="${SKETCH_ERASER}" style="background:#fff;">🧽</div>`;
+        sketchSetHtml('sketch-colors', html);
+        let row = SKETCH_WIDTHS.map((w, i) => `<div class="sketch-wd" data-w="${i}"><i style="width:${6 + i * 5}px;height:${6 + i * 5}px;"></i></div>`).join('');
+        row += '<div class="sketch-act" data-act="undo">↩️ 되돌리기</div><div class="sketch-act" data-act="clear">🗑️ 전체 지우기</div>';
+        sketchSetHtml('sketch-tool-row', row);
+    }
+
+    function sketchFrame() {
+        sketchRAF = null;
+        const d = sketchLastRaw;
+        const screenEl = document.getElementById('game-sketch-screen');
+        if (!d || !screenEl || !screenEl.classList.contains('active')) return;
+        const now = getServerNow();
+        const players = d.players || {}, drawer = d.sketchDrawerId, phase = d.sketchPhase;
+        const nick = (id) => players[id]?.nickname || '참가자';
+        const amDrawer = drawer === myId, solved = d.sketchSolved || {}, acked = d.sketchAcked || {};
+        const guessers = sketchGuessers(d);
+        const word = d.sketchWordReveal || (amDrawer && sketchMyWord ? sketchMyWord.word : null);
+
+        // 그림판 크기: 화면 폭이 바뀌었을 때만 다시 계산 (키보드로 높이만 바뀌는 경우는 무시)
+        const wrapW = document.getElementById('sketch-canvas-wrap').clientWidth;
+        if (wrapW && wrapW !== sketchLastCw && document.activeElement?.id !== 'sketch-guess') sketchLayout();
+        if (sketchCanvas) sketchCanvas.classList.toggle('can-draw', amDrawer && phase === 'draw');
+
+        // 상태 문구
+        const loserIds = Object.values(d.sketchLoserIds || {});
+        let status;
+        if (phase === 'prep') status = amDrawer ? (sketchMyWord && d.sketchAnswers ? '🎨 제시어를 확인하고 "그리기 시작"을 누르세요' : '🎨 제시어를 뽑는 중...') : `🎨 <b>${nick(drawer)}</b>님이 제시어를 확인하는 중... 곧 시작해요!`;
+        else if (phase === 'draw') status = amDrawer ? '✏️ 그림으로 설명하세요! (글자·숫자는 반칙)' : (solved[myId] ? '🎉 맞혔어요! 나머지가 맞힐 때까지 기다려요' : `👀 <b>${nick(drawer)}</b>님의 그림을 보고 맞혀보세요!`);
+        else if (phase === 'review') status = amDrawer ? '🔍 억울한 오답이 있으면 "정답 인정"을 눌러주세요' : '🔍 결과를 확인하는 중...';
+        else {
+            const r = d.sketchReason, names = loserIds.map(nick).join(', ');
+            status = r === 'nobody' ? `😵 아무도 못 맞혔어요! <b>${names}</b>님이 마셔요` : (r === 'miss' ? `🍺 못 맞힌 <b>${names}</b>님이 마셔요` : (r === 'all' ? '🎉 전원 정답! 아무도 안 마셔요' : '출제자 문제로 이번 판은 무효예요'));
+        }
+        sketchSetHtml('sketch-status', status);
+
+        // 타이머
+        let tText = '', tLow = false, pct = 100, showTimer = false;
+        if (phase === 'draw') { const remain = Math.max(0, d.sketchEndAt - now); tText = String(Math.ceil(remain / 1000)); tLow = remain <= 10000; pct = remain / SKETCH_DRAW_MS * 100; showTimer = true; }
+        else if (phase === 'review') { const remain = Math.max(0, d.sketchReviewEndAt - now); tText = `확정까지 ${Math.ceil(remain / 1000)}초`; pct = remain / SKETCH_REVIEW_MS * 100; showTimer = true; }
+        sketchSetStyle('sketch-timer-wrap', 'display', showTimer ? 'block' : 'none');
+        const timeEl = document.getElementById('sketch-time');
+        if (timeEl.textContent !== tText) timeEl.textContent = tText;
+        timeEl.classList.toggle('low', tLow);
+        sketchSetStyle('sketch-bar-fill', 'width', `${Math.max(0, Math.min(100, pct)).toFixed(1)}%`);
+
+        // 카테고리 / 출제자 제시어 상자
+        sketchSetHtml('sketch-cat', d.sketchCategory && phase !== 'done' ? `📂 카테고리: <b>${d.sketchCategory}</b>` : '');
+        let wordHtml = '', showWordBox = false;
+        if (amDrawer && phase === 'prep') {
+            showWordBox = true;
+            const ready = !!(sketchMyWord && d.sketchAnswers);
+            wordHtml = ready
+                ? `<div class="sketch-word-sm">나만 보여요! 이 제시어를 그려보세요 (${sketchMyWord.cat})</div><div class="sketch-word">${sketchMyWord.word}</div><div class="sketch-btn-row">${(d.sketchRerolls || 0) < 1 ? '<button class="secondary" data-act="reroll">🔄 제시어 바꾸기 (1회)</button>' : ''}<button data-act="start">✏️ 그리기 시작 (1분)</button></div>`
+                : '<div class="sketch-word-sm">제시어를 뽑는 중...</div>';
+        } else if (amDrawer && phase === 'draw') {
+            showWordBox = true;
+            wordHtml = `<div class="sketch-word-sm">제시어: <b style="color:#fff; font-size:20px;">${sketchMyWord ? sketchMyWord.word : '(불러오지 못했어요)'}</b></div>`;
+        }
+        sketchSetHtml('sketch-word-box', wordHtml);
+        sketchSetStyle('sketch-word-box', 'display', showWordBox ? 'block' : 'none');
+
+        // 그리기 도구 (출제자, 그리는 중)
+        const showTools = amDrawer && phase === 'draw';
+        sketchSetStyle('sketch-tools', 'display', showTools ? 'block' : 'none');
+        if (showTools) {
+            if (!sketchCache['sketch-colors']) sketchBuildTools();
+            document.querySelectorAll('#sketch-colors .sketch-sw').forEach((el) => el.classList.toggle('on', Number(el.dataset.c) === sketchTool.color));
+            document.querySelectorAll('#sketch-tool-row .sketch-wd').forEach((el) => el.classList.toggle('on', Number(el.dataset.w) === sketchTool.width));
+        }
+
+        // 정답 입력 (맞히는 사람, 아직 못 맞힌 경우)
+        const showGuess = !amDrawer && phase === 'draw' && !solved[myId];
+        sketchSetStyle('sketch-guess-box', 'display', showGuess ? 'block' : 'none');
+
+        // 맞히는 사람 목록: 맞혔는지(✅/⏳)만 보이고 입력한 답은 보이지 않음
+        sketchSetHtml('sketch-players', guessers.map((id) => {
+            const ok = !!solved[id];
+            const tag = ok ? (acked[id] ? '✅ 정답 (인정)' : '✅ 정답') : (phase === 'done' ? '❌ 오답' : '⏳ 생각 중');
+            const col = ok ? 'var(--success-color)' : '#8E9AA8';
+            return `<div class="score-row"><span>${id === myId ? '👤' : '🙂'} ${nick(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${col};">${tag}</span></div>`;
+        }).join('') || '맞히는 사람이 없어요');
+
+        // 결과 확인 / 최종 결과
+        const showReview = phase === 'review' || phase === 'done';
+        sketchSetStyle('sketch-review', 'display', showReview ? 'block' : 'none');
+        if (showReview) {
+            if (sketchGuessesKey !== d.sketchRoundKey) sketchLoadGuesses(d);
+            if (amDrawer && !d.sketchWordReveal && sketchMyWord && !sketchRevealing) {
+                sketchRevealing = true;
+                const w = sketchMyWord.word;
+                sketchTx((room) => sketchReveal(room, myId, w)).finally(() => { sketchRevealing = false; });
+            }
+            const shownWord = d.sketchWordReveal || (amDrawer && sketchMyWord ? sketchMyWord.word : null);
+            sketchSetHtml('sketch-review-title', `${phase === 'review' ? '🔍 결과 확인' : '🏁 결과'} — 정답: <span style="color:var(--accent-color);">${shownWord || (now - (d.sketchEndAt || now) > 4000 ? '(공개 못함)' : '...')}</span>`);
+            const rows = guessers.map((id) => {
+                const list = sketchGuessesAll ? (sketchGuessesAll[id] || []) : null;
+                const g = list === null ? '불러오는 중...' : (list.length ? list.slice(-8).join(' · ') : '(입력 없음)');
+                const ok = !!solved[id];
+                const ackBtn = amDrawer && phase === 'review' && !ok ? `<button class="secondary sketch-ack" data-ack="${id}">✅ 정답 인정</button>` : '';
+                return `<div class="sketch-row"><div>${ok ? '✅' : '❌'} <b>${nick(id)}</b>${acked[id] ? ' <span style="color:var(--accent-color);">(출제자 인정)</span>' : ''}</div><div class="sketch-guesses">${g}</div>${ackBtn}</div>`;
+            }).join('');
+            sketchSetHtml('sketch-review-list', rows);
+            let result = '';
+            if (phase === 'done') {
+                const r = d.sketchReason, names = loserIds.map(nick).join(', ');
+                const reasonText = r === 'nobody' ? '아무도 못 맞혀서 출제자만 마셔요' : (r === 'miss' ? '못 맞힌 사람이 마셔요' : (r === 'all' ? '전원 정답!' : '무효'));
+                result = `<div class="sketch-result-line">🍺 마시는 사람: <b>${names || '없음'}</b></div><div style="font-size:12px; color:#8E9AA8;">${reasonText}</div>`;
+            }
+            sketchSetHtml('sketch-result-box', result);
+            const showFin = amDrawer && phase === 'review';
+            sketchSetStyle('btn-sketch-finalize', 'display', showFin ? 'block' : 'none');
+            const finLabel = `결과 확정 (${Math.ceil(Math.max(0, (d.sketchReviewEndAt || now) - now) / 1000)}초 후 자동)`;
+            const finEl = document.getElementById('btn-sketch-finalize');
+            if (showFin && finEl.textContent !== finLabel) finEl.textContent = finLabel;
+        }
+
+        // 결과 발표 (출제자가 정답을 공개한 뒤, 또는 잠시 기다려도 안 오면)
+        if (phase === 'done') {
+            const key = `sketch_${d.sketchResultKey || d.sketchRoundKey}`;
+            if (sketchDoneKey !== key && (d.sketchWordReveal || now - (d.sketchResultKey || now) > 2500 || d.sketchReason === 'void')) {
+                sketchDoneKey = key;
+                const names = loserIds.map(nick).join(', '), r = d.sketchReason, w = d.sketchWordReveal ? ` (정답: ${d.sketchWordReveal})` : '';
+                triggerExplosionEffect({
+                    key,
+                    title: r === 'all' ? '🎉 전원 정답!' : (r === 'void' ? '🎨 무효' : '🎨 그림 맞추기 종료!'),
+                    message: r === 'nobody' ? `아무도 못 맞혔어요! ${names}님 벌칙!${w}` : (r === 'miss' ? `못 맞힌 ${names}님 벌칙!${w}` : (r === 'all' ? '아무도 마시지 않아요!' : '출제자 문제로 무효예요')),
+                    duration: 0
+                });
+            }
+        }
+
+        if (now - sketchLastPollAt > 250) {
+            sketchLastPollAt = now;
+            if (sketchStep(JSON.parse(JSON.stringify(d)), now)) sketchTx((room) => sketchStep(room, getServerNow()));
+        }
+        sketchRAF = requestAnimationFrame(sketchFrame);
+    }
+
+    (function initSketchHandlers() {
+        const canvas = document.getElementById('sketch-canvas');
+        canvas.addEventListener('pointerdown', sketchPointerDown);
+        canvas.addEventListener('pointermove', sketchPointerMove);
+        canvas.addEventListener('pointerup', sketchPointerUp);
+        canvas.addEventListener('pointercancel', sketchPointerUp);
+        document.getElementById('btn-sketch-guess').addEventListener('click', sketchSubmitGuess);
+        document.getElementById('sketch-guess').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sketchSubmitGuess(); } });
+        document.getElementById('btn-sketch-finalize').addEventListener('click', sketchFinalizePress);
+        document.getElementById('sketch-word-box').addEventListener('click', (e) => {
+            const el = e.target.closest('[data-act]');
+            if (!el) return;
+            if (el.dataset.act === 'reroll') sketchRerollPress();
+            else if (el.dataset.act === 'start') sketchStartPress();
+        });
+        document.getElementById('sketch-tools').addEventListener('click', (e) => {
+            const sw = e.target.closest('[data-c]'), wd = e.target.closest('[data-w]'), act = e.target.closest('[data-act]');
+            if (sw) sketchTool.color = Number(sw.dataset.c);
+            else if (wd) { sketchTool.width = Number(wd.dataset.w); if (sketchTool.color === SKETCH_ERASER) sketchTool.color = 0; }
+            else if (act && sketchCanDraw()) { sketchEmit({ t: act.dataset.act === 'undo' ? 'u' : 'c' }); sketchSendQueue(); }
+        });
+        document.getElementById('sketch-review-list').addEventListener('click', (e) => {
+            const el = e.target.closest('[data-ack]');
+            if (el) sketchAckPress(el.dataset.ack);
+        });
+        window.addEventListener('resize', () => { sketchLastCw = 0; }); // 다음 프레임에 그림판 크기 다시 계산
+    })();
+
     function autoTapSpeedFingerForBot(botId, expectedSignalTime, targetSpot) {
         if (!currentRoomCode) return;
         get(ref(db, `rooms/${currentRoomCode}`)).then((snap) => {
@@ -3790,6 +4543,11 @@
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
+        // 그림 맞추기는 그림판을 최대한 크게 쓰기 위해 바깥/카드 여백을 줄이고 카드 폭을 넓힘
+        const wide = screenId === 'game-sketch-screen';
+        document.body.classList.toggle('sketch-wide', wide);
+        const mc = document.getElementById('main-container');
+        if (mc) mc.classList.toggle('sketch-wide', wide);
     }
 
     window.selectGameMode = function(gameMode) {
@@ -4726,6 +5484,10 @@
                     showScreen('game-pour-screen');
                     pourRender(data);
                 }
+                else if (data.selectedGame === 'sketch') {
+                    showScreen('game-sketch-screen');
+                    sketchRender(data);
+                }
                 else if (data.selectedGame === 'thief') {
                     showScreen('game-thief-screen');
                     thiefRender(data);
@@ -5439,6 +6201,8 @@
                 hgStopLocal();
                 yutStopLocal();
                 thiefStopLocal();
+                sketchStopLocal();
+                if (isHost && sketchLiveDirty) { sketchLiveDirty = false; remove(ref(db, `sketchLive/${currentRoomCode}`)).catch(() => {}); } // 지난 판 그림/답 정리
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
                 document.getElementById('dutch-custom-section').style.display = 'none';
@@ -6387,6 +7151,16 @@
                     pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null,
                     pourLoserIds: null, pourResultKey: null
                 });
+            } else if (gameId === 'sketch') {
+                const now = getServerNow();
+                const humans = pIds.filter((id) => !(roomSnapVal.players[id] || {}).isBot); // 봇은 그림을 그릴 수 없으니 출제자에서 제외
+                const drawer = humans.length ? pickIdProtected(humans) : pIds[0];
+                remove(ref(db, `sketchLive/${currentRoomCode}`)).catch(() => {}); // 지난 판 그림/답 정리
+                update(rRef, {
+                    status: 'playing', sketchRoundKey: now, sketchPhase: 'prep', sketchDrawerId: drawer, sketchPrepAt: now,
+                    sketchCategory: null, sketchAnswers: null, sketchRerolls: 0, sketchStartAt: null, sketchEndAt: null, sketchReviewEndAt: null,
+                    sketchSolved: null, sketchAcked: null, sketchWordReveal: null, sketchLoserIds: null, sketchReason: null, sketchResultKey: null
+                });
             } else if (gameId === 'thief') {
                 const now = getServerNow();
                 const order = thiefShuffle([...pIds]);
@@ -6557,7 +7331,8 @@
                 pourRoundKey: null, pourPhase: null, pourCap: null, pourFuzz: null, pourChickenAt: null, pourChickenDone: null, pourLevel: null, pourTurnOrder: null, pourTurnIdx: null, pourTurnStart: null, pourMinMs: null, pourStreamId: null, pourStreamStart: null, pourLastPourMs: null, pourChickenStart: null, pourChickenBase: null, pourHold: null, pourReleaseAt: null, pourLoserIds: null, pourResultKey: null,
                 hgRoundKey: null, hgPhase: null, hgDecks: null, hgTop: null, hgTable: null, hgScore: null, hgTurnOrder: null, hgTurnIdx: null, hgTurnStart: null, hgFlipSeq: null, hgLastFlipAt: null, hgGraceUntil: null, hgEvent: null, hgEventSeq: null, hgWin: null, hgRingOrder: null, hgLoserIds: null, hgAllTie: null, hgResultKey: null,
                 yutRoundKey: null, yutPhase: null, yutPos: null, yutSc: null, yutPenalty: null, yutTurnOrder: null, yutTurnIdx: null, yutTurnStart: null, yutTurnsLeft: null, yutSeq: null, yutLast: null, yutWinnerId: null, yutLoserIds: null, yutAllTie: null, yutResultKey: null,
-                thiefRoundKey: null, thiefPhase: null, thiefHands: null, thiefOrder: null, thiefTurnIdx: null, thiefTurnStart: null, thiefPairs: null, thiefOut: null, thiefSeq: null, thiefLast: null, thiefLoserId: null, thiefResultKey: null
+                thiefRoundKey: null, thiefPhase: null, thiefHands: null, thiefOrder: null, thiefTurnIdx: null, thiefTurnStart: null, thiefPairs: null, thiefOut: null, thiefSeq: null, thiefLast: null, thiefLoserId: null, thiefResultKey: null,
+                sketchRoundKey: null, sketchPhase: null, sketchDrawerId: null, sketchPrepAt: null, sketchCategory: null, sketchAnswers: null, sketchRerolls: null, sketchStartAt: null, sketchEndAt: null, sketchReviewEndAt: null, sketchSolved: null, sketchAcked: null, sketchWordReveal: null, sketchLoserIds: null, sketchReason: null, sketchResultKey: null
                 // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
             });
         });
