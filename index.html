@@ -464,8 +464,21 @@
         body.sketch-wide { padding: 6px; }
         #main-container.sketch-wide { max-width: 720px; padding: 14px 6px; }
         #sketch-canvas-wrap { width: 100%; display: flex; justify-content: center; margin: 6px 0 8px; }
-        #sketch-canvas { background: #fff; border-radius: 10px; border: 2px solid #2D2D34; display: block; }
-        #sketch-canvas.can-draw { touch-action: none; cursor: crosshair; border-color: var(--accent-color); }
+        /* ⚠️ 위쪽의 전역 `canvas { position:absolute; top:0; left:0; z-index:2; ... }`(도형 그리기용)이 이 캔버스에도 적용되어
+           그림판이 레이아웃에서 빠져 다른 내용 위를 덮었음 → 일반 배치로 되돌림. 테두리는 크기에 영향 없게 box-shadow로. */
+        #sketch-canvas { position: relative; top: auto; left: auto; z-index: auto; display: block; flex: none; background-color: #fff !important; border-radius: 10px; border: none; box-shadow: 0 0 0 2px #2D2D34; touch-action: auto; cursor: default; }
+        #sketch-canvas.can-draw { touch-action: none; cursor: crosshair; box-shadow: 0 0 0 2px var(--accent-color); }
+        /* 그리는 중/결과 단계: 앱 제목·규칙 안내를 숨겨서 그림판과 도구(입력창)가 한 화면에 들어오게 함 */
+        #main-container.sketch-compact > h1, #main-container.sketch-compact > h1 + div { display: none; }
+        #game-sketch-screen.sketch-compact > h2, #game-sketch-screen.sketch-compact > .quiz-container { display: none; }
+        /* 결과 단계: 그림은 절반 크기로 (결과 패널이 바로 보이게). 감싸는 영역이 아니라 캔버스에만 적용해야 폭 측정값이 안 바뀜 */
+        #game-sketch-screen.sketch-small #sketch-canvas { zoom: 0.5; }
+        /* 스피드 게임(할리갈리·윷놀이): 종/뒤집기/던지기 버튼이 폰 한 화면에 들어오도록 규칙 안내는 버튼 아래로, 앱 제목은 숨김 */
+        #game-halli-screen.active, #game-yut-screen.active { display: flex; flex-direction: column; }
+        #game-halli-screen > .quiz-container, #game-yut-screen > .quiz-container { order: 90; margin: 14px 0 0; }
+        #game-halli-screen > .btn-back-lobby, #game-yut-screen > .btn-back-lobby { order: 100; }
+        #main-container:has(#game-halli-screen.active) > h1, #main-container:has(#game-halli-screen.active) > h1 + div,
+        #main-container:has(#game-yut-screen.active) > h1, #main-container:has(#game-yut-screen.active) > h1 + div { display: none; }
         .sketch-time { font-size: 38px; font-weight: 900; color: #fff; line-height: 1.1; }
         .sketch-time.low { color: var(--danger-color); }
         .sketch-bar { height: 8px; background: #2D2D34; border-radius: 4px; overflow: hidden; margin: 4px 8px 6px; }
@@ -4303,6 +4316,9 @@
         const wrapW = document.getElementById('sketch-canvas-wrap').clientWidth;
         if (wrapW && wrapW !== sketchLastCw && document.activeElement?.id !== 'sketch-guess') sketchLayout();
         if (sketchCanvas) sketchCanvas.classList.toggle('can-draw', amDrawer && phase === 'draw');
+        const compact = phase !== 'prep', mainEl = document.getElementById('main-container');
+        screenEl.classList.toggle('sketch-compact', compact); if (mainEl) mainEl.classList.toggle('sketch-compact', compact);
+        screenEl.classList.toggle('sketch-small', phase === 'review' || phase === 'done');
 
         // 상태 문구
         const loserIds = Object.values(d.sketchLoserIds || {});
@@ -4358,7 +4374,7 @@
         // 맞히는 사람 목록: 맞혔는지(✅/⏳)만 보이고 입력한 답은 보이지 않음
         sketchSetHtml('sketch-players', guessers.map((id) => {
             const ok = !!solved[id];
-            const tag = ok ? (acked[id] ? '✅ 정답 (인정)' : '✅ 정답') : (phase === 'done' ? '❌ 오답' : '⏳ 생각 중');
+            const tag = ok ? (acked[id] ? '✅ 정답 (인정)' : '✅ 정답') : (phase === 'done' || phase === 'review' ? '❌ 오답' : '⏳ 생각 중');
             const col = ok ? 'var(--success-color)' : '#8E9AA8';
             return `<div class="score-row"><span>${id === myId ? '👤' : '🙂'} ${nick(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${col};">${tag}</span></div>`;
         }).join('') || '맞히는 사람이 없어요');
@@ -4548,6 +4564,7 @@
         document.body.classList.toggle('sketch-wide', wide);
         const mc = document.getElementById('main-container');
         if (mc) mc.classList.toggle('sketch-wide', wide);
+        if (mc && !wide) mc.classList.remove('sketch-compact'); // 그림 맞추기를 벗어나면 앱 제목 다시 표시
     }
 
     window.selectGameMode = function(gameMode) {
