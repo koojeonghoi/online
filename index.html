@@ -524,6 +524,76 @@
             transform: translateY(-60px); opacity: 0; pointer-events: none;
             transition: transform 0.15s ease-out, opacity 0.15s ease-out;
         }
+
+        /* 🧮 사칙연산 폭탄 & 📜 사자성어·속담 퀴즈 */
+        .opbomb-eq-box {
+            display: flex; align-items: center; justify-content: center;
+            flex-wrap: wrap; gap: 6px; font-size: 26px; font-weight: 800;
+            margin: 12px 0 8px; color: #fff;
+        }
+        .opbomb-slot {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 44px; height: 44px; border-radius: 10px;
+            background: #151518; border: 2px dashed #555966; color: var(--primary-color);
+            font-size: 24px; transition: all 0.15s; cursor: pointer;
+        }
+        .opbomb-slot.active {
+            border-style: solid; border-color: var(--accent-color);
+            background: #33290A; color: var(--accent-color); transform: scale(1.06);
+        }
+        .opbomb-slot.filled {
+            border-style: solid; border-color: var(--primary-color);
+            background: #192840; color: #fff;
+        }
+        .opbomb-slot.wrong-flash {
+            border-style: solid; border-color: var(--danger-color);
+            background: #3d1d1d; color: #ff8b8b; animation: shake 0.2s ease-in-out 2;
+        }
+        .opbomb-target { color: var(--success-color); font-size: 30px; }
+        .opbomb-keypad {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0 8px;
+        }
+        .opbomb-key {
+            padding: 16px 0; font-size: 26px; font-weight: 800;
+            background-color: var(--primary-color); color: #121214;
+            border: none; border-radius: 10px; cursor: pointer; margin: 0;
+        }
+        .opbomb-key:disabled { opacity: 0.4; cursor: not-allowed; }
+        .opbomb-feedback { min-height: 22px; font-size: 13px; font-weight: 700; margin-top: 6px; }
+        .opbomb-feedback.err { color: var(--danger-color); }
+        .opbomb-feedback.ok { color: var(--success-color); }
+
+        .idiom-pill {
+            display: inline-block; padding: 4px 10px; border-radius: 999px;
+            font-size: 12px; font-weight: 700; margin-bottom: 10px;
+            background: #2C2F3A; color: var(--accent-color);
+        }
+        .idiom-question {
+            font-size: 24px; font-weight: 800; line-height: 1.55; color: #fff;
+            word-break: keep-all; margin: 6px 0;
+        }
+        .idiom-blank {
+            display: inline-block; padding: 2px 10px; border-radius: 8px;
+            background: var(--accent-color); color: #121214; font-weight: 900;
+            margin: 0 3px;
+        }
+        .idiom-penalty-box {
+            background: #3B1818; border: 1px solid var(--danger-color); color: #FFD6D6;
+            border-radius: 10px; padding: 10px; font-size: 14px; font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .idiom-choices {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;
+        }
+        .idiom-choice-btn {
+            padding: 14px 8px; font-size: 15px; font-weight: 700; line-height: 1.35;
+            background-color: #252529; color: #fff; border: 2px solid #3A3A42;
+            border-radius: 10px; cursor: pointer; margin: 0; word-break: keep-all;
+        }
+        .idiom-choice-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .idiom-choice-btn.correct { background-color: var(--success-bg); border-color: var(--success-color); color: var(--success-color); }
+        .idiom-choice-btn.wrong { background-color: #3A1616; border-color: var(--danger-color); color: #FF9E9E; }
+        .idiom-choice-btn.wrong-animation { background-color: var(--danger-color) !important; color: #fff !important; animation: shake 0.2s ease-in-out 2; }
     </style>
 </head>
 <body>
@@ -554,7 +624,7 @@
         <div class="boom-overlay-guide">화면을 터치할 때까지 표시됩니다 · 터치하여 닫기</div>
     </div>
     <h1>🎮 실시간 멀티 게임 패키지</h1>
-    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-07-29-v3</div>
+    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-11-25-v1</div>
 
     <div id="login-screen" class="screen active">
         <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
@@ -599,6 +669,8 @@
             <button class="tab-btn" id="tab-yut" onclick="selectGameMode('yut')">🎲 윷놀이</button>
             <button class="tab-btn" id="tab-thief" onclick="selectGameMode('thief')">🃏 도둑잡기</button>
             <button class="tab-btn" id="tab-sketch" onclick="selectGameMode('sketch')">🎨 그림 맞추기</button>
+            <button class="tab-btn" id="tab-opbomb" onclick="selectGameMode('opbomb')">🧮 사칙연산</button>
+            <button class="tab-btn" id="tab-idiom" onclick="selectGameMode('idiom')">📜 사자성어·속담</button>
         </div>
         <h3 ontouchstart="startOnlineCheatPress()" ontouchend="cancelOnlineCheatPress()" onmousedown="startOnlineCheatPress()" onmouseup="cancelOnlineCheatPress()" onmouseleave="cancelOnlineCheatPress()">참여자 목록 (<span id="player-count">0</span>명)</h3>
         <div id="onlineCheatPanel" style="display:none; margin:0 0 12px; padding:12px; border-radius:10px; background:#151518; border:1px dashed #3A3A42; text-align:left;">
@@ -692,6 +764,15 @@
                 <button type="button" id="btn-sw-hide" class="dutch-mode-btn">🙈 숫자 숨기기</button>
             </div>
             <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">각자 자기 폰에서 스톱워치를 시작하고, 목표 시간에 가깝게 멈춰요. 모두 멈추면 목표에서 가장 먼 사람이 패배! (숨기기: 시작하면 숫자가 가려져요)</div>
+        </div>
+        <div id="idiom-settings" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:12px; margin:10px 0 12px; text-align:left;">
+            <div style="color:var(--accent-color); font-size:14px; font-weight:700; margin-bottom:8px;">📜 출제 범위 선택</div>
+            <div class="dutch-mode-tabs" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom:0;">
+                <button type="button" id="btn-idiom-mix" class="dutch-mode-btn active" onclick="window.setIdiomMode('mix')">🎲 혼합</button>
+                <button type="button" id="btn-idiom-idiom" class="dutch-mode-btn" onclick="window.setIdiomMode('idiom')">📜 사자성어</button>
+                <button type="button" id="btn-idiom-proverb" class="dutch-mode-btn" onclick="window.setIdiomMode('proverb')">💬 속담</button>
+            </div>
+            <div style="font-size:11px; color:#8E9AA8; margin-top:7px;">빈칸에 들어갈 알맞은 보기를 고르세요. 오답을 누르면 3초 동안 선택할 수 없고, 가장 늦게 남는 1명이 패배합니다.</div>
         </div>
         <button id="btn-start-game">게임 시작</button>
         <p id="wait-message" style="color: #8E9AA8; font-size: 14px;">방장이 게임을 시작하기를 기다리는 중...</p>
@@ -1202,6 +1283,59 @@
         </div>
         
         <button id="btn-back-lobby-dutch" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 🧮 사칙연산 채우기 게임 스크린 -->
+    <div id="game-opbomb-screen" class="screen">
+        <h2>🧮 사칙연산 폭탄</h2>
+        <div id="opbomb-icon" class="bomb-display" style="font-size: 56px; margin: 6px 0 10px;">💣</div>
+        <div class="quiz-container" style="border-color: var(--danger-color); background: #1a1a1e;">
+            <div style="font-size: 12px; color: #8E9AA8;">앞에서부터 순서대로 계산해 연산자 2개를 채우세요! (가장 늦은 1명 패배)</div>
+            <div class="opbomb-eq-box">
+                <span>(</span>
+                <span id="opbomb-a">0</span>
+                <span id="opbomb-slot-1" class="opbomb-slot active" onclick="window.resetOpBombSlots()">?</span>
+                <span id="opbomb-b">0</span>
+                <span>)</span>
+                <span id="opbomb-slot-2" class="opbomb-slot" onclick="window.resetOpBombSlots()">?</span>
+                <span id="opbomb-c">0</span>
+                <span>=</span>
+                <span id="opbomb-target" class="opbomb-target">0</span>
+            </div>
+            <div id="opbomb-feedback" class="opbomb-feedback"></div>
+        </div>
+        <div id="opbomb-explosion-box" class="role-box liar" style="display: none; font-size: 17px; margin-bottom: 12px;"></div>
+        <div class="opbomb-keypad" id="opbomb-keypad">
+            <button type="button" class="opbomb-key" onclick="window.selectOpBombOperator('+')">+</button>
+            <button type="button" class="opbomb-key" onclick="window.selectOpBombOperator('-')">−</button>
+            <button type="button" class="opbomb-key" onclick="window.selectOpBombOperator('×')">×</button>
+            <button type="button" class="opbomb-key" onclick="window.selectOpBombOperator('÷')">÷</button>
+        </div>
+        <button type="button" id="btn-opbomb-reset" class="secondary" style="padding: 9px; font-size: 13px; margin-bottom: 8px;" onclick="window.resetOpBombSlots()">↩️ 선택 초기화</button>
+        <div class="score-board" style="margin-bottom: 15px;">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 실시간 탈출 현황</div>
+            <div id="opbomb-live-players"></div>
+        </div>
+        <button id="btn-back-lobby-opbomb" class="secondary btn-back-lobby" style="margin-top: 10px;">대기실로 돌아가기</button>
+    </div>
+
+    <!-- 📜 사자성어·속담 퀴즈 게임 스크린 -->
+    <div id="game-idiom-screen" class="screen">
+        <h2>📜 사자성어 · 속담 퀴즈</h2>
+        <div class="quiz-container" style="border-color: var(--accent-color); background: #1a1a1e;">
+            <span id="idiom-category-badge" class="idiom-pill">📜 사자성어</span>
+            <div id="idiom-question-display" class="idiom-question">문제를 불러오는 중...</div>
+        </div>
+        <div id="idiom-penalty-box" class="idiom-penalty-box" style="display: none;">
+            🚫 오답! <span id="idiom-penalty-sec">3.0</span>초 동안 선택할 수 없습니다.
+        </div>
+        <div id="idiom-explosion-box" class="role-box liar" style="display: none; font-size: 17px; margin-bottom: 12px;"></div>
+        <div id="idiom-choices-box" class="idiom-choices"></div>
+        <div class="score-board" style="margin-bottom: 15px;">
+            <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 실시간 탈출 현황</div>
+            <div id="idiom-live-players"></div>
+        </div>
+        <button id="btn-back-lobby-idiom" class="secondary btn-back-lobby" style="margin-top: 10px;">대기실로 돌아가기</button>
     </div>
 </div>
 
@@ -4592,6 +4726,8 @@
         if (drinkSettings) drinkSettings.style.display = (canControlLobby && gameMode === 'drink') ? 'block' : 'none';
         const stopwatchSettings = document.getElementById('stopwatch-settings');
         if (stopwatchSettings) stopwatchSettings.style.display = (canControlLobby && gameMode === 'stopwatch') ? 'block' : 'none';
+        const idiomSettings = document.getElementById('idiom-settings');
+        if (idiomSettings) idiomSettings.style.display = (canControlLobby && gameMode === 'idiom') ? 'block' : 'none';
         if (kingSettings && canControlLobby && gameMode === 'king') renderKingGenderList();
     }
 
@@ -4777,6 +4913,9 @@
             if (data.status !== 'playing' || data.selectedGame !== 'drink') {
                 currentDrinkExpireAt = null;
                 releaseDrinkWakeLock();
+            }
+            if (data.status !== 'playing' || data.selectedGame !== 'idiom') {
+                clearIdiomPenalty();
             }
 
             if(data.status === 'playing') {
@@ -5517,6 +5656,14 @@
                     showScreen('game-halli-screen');
                     hgRender(data);
                 }
+                else if (data.selectedGame === 'opbomb') {
+                    showScreen('game-opbomb-screen');
+                    renderOpBombScreen(data, players, playerIds);
+                }
+                else if (data.selectedGame === 'idiom') {
+                    showScreen('game-idiom-screen');
+                    renderIdiomScreen(data, players, playerIds);
+                }
                 else if (data.selectedGame === 'roulette') {
                     showScreen('game-roulette-screen');
                     const slotCount = data.rouletteSlotCount || 6;
@@ -6219,6 +6366,8 @@
                 yutStopLocal();
                 thiefStopLocal();
                 sketchStopLocal();
+                opBombStopLocal();
+                idiomStopLocal();
                 if (isHost && sketchLiveDirty) { sketchLiveDirty = false; remove(ref(db, `sketchLive/${currentRoomCode}`)).catch(() => {}); } // 지난 판 그림/답 정리
                 clearTimeout(speedFingerSignalTimer); speedFingerRoundKey = null;
                 document.getElementById('dutch-user-board').style.display = 'none';
@@ -6711,6 +6860,514 @@
         });
     }
 
+
+    // =========================================================================
+    // 🧮 게임 1: 사칙연산 채우기 (opbomb)
+    // =========================================================================
+    const OPBOMB_OPS = ['+', '-', '×', '÷'];
+    let opBombSelected = [];
+    let opBombSeenRoundKey = null;
+    let opBombCurrentPuzzle = null;
+    let opBombLatestSolved = {};
+    let opBombLatestLoserId = null;
+    let opBombResetTimer = null;
+    let opBombWrongFlash = false;
+    const opBombBotHandled = new Set();
+
+    function applyMathOp(a, op, b) {
+        if (op === '+') return a + b;
+        if (op === '-') return a - b;
+        if (op === '×') return a * b;
+        if (op === '÷') return (b !== 0 && a % b === 0) ? a / b : null;
+        return null;
+    }
+
+    function evalOpBomb(a, op1, b, op2, c) {
+        const s1 = applyMathOp(a, op1, b);
+        if (s1 === null) return null;
+        return applyMathOp(s1, op2, c);
+    }
+
+    function generateOpBombPuzzle() {
+        for (let tries = 0; tries < 400; tries++) {
+            const op1 = OPBOMB_OPS[Math.floor(Math.random() * 4)];
+            const op2 = OPBOMB_OPS[Math.floor(Math.random() * 4)];
+            let a, b, s1;
+            if (op1 === '÷') {
+                b = Math.floor(Math.random() * 8) + 2;
+                s1 = Math.floor(Math.random() * 9) + 2;
+                a = b * s1;
+            } else {
+                a = Math.floor(Math.random() * 12) + 2;
+                b = Math.floor(Math.random() * 9) + 2;
+                s1 = applyMathOp(a, op1, b);
+            }
+            if (s1 === null || s1 <= 0 || s1 > 60) continue;
+
+            let c, target;
+            if (op2 === '÷') {
+                const divs = [];
+                for (let d = 2; d <= Math.min(9, s1); d++) {
+                    if (s1 % d === 0 && s1 / d >= 1) divs.push(d);
+                }
+                if (!divs.length) continue;
+                c = divs[Math.floor(Math.random() * divs.length)];
+                target = s1 / c;
+            } else {
+                c = Math.floor(Math.random() * 9) + 2;
+                target = applyMathOp(s1, op2, c);
+            }
+            if (target !== null && Number.isInteger(target) && target >= 1 && target <= 80) {
+                return { a, b, c, target, sampleOps: [op1, op2] };
+            }
+        }
+        return { a: 6, b: 2, c: 4, target: 12, sampleOps: ['÷', '×'] };
+    }
+
+    function updateOpBombSlotUI() {
+        const s1 = document.getElementById('opbomb-slot-1');
+        const s2 = document.getElementById('opbomb-slot-2');
+        if (!s1 || !s2) return;
+        s1.textContent = opBombSelected[0] || '?';
+        s2.textContent = opBombSelected[1] || '?';
+        if (opBombWrongFlash) {
+            s1.className = 'opbomb-slot wrong-flash';
+            s2.className = 'opbomb-slot wrong-flash';
+        } else {
+            s1.className = 'opbomb-slot' + (opBombSelected.length === 0 ? ' active' : ' filled');
+            s2.className = 'opbomb-slot' + (opBombSelected.length === 1 ? ' active' : (opBombSelected.length === 2 ? ' filled' : ''));
+        }
+    }
+
+    function setOpBombKeypadDisabled(disabled) {
+        document.querySelectorAll('#opbomb-keypad .opbomb-key').forEach(btn => { btn.disabled = disabled; });
+        const resetBtn = document.getElementById('btn-opbomb-reset');
+        if (resetBtn) resetBtn.disabled = disabled;
+    }
+
+    function opBombStopLocal() {
+        if (opBombResetTimer) { clearTimeout(opBombResetTimer); opBombResetTimer = null; }
+        opBombSelected = [];
+        opBombSeenRoundKey = null;
+        opBombCurrentPuzzle = null;
+        opBombLatestSolved = {};
+        opBombLatestLoserId = null;
+        opBombWrongFlash = false;
+    }
+
+    window.resetOpBombSlots = function() {
+        if (opBombLatestSolved[myId] || opBombLatestLoserId || opBombWrongFlash) return;
+        opBombSelected = [];
+        updateOpBombSlotUI();
+    };
+
+    async function commitOpBombSolve(playerId, roundKey, ops) {
+        if (!currentRoomCode) return;
+        await runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
+            if (!room || room.status !== 'playing' || room.selectedGame !== 'opbomb') return undefined;
+            if (room.opBombRoundKey !== roundKey || room.opBombLoserId) return undefined;
+            const solved = room.opBombSolved || {};
+            if (solved[playerId]) return undefined;
+            solved[playerId] = { at: getServerNow(), ops };
+            room.opBombSolved = solved;
+
+            const pIds = Object.keys(room.players || {});
+            const activeSolvedIds = Object.keys(solved).filter(id => !!room.players?.[id]);
+            if (pIds.length >= 2 && activeSolvedIds.length >= pIds.length - 1) {
+                let loserId = pIds.find(id => !solved[id]);
+                if (!loserId) {
+                    loserId = activeSolvedIds
+                        .sort((a, b) => (solved[b]?.at || 0) - (solved[a]?.at || 0))[0];
+                }
+                room.opBombLoserId = loserId;
+                room.roomLastLoserId = loserId;
+                room.roomLoserPendingChoice = true;
+            }
+            return room;
+        }, { applyLocally: false }).catch((err) => console.error('opbomb commit failed:', err));
+    }
+
+    window.selectOpBombOperator = function(op) {
+        if (!opBombCurrentPuzzle || opBombLatestLoserId || opBombLatestSolved[myId] || opBombWrongFlash) return;
+        if (opBombSelected.length >= 2) return;
+
+        opBombSelected.push(op);
+        updateOpBombSlotUI();
+
+        if (opBombSelected.length === 2) {
+            const { a, b, c, target } = opBombCurrentPuzzle;
+            const val = evalOpBomb(a, opBombSelected[0], b, opBombSelected[1], c);
+            const fb = document.getElementById('opbomb-feedback');
+            if (val === target) {
+                fb.textContent = '🎉 정답! 안전하게 탈출했습니다!';
+                fb.className = 'opbomb-feedback ok';
+                setOpBombKeypadDisabled(true);
+                commitOpBombSolve(myId, opBombSeenRoundKey, [...opBombSelected]);
+            } else {
+                const shown = val === null ? '나누어떨어지지 않음' : val;
+                fb.textContent = `❌ 오답! (계산 결과: ${shown}) 다시 선택하세요.`;
+                fb.className = 'opbomb-feedback err';
+                opBombWrongFlash = true;
+                updateOpBombSlotUI();
+                if (navigator.vibrate) navigator.vibrate(140);
+                if (opBombResetTimer) clearTimeout(opBombResetTimer);
+                opBombResetTimer = setTimeout(() => {
+                    opBombResetTimer = null;
+                    opBombWrongFlash = false;
+                    if (!opBombLatestSolved[myId] && !opBombLatestLoserId) {
+                        opBombSelected = [];
+                        updateOpBombSlotUI();
+                    }
+                }, 450);
+            }
+        }
+    };
+
+    function renderOpBombScreen(data, players, playerIds) {
+        const puzzle = data.opBombPuzzle;
+        if (!puzzle) return;
+        const solved = data.opBombSolved || {};
+        opBombLatestSolved = solved;
+        opBombLatestLoserId = data.opBombLoserId || null;
+
+        if (opBombSeenRoundKey !== data.opBombRoundKey) {
+            opBombSeenRoundKey = data.opBombRoundKey;
+            opBombCurrentPuzzle = puzzle;
+            opBombSelected = [];
+            opBombWrongFlash = false;
+            if (opBombResetTimer) { clearTimeout(opBombResetTimer); opBombResetTimer = null; }
+            hideBoomOverlay();
+            document.getElementById('opbomb-a').innerText = puzzle.a;
+            document.getElementById('opbomb-b').innerText = puzzle.b;
+            document.getElementById('opbomb-c').innerText = puzzle.c;
+            document.getElementById('opbomb-target').innerText = puzzle.target;
+            document.getElementById('opbomb-feedback').textContent = '';
+            document.getElementById('opbomb-feedback').className = 'opbomb-feedback';
+            updateOpBombSlotUI();
+        }
+
+        const iconEl = document.getElementById('opbomb-icon');
+        if (iconEl) iconEl.innerText = data.opBombLoserId ? '💥' : '💣';
+
+        const liveEl = document.getElementById('opbomb-live-players');
+        liveEl.innerHTML = '';
+        const rankOrder = Object.entries(solved)
+            .sort(([, x], [, y]) => (x.at || 0) - (y.at || 0))
+            .map(([id]) => id);
+        playerIds.forEach((id) => {
+            const row = document.createElement('div');
+            row.className = 'score-row';
+            const rankIdx = rankOrder.indexOf(id);
+            const isSolved = rankIdx !== -1;
+            const isLoser = data.opBombLoserId === id;
+            const badgeClass = isSolved ? 'success' : 'waiting';
+            const badgeText = isLoser ? '💥 꼴찌 탈락!' : (isSolved ? `${rankIdx + 1}등 탈출! 🎉` : '풀이 중.. 🧮');
+            row.innerHTML = `<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`;
+            liveEl.appendChild(row);
+        });
+
+        const expBox = document.getElementById('opbomb-explosion-box');
+        if (data.opBombLoserId) {
+            const loserNick = players[data.opBombLoserId]?.nickname || '참가자';
+            const ops = puzzle.sampleOps || ['+', '+'];
+            expBox.innerHTML = `💥 사칙연산 폭탄 종료! 💥<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${loserNick}님 꼴찌 당첨! 🚨</span><div style="font-size:13px; color:#EAEAEA; margin-top:6px;">예시 정답: (${puzzle.a} ${ops[0]} ${puzzle.b}) ${ops[1]} ${puzzle.c} = ${puzzle.target}</div>`;
+            expBox.style.display = 'block';
+            setOpBombKeypadDisabled(true);
+            triggerExplosionEffect({
+                key: `opbomb_${data.opBombRoundKey}_${data.opBombLoserId}`,
+                title: '💥 BOOM! 💥',
+                message: `${loserNick}님 사칙연산 꼴찌 당첨!`,
+                duration: 0
+            });
+        } else {
+            expBox.style.display = 'none';
+            setOpBombKeypadDisabled(!!solved[myId]);
+            if (isHost) {
+                playerIds.filter(id => players[id]?.isBot && !solved[id]).forEach((botId) => {
+                    const key = `${currentRoomCode}_${data.opBombRoundKey}_${botId}`;
+                    if (!opBombBotHandled.has(key)) {
+                        opBombBotHandled.add(key);
+                        setTimeout(() => commitOpBombSolve(botId, data.opBombRoundKey, puzzle.sampleOps || ['+', '+']), botDelay(2200, 6000));
+                    }
+                });
+            }
+        }
+    }
+
+    // =========================================================================
+    // 📜 게임 2: 사자성어 & 속담 빈칸 퀴즈 (idiom)
+    // =========================================================================
+    const IDIOM_POOL = [
+        ["일석", "이조"], ["동문", "서답"], ["자업", "자득"], ["새옹", "지마"], ["유비", "무환"],
+        ["고진", "감래"], ["다다", "익선"], ["백발", "백중"], ["설상", "가상"], ["어부", "지리"],
+        ["오리", "무중"], ["우이", "독경"], ["이심", "전심"], ["일취", "월장"], ["적반", "하장"],
+        ["죽마", "고우"], ["청출", "어람"], ["화룡", "점정"], ["금상", "첨화"], ["막상", "막하"],
+        ["사면", "초가"], ["천고", "마비"], ["동병", "상련"], ["결초", "보은"], ["갑론", "을박"],
+        ["각골", "난망"], ["감언", "이설"], ["과유", "불급"], ["구사", "일생"], ["기사", "회생"],
+        ["난형", "난제"], ["대기", "만성"], ["동고", "동락"], ["마이", "동풍"], ["문전", "성시"],
+        ["반신", "반의"], ["백년", "가약"], ["사필", "귀정"], ["삼고", "초려"], ["선견", "지명"],
+        ["속수", "무책"], ["십시", "일반"], ["아전", "인수"], ["안하", "무인"], ["역지", "사지"],
+        ["오합", "지졸"], ["온고", "지신"], ["일거", "양득"], ["전화", "위복"], ["진퇴", "양난"]
+    ];
+
+    const PROVERB_POOL = [
+        ["가는 말이 고와야", "오는 말이 곱다"],
+        ["낮말은 새가 듣고", "밤말은 쥐가 듣는다"],
+        ["티끌 모아", "태산"],
+        ["소 잃고", "외양간 고친다"],
+        ["호랑이도 제 말 하면", "온다"],
+        ["등잔 밑이", "어둡다"],
+        ["시작이", "반이다"],
+        ["원숭이도 나무에서", "떨어질 때가 있다"],
+        ["천 리 길도", "한 걸음부터"],
+        ["구슬이 서 말이라도", "꿰어야 보배"],
+        ["돌다리도 두들겨 보고", "건너라"],
+        ["빈 수레가", "요란하다"],
+        ["서당 개 삼 년에", "풍월을 읊는다"],
+        ["쥐구멍에도", "볕 들 날 있다"],
+        ["하늘이 무너져도", "솟아날 구멍이 있다"],
+        ["될성부른 나무는", "떡잎부터 알아본다"],
+        ["개구리 올챙이 적", "생각 못 한다"],
+        ["고래 싸움에", "새우 등 터진다"],
+        ["까마귀 날자", "배 떨어진다"],
+        ["누워서", "침 뱉기"],
+        ["달면 삼키고", "쓰면 뱉는다"],
+        ["도둑이", "제 발 저리다"],
+        ["백지장도", "맞들면 낫다"],
+        ["세 살 버릇", "여든까지 간다"],
+        ["우는 아이", "떡 하나 더 준다"],
+        ["호랑이 굴에 들어가야", "호랑이를 잡는다"],
+        ["빛 좋은", "개살구"],
+        ["아니 땐 굴뚝에", "연기 날까"],
+        ["지렁이도 밟으면", "꿈틀한다"],
+        ["윗물이 맑아야", "아랫물이 맑다"],
+        ["꿩 대신", "닭"],
+        ["금강산도", "식후경"],
+        ["남의 떡이", "더 커 보인다"],
+        ["닭 쫓던 개", "지붕 쳐다본다"],
+        ["도토리", "키 재기"],
+        ["떡 줄 사람은 생각도 않는데", "김칫국부터 마신다"],
+        ["말 한마디에", "천 냥 빚도 갚는다"],
+        ["바늘 도둑이", "소 도둑 된다"],
+        ["발 없는 말이", "천 리 간다"],
+        ["벼는 익을수록", "고개를 숙인다"],
+        ["병 주고", "약 준다"],
+        ["사공이 많으면", "배가 산으로 간다"],
+        ["싼 게", "비지떡"],
+        ["열 번 찍어", "안 넘어가는 나무 없다"],
+        ["우물 안", "개구리"],
+        ["작은 고추가", "맵다"],
+        ["제 눈에", "안경"],
+        ["콩 심은 데 콩 나고", "팥 심은 데 팥 난다"],
+        ["꼬리가 길면", "밟힌다"],
+        ["하룻강아지", "범 무서운 줄 모른다"]
+    ];
+
+    let idiomSelectedMode = 'mix';
+    let idiomSeenRoundKey = null;
+    let idiomCurrentPuzzle = null;
+    let idiomLatestSolved = {};
+    let idiomLatestLoserId = null;
+    let idiomLockUntil = 0;
+    let idiomPenaltyInterval = null;
+    const idiomWrongChoices = new Set();
+    const idiomBotHandled = new Set();
+
+    window.setIdiomMode = function(mode) {
+        idiomSelectedMode = mode;
+        ['mix', 'idiom', 'proverb'].forEach((m) => {
+            const btn = document.getElementById(`btn-idiom-${m}`);
+            if (btn) btn.classList.toggle('active', m === mode);
+        });
+    };
+
+    function buildIdiomPuzzle(category, targetIdx) {
+        const pool = category === 'idiom' ? IDIOM_POOL : PROVERB_POOL;
+        const safeIdx = ((targetIdx % pool.length) + pool.length) % pool.length;
+        const [front, back] = pool[safeIdx];
+        const blankPos = Math.random() < 0.5 ? 0 : 1; // 0: 앞부분 빈칸, 1: 뒷부분 빈칸
+        const answer = blankPos === 0 ? front : back;
+        const distractors = [];
+        for (const item of shuffleArray(pool.filter((_, idx) => idx !== safeIdx))) {
+            const candidate = item[blankPos];
+            if (candidate !== answer && !distractors.includes(candidate)) distractors.push(candidate);
+            if (distractors.length === 3) break;
+        }
+        return { category, blankPos, front, back, answer, choices: shuffleArray([answer, ...distractors]) };
+    }
+
+    function clearIdiomPenalty() {
+        if (idiomPenaltyInterval) {
+            clearInterval(idiomPenaltyInterval);
+            idiomPenaltyInterval = null;
+        }
+        idiomLockUntil = 0;
+        const box = document.getElementById('idiom-penalty-box');
+        if (box) box.style.display = 'none';
+    }
+
+    function idiomStopLocal() {
+        clearIdiomPenalty();
+        idiomSeenRoundKey = null;
+        idiomCurrentPuzzle = null;
+        idiomLatestSolved = {};
+        idiomLatestLoserId = null;
+        idiomWrongChoices.clear();
+    }
+
+    function refreshIdiomButtonsDisabled(forceDisable = false) {
+        const locked = forceDisable || !!idiomLatestLoserId || !!idiomLatestSolved[myId] || Date.now() < idiomLockUntil;
+        document.querySelectorAll('#idiom-choices-box .idiom-choice-btn').forEach((btn) => {
+            const val = btn.dataset.choice;
+            btn.disabled = locked || idiomWrongChoices.has(val);
+        });
+    }
+
+    function startIdiomPenalty(ms = 3000) {
+        clearIdiomPenalty();
+        idiomLockUntil = Date.now() + ms;
+        const box = document.getElementById('idiom-penalty-box');
+        const secEl = document.getElementById('idiom-penalty-sec');
+        if (box) box.style.display = 'block';
+        refreshIdiomButtonsDisabled(true);
+
+        const tick = () => {
+            const remain = idiomLockUntil - Date.now();
+            if (remain <= 0) {
+                clearIdiomPenalty();
+                refreshIdiomButtonsDisabled(false);
+                return;
+            }
+            if (secEl) secEl.textContent = (remain / 1000).toFixed(1);
+        };
+        tick();
+        idiomPenaltyInterval = setInterval(tick, 100);
+    }
+
+    async function commitIdiomSolve(playerId, roundKey) {
+        if (!currentRoomCode) return;
+        await runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
+            if (!room || room.status !== 'playing' || room.selectedGame !== 'idiom') return undefined;
+            if (room.idiomRoundKey !== roundKey || room.idiomLoserId) return undefined;
+            const solved = room.idiomSolved || {};
+            if (solved[playerId]) return undefined;
+            solved[playerId] = { at: getServerNow() };
+            room.idiomSolved = solved;
+
+            const pIds = Object.keys(room.players || {});
+            const activeSolvedIds = Object.keys(solved).filter(id => !!room.players?.[id]);
+            if (pIds.length >= 2 && activeSolvedIds.length >= pIds.length - 1) {
+                let loserId = pIds.find(id => !solved[id]);
+                if (!loserId) {
+                    loserId = activeSolvedIds
+                        .sort((a, b) => (solved[b]?.at || 0) - (solved[a]?.at || 0))[0];
+                }
+                room.idiomLoserId = loserId;
+                room.roomLastLoserId = loserId;
+                room.roomLoserPendingChoice = true;
+            }
+            return room;
+        }, { applyLocally: false }).catch((err) => console.error('idiom commit failed:', err));
+    }
+
+    function handleIdiomChoiceClick(choiceText, btnEl) {
+        if (!idiomCurrentPuzzle || idiomLatestLoserId || idiomLatestSolved[myId]) return;
+        if (Date.now() < idiomLockUntil) return;
+
+        if (choiceText === idiomCurrentPuzzle.answer) {
+            clearIdiomPenalty();
+            btnEl.classList.add('correct');
+            refreshIdiomButtonsDisabled(true);
+            commitIdiomSolve(myId, idiomSeenRoundKey);
+        } else {
+            idiomWrongChoices.add(choiceText);
+            btnEl.classList.add('wrong', 'wrong-animation');
+            setTimeout(() => btnEl.classList.remove('wrong-animation'), 450);
+            if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+            startIdiomPenalty(3000);
+        }
+    }
+
+    function renderIdiomScreen(data, players, playerIds) {
+        const puzzle = data.idiomPuzzle;
+        if (!puzzle) return;
+        const solved = data.idiomSolved || {};
+        idiomLatestSolved = solved;
+        idiomLatestLoserId = data.idiomLoserId || null;
+
+        if (idiomSeenRoundKey !== data.idiomRoundKey) {
+            idiomSeenRoundKey = data.idiomRoundKey;
+            idiomCurrentPuzzle = puzzle;
+            idiomWrongChoices.clear();
+            clearIdiomPenalty();
+            hideBoomOverlay();
+
+            document.getElementById('idiom-category-badge').textContent = puzzle.category === 'idiom' ? '📜 사자성어' : '💬 속담';
+            const blankHtml = `<span class="idiom-blank">${puzzle.category === 'idiom' ? '□□' : '???'}</span>`;
+            const sep = puzzle.category === 'idiom' ? '' : ' ';
+            document.getElementById('idiom-question-display').innerHTML = puzzle.blankPos === 0
+                ? `${blankHtml}${sep}${puzzle.back}`
+                : `${puzzle.front}${sep}${blankHtml}`;
+
+            const choicesBox = document.getElementById('idiom-choices-box');
+            choicesBox.innerHTML = '';
+            (puzzle.choices || []).forEach((choice) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'idiom-choice-btn';
+                btn.textContent = choice;
+                btn.dataset.choice = choice;
+                btn.onclick = () => handleIdiomChoiceClick(choice, btn);
+                choicesBox.appendChild(btn);
+            });
+        }
+
+        const liveEl = document.getElementById('idiom-live-players');
+        liveEl.innerHTML = '';
+        const rankOrder = Object.entries(solved)
+            .sort(([, x], [, y]) => (x.at || 0) - (y.at || 0))
+            .map(([id]) => id);
+        playerIds.forEach((id) => {
+            const row = document.createElement('div');
+            row.className = 'score-row';
+            const rankIdx = rankOrder.indexOf(id);
+            const isSolved = rankIdx !== -1;
+            const isLoser = data.idiomLoserId === id;
+            const badgeClass = isSolved ? 'success' : 'waiting';
+            const badgeText = isLoser ? '💥 꼴찌 탈락!' : (isSolved ? `${rankIdx + 1}등 탈출! 🎉` : '고르는 중.. 📜');
+            row.innerHTML = `<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`;
+            liveEl.appendChild(row);
+        });
+
+        const expBox = document.getElementById('idiom-explosion-box');
+        if (data.idiomLoserId) {
+            clearIdiomPenalty();
+            refreshIdiomButtonsDisabled(true);
+            const loserNick = players[data.idiomLoserId]?.nickname || '참가자';
+            const fullAnswer = puzzle.category === 'idiom' ? `${puzzle.front}${puzzle.back}` : `${puzzle.front} ${puzzle.back}`;
+            expBox.innerHTML = `⌛ 퀴즈 종료! ⌛<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${loserNick}님 꼴찌 당첨! 🚨</span><div style="font-size:14px; color:#EAEAEA; margin-top:6px;">정답: <strong>${fullAnswer}</strong></div>`;
+            expBox.style.display = 'block';
+            triggerExplosionEffect({
+                key: `idiom_${data.idiomRoundKey}_${data.idiomLoserId}`,
+                title: '💥 탈락! 💥',
+                message: `${loserNick}님 꼴찌 벌칙 당첨!`,
+                duration: 0
+            });
+        } else {
+            expBox.style.display = 'none';
+            refreshIdiomButtonsDisabled(false);
+            if (isHost) {
+                playerIds.filter(id => players[id]?.isBot && !solved[id]).forEach((botId) => {
+                    const key = `${currentRoomCode}_${data.idiomRoundKey}_${botId}`;
+                    if (!idiomBotHandled.has(key)) {
+                        idiomBotHandled.add(key);
+                        setTimeout(() => commitIdiomSolve(botId, data.idiomRoundKey), botDelay(2000, 5500));
+                    }
+                });
+            }
+        }
+    }
+
     function hideBoomOverlay() {
         const boomOverlay = document.getElementById('boom-overlay');
         if (boomOverlay) boomOverlay.classList.remove('show');
@@ -7033,6 +7690,11 @@
                 pickedContent = await takeUnusedIndex(`speed${len}`, (len === 3 ? chosungPool3 : chosungPool2).length);
             } else if (gameId === 'balance') {
                 pickedContent = await takeUnusedIndex('balance', balancePool.length);
+            } else if (gameId === 'idiom') {
+                const mode = (keepSettings && roomSnapVal.idiomLastMode) ? roomSnapVal.idiomLastMode : idiomSelectedMode;
+                const cat = mode === 'mix' ? (Math.random() < 0.5 ? 'idiom' : 'proverb') : mode;
+                const pool = cat === 'idiom' ? IDIOM_POOL : PROVERB_POOL;
+                pickedContent = { mode, cat, idx: await takeUnusedIndex(`idiom_${cat}`, pool.length) };
             }
             update(rRef, { roomLoserPendingChoice: false, roomLastLoserId: null, selectedGame: gameId, roomLastGameId: gameId });
             if (gameId === 'liar') {
@@ -7285,6 +7947,24 @@
                     status: 'playing', ladderPlayerOrder: shuffledOrder, ladderRungs: rungs,
                     ladderPenaltyBottoms: bottomIndexes, ladderRevealed: false, ladderRoundKey: getServerNow()
                 });
+            } else if (gameId === 'opbomb') {
+                update(rRef, {
+                    status: 'playing',
+                    opBombRoundKey: getServerNow(),
+                    opBombPuzzle: generateOpBombPuzzle(),
+                    opBombSolved: null,
+                    opBombLoserId: null
+                });
+            } else if (gameId === 'idiom') {
+                const puzzle = buildIdiomPuzzle(pickedContent.cat, pickedContent.idx);
+                update(rRef, {
+                    status: 'playing',
+                    idiomRoundKey: getServerNow(),
+                    idiomLastMode: pickedContent.mode,
+                    idiomPuzzle: puzzle,
+                    idiomSolved: null,
+                    idiomLoserId: null
+                });
             }
         });
     }
@@ -7349,7 +8029,9 @@
                 hgRoundKey: null, hgPhase: null, hgDecks: null, hgTop: null, hgTable: null, hgScore: null, hgTurnOrder: null, hgTurnIdx: null, hgTurnStart: null, hgFlipSeq: null, hgLastFlipAt: null, hgGraceUntil: null, hgEvent: null, hgEventSeq: null, hgWin: null, hgRingOrder: null, hgLoserIds: null, hgAllTie: null, hgResultKey: null,
                 yutRoundKey: null, yutPhase: null, yutPos: null, yutSc: null, yutPenalty: null, yutTurnOrder: null, yutTurnIdx: null, yutTurnStart: null, yutTurnsLeft: null, yutSeq: null, yutLast: null, yutWinnerId: null, yutLoserIds: null, yutAllTie: null, yutResultKey: null,
                 thiefRoundKey: null, thiefPhase: null, thiefHands: null, thiefOrder: null, thiefTurnIdx: null, thiefTurnStart: null, thiefPairs: null, thiefOut: null, thiefSeq: null, thiefLast: null, thiefLoserId: null, thiefResultKey: null,
-                sketchRoundKey: null, sketchPhase: null, sketchDrawerId: null, sketchPrepAt: null, sketchCategory: null, sketchAnswers: null, sketchRerolls: null, sketchStartAt: null, sketchEndAt: null, sketchReviewEndAt: null, sketchSolved: null, sketchAcked: null, sketchWordReveal: null, sketchLoserIds: null, sketchReason: null, sketchResultKey: null
+                sketchRoundKey: null, sketchPhase: null, sketchDrawerId: null, sketchPrepAt: null, sketchCategory: null, sketchAnswers: null, sketchRerolls: null, sketchStartAt: null, sketchEndAt: null, sketchReviewEndAt: null, sketchSolved: null, sketchAcked: null, sketchWordReveal: null, sketchLoserIds: null, sketchReason: null, sketchResultKey: null,
+                opBombRoundKey: null, opBombPuzzle: null, opBombSolved: null, opBombLoserId: null,
+                idiomRoundKey: null, idiomPuzzle: null, idiomSolved: null, idiomLoserId: null
                 // roomLastLoserId는 일부러 지우지 않음: 대기실에서 직전 패배자가 이번 판 게임을 고를 수 있도록 유지
             });
         });
