@@ -591,9 +591,9 @@
             border-radius: 10px; cursor: pointer; margin: 0; word-break: keep-all;
         }
         .idiom-choice-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-        .idiom-choice-btn.correct { background-color: var(--success-bg); border-color: var(--success-color); color: var(--success-color); }
-        .idiom-choice-btn.wrong { background-color: #3A1616; border-color: var(--danger-color); color: #FF9E9E; }
-        .idiom-choice-btn.wrong-animation { background-color: var(--danger-color) !important; color: #fff !important; animation: shake 0.2s ease-in-out 2; }
+        .idiom-choice-btn.correct { background-color: var(--success-bg) !important; border-color: var(--success-color) !important; color: var(--success-color) !important; opacity: 1 !important; }
+        .idiom-choice-btn.wrong { background-color: #3A1616 !important; border-color: var(--danger-color) !important; color: #FF9E9E !important; opacity: 0.7 !important; }
+        .idiom-choice-btn.wrong-animation { background-color: var(--danger-color) !important; color: #fff !important; opacity: 1 !important; animation: shake 0.2s ease-in-out 2; }
     </style>
 </head>
 <body>
@@ -624,7 +624,7 @@
         <div class="boom-overlay-guide">화면을 터치할 때까지 표시됩니다 · 터치하여 닫기</div>
     </div>
     <h1>🎮 실시간 멀티 게임 패키지</h1>
-    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-11-25-v1</div>
+    <div style="text-align:center; font-size:11px; color:#555; margin-top:-8px; margin-bottom:10px;">build 2026-11-25-v2</div>
 
     <div id="login-screen" class="screen active">
         <input type="text" id="nickname-input" placeholder="닉네임을 입력하세요">
@@ -6872,6 +6872,8 @@
     let opBombLatestLoserId = null;
     let opBombResetTimer = null;
     let opBombWrongFlash = false;
+    let opBombSubmittingRoundKey = null;
+    let opBombLeaveCheckKey = null;
     const opBombBotHandled = new Set();
 
     function applyMathOp(a, op, b) {
@@ -6953,42 +6955,76 @@
         opBombLatestSolved = {};
         opBombLatestLoserId = null;
         opBombWrongFlash = false;
+        opBombSubmittingRoundKey = null;
+        opBombLeaveCheckKey = null;
+    }
+
+    function isOpBombLockedForMe() {
+        return !!(opBombLatestSolved[myId] || opBombLatestLoserId || (opBombSeenRoundKey !== null && opBombSubmittingRoundKey === opBombSeenRoundKey));
     }
 
     window.resetOpBombSlots = function() {
-        if (opBombLatestSolved[myId] || opBombLatestLoserId || opBombWrongFlash) return;
+        if (isOpBombLockedForMe() || opBombWrongFlash) return;
         opBombSelected = [];
         updateOpBombSlotUI();
     };
 
-    async function commitOpBombSolve(playerId, roundKey, ops) {
+    function finalizeOpBombLoserIfReady(room) {
+        const solved = room.opBombSolved || {};
+        const pIds = Object.keys(room.players || {});
+        const activeSolvedIds = pIds.filter(id => !!solved[id]);
+        if (pIds.length >= 2 && activeSolvedIds.length >= pIds.length - 1) {
+            let loserId = pIds.find(id => !solved[id]);
+            if (!loserId) {
+                loserId = activeSolvedIds
+                    .sort((a, b) => (solved[b]?.at || 0) - (solved[a]?.at || 0))[0];
+            }
+            room.opBombLoserId = loserId;
+            room.roomLastLoserId = loserId;
+            room.roomLoserPendingChoice = true;
+            return true;
+        }
+        return false;
+    }
+
+    async function finishOpBombOnLeave(roundKey) {
         if (!currentRoomCode) return;
         await runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
             if (!room || room.status !== 'playing' || room.selectedGame !== 'opbomb') return undefined;
             if (room.opBombRoundKey !== roundKey || room.opBombLoserId) return undefined;
-            const solved = room.opBombSolved || {};
-            if (solved[playerId]) return undefined;
-            solved[playerId] = { at: getServerNow(), ops };
-            room.opBombSolved = solved;
+            return finalizeOpBombLoserIfReady(room) ? room : undefined;
+        }, { applyLocally: false }).catch((err) => {
+            console.error('opbomb leave-finish failed:', err);
+            opBombLeaveCheckKey = null;
+        });
+    }
 
-            const pIds = Object.keys(room.players || {});
-            const activeSolvedIds = Object.keys(solved).filter(id => !!room.players?.[id]);
-            if (pIds.length >= 2 && activeSolvedIds.length >= pIds.length - 1) {
-                let loserId = pIds.find(id => !solved[id]);
-                if (!loserId) {
-                    loserId = activeSolvedIds
-                        .sort((a, b) => (solved[b]?.at || 0) - (solved[a]?.at || 0))[0];
-                }
-                room.opBombLoserId = loserId;
-                room.roomLastLoserId = loserId;
-                room.roomLoserPendingChoice = true;
+    async function commitOpBombSolve(playerId, roundKey, ops) {
+        if (!currentRoomCode) return false;
+        try {
+            const res = await runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
+                if (!room || room.status !== 'playing' || room.selectedGame !== 'opbomb') return undefined;
+                if (room.opBombRoundKey !== roundKey || room.opBombLoserId) return undefined;
+                const solved = room.opBombSolved || {};
+                if (solved[playerId]) return undefined;
+                solved[playerId] = { at: getServerNow(), ops };
+                room.opBombSolved = solved;
+                finalizeOpBombLoserIfReady(room);
+                return room;
+            }, { applyLocally: false });
+            return !!(res && res.committed);
+        } catch (err) {
+            console.error('opbomb commit failed:', err);
+            if (playerId === myId && opBombSeenRoundKey === roundKey && !opBombLatestSolved[myId] && !opBombLatestLoserId) {
+                opBombSubmittingRoundKey = null;
+                setOpBombKeypadDisabled(false);
             }
-            return room;
-        }, { applyLocally: false }).catch((err) => console.error('opbomb commit failed:', err));
+            return false;
+        }
     }
 
     window.selectOpBombOperator = function(op) {
-        if (!opBombCurrentPuzzle || opBombLatestLoserId || opBombLatestSolved[myId] || opBombWrongFlash) return;
+        if (!opBombCurrentPuzzle || isOpBombLockedForMe() || opBombWrongFlash) return;
         if (opBombSelected.length >= 2) return;
 
         opBombSelected.push(op);
@@ -6999,6 +7035,7 @@
             const val = evalOpBomb(a, opBombSelected[0], b, opBombSelected[1], c);
             const fb = document.getElementById('opbomb-feedback');
             if (val === target) {
+                opBombSubmittingRoundKey = opBombSeenRoundKey;
                 fb.textContent = '🎉 정답! 안전하게 탈출했습니다!';
                 fb.className = 'opbomb-feedback ok';
                 setOpBombKeypadDisabled(true);
@@ -7035,6 +7072,8 @@
             opBombCurrentPuzzle = puzzle;
             opBombSelected = [];
             opBombWrongFlash = false;
+            opBombSubmittingRoundKey = null;
+            opBombLeaveCheckKey = null;
             if (opBombResetTimer) { clearTimeout(opBombResetTimer); opBombResetTimer = null; }
             hideBoomOverlay();
             document.getElementById('opbomb-a').innerText = puzzle.a;
@@ -7052,6 +7091,7 @@
         const liveEl = document.getElementById('opbomb-live-players');
         liveEl.innerHTML = '';
         const rankOrder = Object.entries(solved)
+            .filter(([id]) => !!players[id])
             .sort(([, x], [, y]) => (x.at || 0) - (y.at || 0))
             .map(([id]) => id);
         playerIds.forEach((id) => {
@@ -7081,8 +7121,16 @@
             });
         } else {
             expBox.style.display = 'none';
-            setOpBombKeypadDisabled(!!solved[myId]);
+            setOpBombKeypadDisabled(isOpBombLockedForMe());
             if (isHost) {
+                const unsolvedActive = playerIds.filter(id => !solved[id]);
+                if (playerIds.length >= 2 && unsolvedActive.length <= 1) {
+                    const leaveKey = `${data.opBombRoundKey}_${playerIds.join(',')}_${rankOrder.length}`;
+                    if (opBombLeaveCheckKey !== leaveKey) {
+                        opBombLeaveCheckKey = leaveKey;
+                        finishOpBombOnLeave(data.opBombRoundKey);
+                    }
+                }
                 playerIds.filter(id => players[id]?.isBot && !solved[id]).forEach((botId) => {
                     const key = `${currentRoomCode}_${data.opBombRoundKey}_${botId}`;
                     if (!opBombBotHandled.has(key)) {
@@ -7170,6 +7218,8 @@
     let idiomLatestLoserId = null;
     let idiomLockUntil = 0;
     let idiomPenaltyInterval = null;
+    let idiomSubmittingRoundKey = null;
+    let idiomLeaveCheckKey = null;
     const idiomWrongChoices = new Set();
     const idiomBotHandled = new Set();
 
@@ -7212,11 +7262,17 @@
         idiomCurrentPuzzle = null;
         idiomLatestSolved = {};
         idiomLatestLoserId = null;
+        idiomSubmittingRoundKey = null;
+        idiomLeaveCheckKey = null;
         idiomWrongChoices.clear();
     }
 
+    function isIdiomSolvedOrLockedForMe() {
+        return !!(idiomLatestLoserId || idiomLatestSolved[myId] || (idiomSeenRoundKey !== null && idiomSubmittingRoundKey === idiomSeenRoundKey));
+    }
+
     function refreshIdiomButtonsDisabled(forceDisable = false) {
-        const locked = forceDisable || !!idiomLatestLoserId || !!idiomLatestSolved[myId] || Date.now() < idiomLockUntil;
+        const locked = forceDisable || isIdiomSolvedOrLockedForMe() || Date.now() < idiomLockUntil;
         document.querySelectorAll('#idiom-choices-box .idiom-choice-btn').forEach((btn) => {
             const val = btn.dataset.choice;
             btn.disabled = locked || idiomWrongChoices.has(val);
@@ -7244,37 +7300,66 @@
         idiomPenaltyInterval = setInterval(tick, 100);
     }
 
-    async function commitIdiomSolve(playerId, roundKey) {
+    function finalizeIdiomLoserIfReady(room) {
+        const solved = room.idiomSolved || {};
+        const pIds = Object.keys(room.players || {});
+        const activeSolvedIds = pIds.filter(id => !!solved[id]);
+        if (pIds.length >= 2 && activeSolvedIds.length >= pIds.length - 1) {
+            let loserId = pIds.find(id => !solved[id]);
+            if (!loserId) {
+                loserId = activeSolvedIds
+                    .sort((a, b) => (solved[b]?.at || 0) - (solved[a]?.at || 0))[0];
+            }
+            room.idiomLoserId = loserId;
+            room.roomLastLoserId = loserId;
+            room.roomLoserPendingChoice = true;
+            return true;
+        }
+        return false;
+    }
+
+    async function finishIdiomOnLeave(roundKey) {
         if (!currentRoomCode) return;
         await runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
             if (!room || room.status !== 'playing' || room.selectedGame !== 'idiom') return undefined;
             if (room.idiomRoundKey !== roundKey || room.idiomLoserId) return undefined;
-            const solved = room.idiomSolved || {};
-            if (solved[playerId]) return undefined;
-            solved[playerId] = { at: getServerNow() };
-            room.idiomSolved = solved;
+            return finalizeIdiomLoserIfReady(room) ? room : undefined;
+        }, { applyLocally: false }).catch((err) => {
+            console.error('idiom leave-finish failed:', err);
+            idiomLeaveCheckKey = null;
+        });
+    }
 
-            const pIds = Object.keys(room.players || {});
-            const activeSolvedIds = Object.keys(solved).filter(id => !!room.players?.[id]);
-            if (pIds.length >= 2 && activeSolvedIds.length >= pIds.length - 1) {
-                let loserId = pIds.find(id => !solved[id]);
-                if (!loserId) {
-                    loserId = activeSolvedIds
-                        .sort((a, b) => (solved[b]?.at || 0) - (solved[a]?.at || 0))[0];
-                }
-                room.idiomLoserId = loserId;
-                room.roomLastLoserId = loserId;
-                room.roomLoserPendingChoice = true;
+    async function commitIdiomSolve(playerId, roundKey) {
+        if (!currentRoomCode) return false;
+        try {
+            const res = await runTransaction(ref(db, `rooms/${currentRoomCode}`), (room) => {
+                if (!room || room.status !== 'playing' || room.selectedGame !== 'idiom') return undefined;
+                if (room.idiomRoundKey !== roundKey || room.idiomLoserId) return undefined;
+                const solved = room.idiomSolved || {};
+                if (solved[playerId]) return undefined;
+                solved[playerId] = { at: getServerNow() };
+                room.idiomSolved = solved;
+                finalizeIdiomLoserIfReady(room);
+                return room;
+            }, { applyLocally: false });
+            return !!(res && res.committed);
+        } catch (err) {
+            console.error('idiom commit failed:', err);
+            if (playerId === myId && idiomSeenRoundKey === roundKey && !idiomLatestSolved[myId] && !idiomLatestLoserId) {
+                idiomSubmittingRoundKey = null;
+                refreshIdiomButtonsDisabled(false);
             }
-            return room;
-        }, { applyLocally: false }).catch((err) => console.error('idiom commit failed:', err));
+            return false;
+        }
     }
 
     function handleIdiomChoiceClick(choiceText, btnEl) {
-        if (!idiomCurrentPuzzle || idiomLatestLoserId || idiomLatestSolved[myId]) return;
+        if (!idiomCurrentPuzzle || isIdiomSolvedOrLockedForMe()) return;
         if (Date.now() < idiomLockUntil) return;
 
         if (choiceText === idiomCurrentPuzzle.answer) {
+            idiomSubmittingRoundKey = idiomSeenRoundKey;
             clearIdiomPenalty();
             btnEl.classList.add('correct');
             refreshIdiomButtonsDisabled(true);
@@ -7298,6 +7383,8 @@
         if (idiomSeenRoundKey !== data.idiomRoundKey) {
             idiomSeenRoundKey = data.idiomRoundKey;
             idiomCurrentPuzzle = puzzle;
+            idiomSubmittingRoundKey = null;
+            idiomLeaveCheckKey = null;
             idiomWrongChoices.clear();
             clearIdiomPenalty();
             hideBoomOverlay();
@@ -7325,6 +7412,7 @@
         const liveEl = document.getElementById('idiom-live-players');
         liveEl.innerHTML = '';
         const rankOrder = Object.entries(solved)
+            .filter(([id]) => !!players[id])
             .sort(([, x], [, y]) => (x.at || 0) - (y.at || 0))
             .map(([id]) => id);
         playerIds.forEach((id) => {
@@ -7357,6 +7445,14 @@
             expBox.style.display = 'none';
             refreshIdiomButtonsDisabled(false);
             if (isHost) {
+                const unsolvedActive = playerIds.filter(id => !solved[id]);
+                if (playerIds.length >= 2 && unsolvedActive.length <= 1) {
+                    const leaveKey = `${data.idiomRoundKey}_${playerIds.join(',')}_${rankOrder.length}`;
+                    if (idiomLeaveCheckKey !== leaveKey) {
+                        idiomLeaveCheckKey = leaveKey;
+                        finishIdiomOnLeave(data.idiomRoundKey);
+                    }
+                }
                 playerIds.filter(id => players[id]?.isBot && !solved[id]).forEach((botId) => {
                     const key = `${currentRoomCode}_${data.idiomRoundKey}_${botId}`;
                     if (!idiomBotHandled.has(key)) {
