@@ -1,23 +1,90 @@
-// 🍻 랜덤 마시기 알림 전용 최소 서비스워커.
-// 캐싱/오프라인 기능은 없음 — Notification.showNotification()을 쓰기 위한 용도로만 존재함.
-// (Android Chrome 등 일부 브라우저는 new Notification()을 직접 호출하면 예외를 던지고,
-//  반드시 ServiceWorkerRegistration.showNotification()을 거쳐야 알림이 뜸)
+// 🍻 랜덤 마시기 알림 및 앱 셸 캐시 라이프사이클 서비스워커.
+// Notification.showNotification() 지원(Android Chrome 등)과
+// 오프라인 앱 셸 폴백(네트워크 우선 + 캐시 폴백)을 함께 제공합니다.
 
-self.addEventListener('install', () => {
-    self.skipWaiting();
+const CACHE_PREFIX = 'party-games-shell-';
+const CACHE_NAME = `${CACHE_PREFIX}v1`;
+const APP_SHELL_ASSETS = ['./', './index.html', './manifest.json'];
+
+self.addEventListener('install', (event) => {
+    const precache = self.caches
+        ? self.caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_ASSETS))
+        : Promise.resolve();
+    event.waitUntil(precache.then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
-    event.waitUntil(self.clients.claim());
+    const cleanup = self.caches
+        ? self.caches
+              .keys()
+              .then((keys) =>
+                  Promise.all(
+                      keys
+                          .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+                          .map((key) => self.caches.delete(key))
+                  )
+              )
+        : Promise.resolve();
+    event.waitUntil(cleanup.then(() => self.clients.claim()));
+});
+
+self.addEventListener('fetch', (event) => {
+    const request = event.request;
+    if (!request || request.method !== 'GET') return;
+
+    let url;
+    try {
+        url = new URL(request.url, self.location ? self.location.href : undefined);
+    } catch (_) {
+        return;
+    }
+
+    if (self.location && url.origin !== self.location.origin) return;
+    if (url.pathname.endsWith('/sw.js')) return;
+
+    const fetcher = typeof self.fetch === 'function' ? self.fetch.bind(self) : fetch;
+    event.respondWith(
+        fetcher(request)
+            .then((response) => {
+                if (response && response.ok && self.caches) {
+                    const responseClone = response.clone();
+                    const cacheUpdate = self.caches
+                        .open(CACHE_NAME)
+                        .then((cache) => cache.put(request, responseClone))
+                        .catch(() => {});
+                    if (typeof event.waitUntil === 'function') {
+                        event.waitUntil(cacheUpdate);
+                    }
+                }
+                return response;
+            })
+            .catch((networkErr) => {
+                if (!self.caches) throw networkErr;
+                return self.caches.match(request).then((cached) => {
+                    if (cached) return cached;
+                    if (request.mode === 'navigate') {
+                        return self.caches.match('./index.html').then((fallback) => {
+                            if (fallback) return fallback;
+                            throw networkErr;
+                        });
+                    }
+                    throw networkErr;
+                });
+            })
+    );
 });
 
 // 알림을 탭하면 앱 화면으로 포커스 이동
 self.addEventListener('notificationclick', (event) => {
-    event.notification.close();
+    if (event.notification && typeof event.notification.close === 'function') {
+        event.notification.close();
+    }
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
             for (const client of clientList) {
-                if ('focus' in client) return client.focus();
+                if ('focus' in client && typeof client.focus === 'function') {
+                    return client.focus();
+                }
             }
             if (self.clients.openWindow) return self.clients.openWindow('./');
         })
