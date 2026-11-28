@@ -36,7 +36,7 @@ describe('rummikub game logic (Phase 3)', () => {
     expect(evaluateRummiMeld([{ id: 1, color: 'joker', num: 0, joker: true }]).valid).toBe(false);
   });
 
-  it('does NOT instantly end a 2-player game before player 2 gets a turn', () => {
+  it('immediately ends the game via lateMeld as soon as only 1 unmelded player remains (including turn 0)', () => {
     const roomData = {};
     const st = {
       melded: { p1: true, p2: false },
@@ -44,9 +44,13 @@ describe('rummikub game logic (Phase 3)', () => {
       winnerId: null,
       loserId: null
     };
-    const endedEarly = checkRummiLateMeldEnd(roomData, st, ['p1', 'p2'], 'p1');
-    expect(endedEarly).toBe(false);
-    expect(st.winnerId).toBeNull();
+    const ended = checkRummiLateMeldEnd(roomData, st, ['p1', 'p2'], 'p1');
+    expect(ended).toBe(true);
+    expect(st.winnerId).toBe('p1');
+    expect(st.loserId).toBe('p2');
+    expect(st.endReason).toBe('lateMeld');
+    expect(roomData.roomLastLoserId).toBe('p2');
+    expect(roomData.roomLoserPendingChoice).toBe(true);
   });
 
   it('ends game via lateMeld once every player has had at least one full turn and only 1 remains unmelded', () => {
