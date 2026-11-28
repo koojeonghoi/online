@@ -1603,12 +1603,22 @@
       return escapeHtml(value);
     }
 
+    const SAFE_RASTER_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=\s]+$/i;
+
+    function isSafeImageDataUrl(val) {
+      if (typeof val !== 'string') return false;
+      return SAFE_RASTER_DATA_URL_RE.test(val.trim());
+    }
+
     function isBadUrl(val) {
       const norm = String(val == null ? '' : val)
         .replace(/[\u0000-\u0020]+/g, '')
         .toLowerCase();
       if (norm.startsWith('javascript:') || norm.startsWith('vbscript:')) return true;
-      if (norm.startsWith('data:') && !norm.startsWith('data:image/')) return true;
+      if (norm.startsWith('data:')) {
+        if (norm.startsWith('data:image/svg+xml')) return true;
+        return !/^data:image\/(png|jpeg|jpg|webp|gif)[;,]/i.test(norm);
+      }
       return false;
     }
 
@@ -4429,6 +4439,7 @@
         const order = (d.pourTurnOrder || []).filter((id) => players[id]);
         const curId = (d.pourTurnOrder || [])[d.pourTurnIdx || 0];
         const nick = (id) => players[id]?.nickname || '참가자';
+        const nickHtml = (id) => escapeHtml(nick(id));
         const start = d.pourChickenStart;
 
         // 컵 / 물줄기
@@ -4448,19 +4459,19 @@
         // 상태 문구
         let status;
         if (phase === 'turn') {
-            if (d.pourStreamId) status = `💧 <b>${nick(d.pourStreamId)}</b>님이 따르는 중...`;
+            if (d.pourStreamId) status = `💧 <b>${nickHtml(d.pourStreamId)}</b>님이 따르는 중...`;
             else if (curId === myId) {
                 const tooShort = d.pourTooShortAt && now - d.pourTooShortAt < 2500;
                 status = tooShort ? '⚠️ 너무 짧아요! 최소 시간 이상 꾹 눌러야 해요'
                     : (blurred ? '🌫️ 물이 뿌옇게 보여요... 🎯 내 차례! 꾹 눌러 따르세요' : '🎯 내 차례! 버튼을 꾹 눌러 따르세요');
             }
-            else status = `⏳ <b>${nick(curId)}</b>님이 따를 차례예요${blurred ? ' 🌫️' : ''}`;
+            else status = `⏳ <b>${nickHtml(curId)}</b>님이 따를 차례예요${blurred ? ' 🌫️' : ''}`;
         } else if (phase === 'chicken') {
             status = now < start
                 ? `🔥 서든데스! <b>${Math.max(1, Math.ceil((start - now) / 1000))}초</b> 뒤 시작 — 지금 버튼을 꾹 누르세요!`
                 : `🔥 <b>${holders.length}명</b>이 버티는 중 — 넘치기 전에 손을 떼세요!`;
         } else {
-            const names = Object.values(d.pourLoserIds || {}).map(nick).join(', ');
+            const names = Object.values(d.pourLoserIds || {}).map(nickHtml).join(', ');
             status = `💦 <b>${names}</b>님 물이 넘쳤어요!`;
         }
         document.getElementById('pour-status').innerHTML = __epSanitizeHtml(status);
@@ -4506,7 +4517,7 @@
                 else if (pourRelOf(d, id, start) === Infinity) { icon = '🔥'; right = '버티는 중'; color = 'var(--danger-color)'; }
                 else { icon = '🏃'; right = '탈출'; color = 'var(--success-color)'; }
             } else if (phase === 'done' && loserSet.has(id)) { icon = '💦'; right = '패배!'; color = 'var(--danger-color)'; }
-            return `<div class="score-row"><span>${icon} ${i + 1}. ${nick(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${color};">${right}</span></div>`;
+            return `<div class="score-row"><span>${icon} ${i + 1}. ${nickHtml(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${color};">${right}</span></div>`;
         }).join('');
         if (rows !== pourLastListHtml) { pourLastListHtml = rows; document.getElementById('pour-player-list').innerHTML = __epSanitizeHtml(rows || '대기 중...'); }
 
@@ -4662,6 +4673,7 @@
         const order = (d.hgTurnOrder || []).filter((id) => players[id]);
         const curId = (d.hgTurnOrder || [])[d.hgTurnIdx || 0];
         const nick = (id) => players[id]?.nickname || '참가자';
+        const nickHtml = (id) => escapeHtml(nick(id));
         const tops = d.hgTop || {}, score = d.hgScore || {};
         const loserSet = new Set(Object.values(d.hgLoserIds || {}));
         const anyLeft = order.some((id) => hgDeckLen(d, id) > 0);
@@ -4671,22 +4683,22 @@
         const win = d.hgWin, pressedList = Object.values(d.hgRingOrder || []);
         let status;
         if (phase === 'done') {
-            status = `🔔 <b>${[...loserSet].map(nick).join(', ')}</b>님이 가장 적게 모았어요!`;
+            status = `🔔 <b>${[...loserSet].map(nickHtml).join(', ')}</b>님이 가장 적게 모았어요!`;
         } else if (win) {
             status = win.who === myId ? '🔔 제일 빨랐어요! 나머지가 누르는 중...'
-                : (pressedList.includes(myId) ? '✅ 눌렀어요! 결과를 기다리는 중...' : `🔔 <b>${nick(win.who)}</b>님이 먼저 쳤어요! 얼른 누르세요!!`);
+                : (pressedList.includes(myId) ? '✅ 눌렀어요! 결과를 기다리는 중...' : `🔔 <b>${nickHtml(win.who)}</b>님이 먼저 쳤어요! 얼른 누르세요!!`);
         } else if (ev && now - ev.at < 2500) {
             status = ev.type === 'win'
-                ? `🔔 <b>${nick(ev.who)}</b>님 ${HG_FRUITS[ev.fruit]} 성공! +${ev.n}장`
+                ? `🔔 <b>${nickHtml(ev.who)}</b>님 ${HG_FRUITS[ev.fruit]} 성공! +${ev.n}장`
                 : (ev.type === 'miss'
                     ? `😱 ${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요!`
                     : (ev.type === 'drink'
-                        ? `🍺 <b>${Object.values(ev.who).map(nick).join(', ')}</b>님 한 모금!`
-                        : `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점 🍺`));
+                        ? `🍺 <b>${Object.values(ev.who).map(nickHtml).join(', ')}</b>님 한 모금!`
+                        : `🚨 <b>${nickHtml(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점 🍺`));
         } else if (!anyLeft) {
             status = '🔔 마지막 카드예요! 5개가 있는지 확인하세요';
         } else {
-            status = curId === myId ? '🃏 내 차례! 카드를 뒤집으세요' : `⏳ <b>${nick(curId)}</b>님이 뒤집는 중`;
+            status = curId === myId ? '🃏 내 차례! 카드를 뒤집으세요' : `⏳ <b>${nickHtml(curId)}</b>님이 뒤집는 중`;
         }
 
         // 플레이어별 카드판
@@ -4697,7 +4709,7 @@
                 : '<div class="hg-card empty">-</div>';
             const cls = 'hg-tile' + (phase === 'play' && id === curId ? ' turn' : '') + (loserSet.has(id) ? ' loser' : '');
             const sc = score[id] || 0;
-            return `<div class="${cls}"><div class="hg-name">${phase === 'play' && id === curId ? '👉 ' : ''}${nick(id)}${id === myId ? ' (나)' : ''}</div>${card}<div class="hg-meta">🃏 ${hgDeckLen(d, id)}장 남음 · ⭐ ${sc}</div></div>`;
+            return `<div class="${cls}"><div class="hg-name">${phase === 'play' && id === curId ? '👉 ' : ''}${nickHtml(id)}${id === myId ? ' (나)' : ''}</div>${card}<div class="hg-meta">🃏 ${hgDeckLen(d, id)}장 남음 · ⭐ ${sc}</div></div>`;
         }).join('');
         const html = `${status}\u0001${tiles}\u0001${d.hgTable || 0}`;
         if (html !== hgLastHtml) {
@@ -4709,15 +4721,15 @@
         // 최근 종 결과는 다음 결과가 나올 때까지 남겨둠 — 성공이면 나머지 전원이 마시는 시간
         let evHtml = '종을 쳐서 같은 과일 5개를 맞춰보세요!', evDrink = false;
         if (ev && ev.type === 'win') {
-            evHtml = `🔔 <b>${nick(ev.who)}</b>님이 제일 빨랐어요! ${HG_FRUITS[ev.fruit]} +${ev.n}장<br>⏳ 나머지는 얼른 종을 누르세요! (못 누른 사람 / 제일 늦은 사람이 🍺)`;
+            evHtml = `🔔 <b>${nickHtml(ev.who)}</b>님이 제일 빨랐어요! ${HG_FRUITS[ev.fruit]} +${ev.n}장<br>⏳ 나머지는 얼른 종을 누르세요! (못 누른 사람 / 제일 늦은 사람이 🍺)`;
         } else if (ev && ev.type === 'drink') {
-            evHtml = `🍺 <b>${Object.values(ev.who).map(nick).join(', ')}</b>님 한 모금! (${ev.reason === 'miss' ? '종을 못 눌렀어요' : '제일 늦게 눌렀어요'})<br>🔔 ${nick(ev.winner)}님 ${HG_FRUITS[ev.fruit]} +${ev.n}장`;
+            evHtml = `🍺 <b>${Object.values(ev.who).map(nickHtml).join(', ')}</b>님 한 모금! (${ev.reason === 'miss' ? '종을 못 눌렀어요' : '제일 늦게 눌렀어요'})<br>🔔 ${nickHtml(ev.winner)}님 ${HG_FRUITS[ev.fruit]} +${ev.n}장`;
             evDrink = true;
         } else if (ev && ev.type === 'miss') {
             evHtml = `😱 ${HG_FRUITS[ev.fruit]} 5개를 아무도 못 쳤어요!<br>🍺 전원 한 모금!`;
             evDrink = true;
         } else if (ev) {
-            evHtml = `🚨 <b>${nick(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점<br>🍺 ${nick(ev.who)}님만 한 모금!`;
+            evHtml = `🚨 <b>${nickHtml(ev.who)}</b>님 오답! -${HG_WRONG_PENALTY}점<br>🍺 ${nickHtml(ev.who)}님만 한 모금!`;
             evDrink = true;
         }
         const evKey = `${evDrink ? 'd' : 'n'}${evHtml}`;
@@ -5002,6 +5014,7 @@
 
         const players = v.players || {};
         const nick = (id) => players[id]?.nickname || d.players?.[id]?.nickname || '참가자';
+        const nickHtml = (id) => escapeHtml(nick(id));
         const ids = (v.yutTurnOrder || []).filter((id) => players[id]);
         const curId = (d.yutTurnOrder || [])[d.yutTurnIdx || 0];
         const done = d.yutPhase === 'done' && revealed;
@@ -5010,14 +5023,14 @@
         // 상태 문구
         let status;
         if (done) {
-            const names = [...loserSet].map(nick).join(', ');
-            status = d.yutWinnerId ? `🏁 <b>${nick(d.yutWinnerId)}</b>님 도착! 꼴찌는 <b>${names}</b>` : `⏰ 턴 종료! 가장 뒤처진 <b>${names}</b>님`;
+            const names = [...loserSet].map(nickHtml).join(', ');
+            status = d.yutWinnerId ? `🏁 <b>${nickHtml(d.yutWinnerId)}</b>님 도착! 꼴찌는 <b>${names}</b>` : `⏰ 턴 종료! 가장 뒤처진 <b>${names}</b>님`;
         } else if (!revealed && last) {
-            status = `🎲 <b>${nick(last.who)}</b>님이 윷을 던지는 중...`;
+            status = `🎲 <b>${nickHtml(last.who)}</b>님이 윷을 던지는 중...`;
         } else if (d.yutPhase === 'play' && curId === myId) {
             status = last && last.who === myId && last.bonus ? '🎁 한 번 더! 윷을 던지세요' : '🎲 내 차례! 윷을 던지세요';
         } else {
-            status = `⏳ <b>${nick(curId)}</b>님이 던질 차례예요`;
+            status = `⏳ <b>${nickHtml(curId)}</b>님이 던질 차례예요`;
         }
         if (status !== yutLastStatusHtml) { yutLastStatusHtml = status; document.getElementById('yut-status').innerHTML = __epSanitizeHtml(status); }
 
@@ -5036,11 +5049,11 @@
         // 최근 던지기 결과 (공개된 뒤에만)
         let boxHtml = '윷을 던져보세요!';
         if (last && revealed) {
-            boxHtml = `<div style="font-size:18px; font-weight:800; color:#fff;">${nick(last.who)}님 ${YUT_NAMES[last.steps]}! <span style="font-size:13px; font-weight:600; color:#8E9AA8;">${last.steps}칸${last.finished ? ' → 🏁 도착!' : ''}</span></div>`;
+            boxHtml = `<div style="font-size:18px; font-weight:800; color:#fff;">${nickHtml(last.who)}님 ${YUT_NAMES[last.steps]}! <span style="font-size:13px; font-weight:600; color:#8E9AA8;">${last.steps}칸${last.finished ? ' → 🏁 도착!' : ''}</span></div>`;
             const caps = Object.values(last.captured || {});
-            if (caps.length) boxHtml += `<div>⚔️ ${caps.map(nick).join(', ')}님을 잡았어요! 출발점으로~</div>`;
+            if (caps.length) boxHtml += `<div>⚔️ ${caps.map(nickHtml).join(', ')}님을 잡았어요! 출발점으로~</div>`;
             if (last.bonus) boxHtml += '<div>🎁 한 번 더 던져요!</div>';
-            if (last.penalty) boxHtml += `<div class="yut-pen">🍺 벌칙 칸! ${nick(last.who)}님 — ${last.penalty}</div>`;
+            if (last.penalty) boxHtml += `<div class="yut-pen">🍺 벌칙 칸! ${nickHtml(last.who)}님 — ${escapeHtml(last.penalty)}</div>`;
         }
         if (boxHtml !== yutLastBoxHtml) { yutLastBoxHtml = boxHtml; document.getElementById('yut-last').innerHTML = __epSanitizeHtml(boxHtml); }
 
@@ -5052,7 +5065,7 @@
             let icon = d.yutPhase === 'play' && id === curId ? '👉' : '👤', right = `남은 ${left}턴 · 도착까지 ${dist}칸`, color = '#8E9AA8';
             if (done && id === d.yutWinnerId) { icon = '👑'; right = '도착!'; color = 'var(--success-color)'; }
             else if (done && loserSet.has(id)) { icon = '💦'; right = `패배! (${dist}칸 남음)`; color = 'var(--danger-color)'; }
-            return `<div class="score-row"><span>${icon} ${i + 1}. ${nick(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${color};">${right}</span></div>`;
+            return `<div class="score-row"><span>${icon} ${i + 1}. ${nickHtml(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${color};">${right}</span></div>`;
         }).join('');
         if (rows !== yutLastListHtml) { yutLastListHtml = rows; document.getElementById('yut-player-list').innerHTML = __epSanitizeHtml(rows || '대기 중...'); }
 
@@ -5278,6 +5291,7 @@
         const fullOrder = d.thiefOrder || [];
         const order = fullOrder.filter((id) => players[id]);
         const nick = (id) => players[id]?.nickname || '참가자';
+        const nickHtml = (id) => escapeHtml(nick(id));
         const done = d.thiefPhase === 'done';
         const idx = d.thiefTurnIdx || 0, curId = fullOrder[idx];
         const others = !done && curId === myId ? thiefOthersAlive(d, myId) : [];
@@ -5295,9 +5309,9 @@
 
         // 상태 문구
         let status;
-        if (done) status = d.thiefLoserId ? `👺 도둑은 <b>${nick(d.thiefLoserId)}</b>님!` : '🃏 조커를 든 사람이 나가서 무효예요';
+        if (done) status = d.thiefLoserId ? `👺 도둑은 <b>${nickHtml(d.thiefLoserId)}</b>님!` : '🃏 조커를 든 사람이 나가서 무효예요';
         else if (myTurn) status = '🃏 내 차례! 뽑을 사람을 고르고 카드를 한 장 뽑으세요';
-        else status = `⏳ <b>${nick(curId)}</b>님이 카드를 뽑는 중`;
+        else status = `⏳ <b>${nickHtml(curId)}</b>님이 카드를 뽑는 중`;
         thiefSet('thief-status', status);
 
         // 플레이어 목록 (앉은 순서)
@@ -5306,24 +5320,24 @@
             const isThief = done && id === d.thiefLoserId;
             const tag = isThief ? '👺 도둑!' : (rank >= 0 ? `✅ 탈출 ${rank + 1}등` : `🃏 ${thiefHand(d, id).length}장`);
             const cls = 'thief-tile' + (!done && id === curId ? ' turn' : '') + (id === targetId ? ' target' : '') + (myTurn && others.includes(id) ? ' pick' : '') + (rank >= 0 && !isThief ? ' out' : '') + (isThief ? ' thief' : '');
-            return `<div class="${cls}" data-id="${id}"><div class="thief-name">${!done && id === curId ? '👉 ' : ''}${nick(id)}${id === myId ? ' (나)' : ''}</div><div class="thief-meta">${tag}</div></div>`;
+            return `<div class="${cls}" data-id="${__epEscapeAttr(id)}"><div class="thief-name">${!done && id === curId ? '👉 ' : ''}${nickHtml(id)}${id === myId ? ' (나)' : ''}</div><div class="thief-meta">${tag}</div></div>`;
         }).join(''));
 
         // 뽑을 카드(내가 고른 사람의 손패, 뒤집힌 채) — 내 차례에만 보임
         if (!targetId) { thiefSet('thief-target-label', ''); thiefSet('thief-backs', ''); }
         else {
             const n = thiefHand(d, targetId).length;
-            thiefSet('thief-target-label', `👆 <b>${nick(targetId)}</b>님의 카드 (${n}장) — 한 장을 눌러 뽑으세요 <span style="color:#8E9AA8; font-weight:400;">(다른 사람을 누르면 바꿀 수 있어요)</span>`);
-            thiefSet('thief-backs', Array.from({ length: n }, (_, i) => `<div class="thief-back active" data-id="${targetId}" data-k="${i}">?</div>`).join(''));
+            thiefSet('thief-target-label', `👆 <b>${nickHtml(targetId)}</b>님의 카드 (${n}장) — 한 장을 눌러 뽑으세요 <span style="color:#8E9AA8; font-weight:400;">(다른 사람을 누르면 바꿀 수 있어요)</span>`);
+            thiefSet('thief-backs', Array.from({ length: n }, (_, i) => `<div class="thief-back active" data-id="${__epEscapeAttr(targetId)}" data-k="${i}">?</div>`).join(''));
         }
 
         // 최근 결과 (뽑은 카드는 짝이 맞아 버려졌을 때만 공개)
         let lastHtml = '첫 카드를 뽑아보세요!';
         if (last) {
-            lastHtml = `<b>${nick(last.from)}</b>님이 <b>${nick(last.to)}</b>님의 카드를 뽑았어요`;
+            lastHtml = `<b>${nickHtml(last.from)}</b>님이 <b>${nickHtml(last.to)}</b>님의 카드를 뽑았어요`;
             lastHtml += last.matched >= 0 ? `<br>✨ ${THIEF_SYMS[last.matched]}${THIEF_SYMS[last.matched]} 짝이 맞아서 버렸어요!` : '<br>짝이 없어서 그대로 들고 있어요';
-            if (last.outFrom) lastHtml += `<br>✅ <b>${nick(last.from)}</b>님 탈출!`;
-            if (last.outTo) lastHtml += `<br>✅ <b>${nick(last.to)}</b>님 탈출!`;
+            if (last.outFrom) lastHtml += `<br>✅ <b>${nickHtml(last.from)}</b>님 탈출!`;
+            if (last.outTo) lastHtml += `<br>✅ <b>${nickHtml(last.to)}</b>님 탈출!`;
         }
         thiefSet('thief-last', lastHtml);
 
@@ -5844,6 +5858,7 @@
         const now = getServerNow();
         const players = d.players || {}, drawer = d.sketchDrawerId, phase = d.sketchPhase;
         const nick = (id) => players[id]?.nickname || '참가자';
+        const nickHtml = (id) => escapeHtml(nick(id));
         const amDrawer = drawer === myId, solved = d.sketchSolved || {}, acked = d.sketchAcked || {};
         const guessers = sketchGuessers(d);
         const word = d.sketchWordReveal || (amDrawer && sketchMyWord ? sketchMyWord.word : null);
@@ -5859,11 +5874,11 @@
         // 상태 문구
         const loserIds = Object.values(d.sketchLoserIds || {});
         let status;
-        if (phase === 'prep') status = amDrawer ? (sketchMyWord && d.sketchAnswers ? '🎨 제시어를 확인하고 "그리기 시작"을 누르세요' : '🎨 제시어를 뽑는 중...') : `🎨 <b>${nick(drawer)}</b>님이 제시어를 확인하는 중... 곧 시작해요!`;
-        else if (phase === 'draw') status = amDrawer ? '✏️ 그림으로 설명하세요! (글자·숫자는 반칙)' : (solved[myId] ? '🎉 맞혔어요! 나머지가 맞힐 때까지 기다려요' : `👀 <b>${nick(drawer)}</b>님의 그림을 보고 맞혀보세요!`);
+        if (phase === 'prep') status = amDrawer ? (sketchMyWord && d.sketchAnswers ? '🎨 제시어를 확인하고 "그리기 시작"을 누르세요' : '🎨 제시어를 뽑는 중...') : `🎨 <b>${nickHtml(drawer)}</b>님이 제시어를 확인하는 중... 곧 시작해요!`;
+        else if (phase === 'draw') status = amDrawer ? '✏️ 그림으로 설명하세요! (글자·숫자는 반칙)' : (solved[myId] ? '🎉 맞혔어요! 나머지가 맞힐 때까지 기다려요' : `👀 <b>${nickHtml(drawer)}</b>님의 그림을 보고 맞혀보세요!`);
         else if (phase === 'review') status = amDrawer ? '🔍 억울한 오답이 있으면 "정답 인정"을 눌러주세요' : '🔍 결과를 확인하는 중...';
         else {
-            const r = d.sketchReason, names = loserIds.map(nick).join(', ');
+            const r = d.sketchReason, names = loserIds.map(nickHtml).join(', ');
             status = r === 'nobody' ? `😵 아무도 못 맞혔어요! <b>${names}</b>님이 마셔요` : (r === 'miss' ? `🍺 못 맞힌 <b>${names}</b>님이 마셔요` : (r === 'all' ? '🎉 전원 정답! 아무도 안 마셔요' : '출제자 문제로 이번 판은 무효예요'));
         }
         sketchSetHtml('sketch-status', status);
@@ -5879,17 +5894,17 @@
         sketchSetStyle('sketch-bar-fill', 'width', `${Math.max(0, Math.min(100, pct)).toFixed(1)}%`);
 
         // 카테고리 / 출제자 제시어 상자
-        sketchSetHtml('sketch-cat', d.sketchCategory && phase !== 'done' ? `📂 카테고리: <b>${d.sketchCategory}</b>` : '');
+        sketchSetHtml('sketch-cat', d.sketchCategory && phase !== 'done' ? `📂 카테고리: <b>${escapeHtml(d.sketchCategory)}</b>` : '');
         let wordHtml = '', showWordBox = false;
         if (amDrawer && phase === 'prep') {
             showWordBox = true;
             const ready = !!(sketchMyWord && d.sketchAnswers);
             wordHtml = ready
-                ? `<div class="sketch-word-sm">나만 보여요! 이 제시어를 그려보세요 (${sketchMyWord.cat})</div><div class="sketch-word">${sketchMyWord.word}</div><div class="sketch-btn-row">${(d.sketchRerolls || 0) < 1 ? '<button class="secondary" data-act="reroll">🔄 제시어 바꾸기 (1회)</button>' : ''}<button data-act="start">✏️ 그리기 시작 (1분)</button></div>`
+                ? `<div class="sketch-word-sm">나만 보여요! 이 제시어를 그려보세요 (${escapeHtml(sketchMyWord.cat)})</div><div class="sketch-word">${escapeHtml(sketchMyWord.word)}</div><div class="sketch-btn-row">${(d.sketchRerolls || 0) < 1 ? '<button class="secondary" data-act="reroll">🔄 제시어 바꾸기 (1회)</button>' : ''}<button data-act="start">✏️ 그리기 시작 (1분)</button></div>`
                 : '<div class="sketch-word-sm">제시어를 뽑는 중...</div>';
         } else if (amDrawer && phase === 'draw') {
             showWordBox = true;
-            wordHtml = `<div class="sketch-word-sm">제시어: <b style="color:#fff; font-size:20px;">${sketchMyWord ? sketchMyWord.word : '(불러오지 못했어요)'}</b></div>`;
+            wordHtml = `<div class="sketch-word-sm">제시어: <b style="color:#fff; font-size:20px;">${sketchMyWord ? escapeHtml(sketchMyWord.word) : '(불러오지 못했어요)'}</b></div>`;
         }
         sketchSetHtml('sketch-word-box', wordHtml);
         sketchSetStyle('sketch-word-box', 'display', showWordBox ? 'block' : 'none');
@@ -5912,7 +5927,7 @@
             const ok = !!solved[id];
             const tag = ok ? (acked[id] ? '✅ 정답 (인정)' : '✅ 정답') : (phase === 'done' || phase === 'review' ? '❌ 오답' : '⏳ 생각 중');
             const col = ok ? 'var(--success-color)' : '#8E9AA8';
-            return `<div class="score-row"><span>${id === myId ? '👤' : '🙂'} ${nick(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${col};">${tag}</span></div>`;
+            return `<div class="score-row"><span>${id === myId ? '👤' : '🙂'} ${nickHtml(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${col};">${tag}</span></div>`;
         }).join('') || '맞히는 사람이 없어요');
 
         // 결과 확인 / 최종 결과
@@ -5926,18 +5941,18 @@
                 sketchTx((room) => sketchReveal(room, myId, w)).finally(() => { sketchRevealing = false; });
             }
             const shownWord = d.sketchWordReveal || (amDrawer && sketchMyWord ? sketchMyWord.word : null);
-            sketchSetHtml('sketch-review-title', `${phase === 'review' ? '🔍 결과 확인' : '🏁 결과'} — 정답: <span style="color:var(--accent-color);">${shownWord || (now - (d.sketchEndAt || now) > 4000 ? '(공개 못함)' : '...')}</span>`);
+            sketchSetHtml('sketch-review-title', `${phase === 'review' ? '🔍 결과 확인' : '🏁 결과'} — 정답: <span style="color:var(--accent-color);">${shownWord ? escapeHtml(shownWord) : (now - (d.sketchEndAt || now) > 4000 ? '(공개 못함)' : '...')}</span>`);
             const rows = guessers.map((id) => {
                 const list = sketchGuessesAll ? (sketchGuessesAll[id] || []) : null;
-                const g = list === null ? '불러오는 중...' : (list.length ? list.slice(-8).join(' · ') : '(입력 없음)');
+                const g = list === null ? '불러오는 중...' : (list.length ? list.slice(-8).map(escapeHtml).join(' · ') : '(입력 없음)');
                 const ok = !!solved[id];
-                const ackBtn = amDrawer && phase === 'review' && !ok ? `<button class="secondary sketch-ack" data-ack="${id}">✅ 정답 인정</button>` : '';
-                return `<div class="sketch-row"><div>${ok ? '✅' : '❌'} <b>${nick(id)}</b>${acked[id] ? ' <span style="color:var(--accent-color);">(출제자 인정)</span>' : ''}</div><div class="sketch-guesses">${g}</div>${ackBtn}</div>`;
+                const ackBtn = amDrawer && phase === 'review' && !ok ? `<button class="secondary sketch-ack" data-ack="${__epEscapeAttr(id)}">✅ 정답 인정</button>` : '';
+                return `<div class="sketch-row"><div>${ok ? '✅' : '❌'} <b>${nickHtml(id)}</b>${acked[id] ? ' <span style="color:var(--accent-color);">(출제자 인정)</span>' : ''}</div><div class="sketch-guesses">${g}</div>${ackBtn}</div>`;
             }).join('');
             sketchSetHtml('sketch-review-list', rows);
             let result = '';
             if (phase === 'done') {
-                const r = d.sketchReason, names = loserIds.map(nick).join(', ');
+                const r = d.sketchReason, names = loserIds.map(nickHtml).join(', ');
                 const reasonText = r === 'nobody' ? '아무도 못 맞혀서 출제자만 마셔요' : (r === 'miss' ? '못 맞힌 사람이 마셔요' : (r === 'all' ? '전원 정답!' : '무효'));
                 result = `<div class="sketch-result-line">🍺 마시는 사람: <b>${names || '없음'}</b></div><div style="font-size:12px; color:#8E9AA8;">${reasonText}</div>`;
             }
@@ -6042,25 +6057,6 @@
     document.addEventListener('gesturestart', (e) => e.preventDefault());
     document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
 
-    onDomReady(() => {
-        document.getElementById('join-mode-box').style.display = 'block';
-        clearCanvas();
-        setupCurrencyFormatting();
-        try {
-            const savedNickname = localStorage.getItem('partyGameNickname');
-            if (savedNickname) document.getElementById('nickname-input').value = savedNickname;
-        } catch (e) { /* 저장소 사용 불가 시 무시 */ }
-        tryRestoreActiveRoom();
-        const shapeSelect = document.getElementById('draw-shape-select');
-        if (shapeSelect) {
-            shapes.forEach((s, i) => {
-                const opt = document.createElement('option');
-                opt.value = String(i); opt.textContent = s.name;
-                shapeSelect.appendChild(opt);
-            });
-        }
-    });
-
     function setupCurrencyFormatting() {
         const totalInput = document.getElementById('dutch-total-input');
         let dutchTotalSyncTimer = null;
@@ -6138,7 +6134,7 @@
     }
 
     window.openImageModal = function(nickname, imgData) {
-        if(!imgData) return;
+        if (!isSafeImageDataUrl(imgData)) return;
         document.getElementById('modal-user-title').innerText = `👑 ${nickname}님의 그림`;
         document.getElementById('modal-target-img').src = imgData;
         document.getElementById('global-image-modal').style.display = 'flex';
@@ -6210,6 +6206,25 @@
             showScreen('lobby-screen');
             document.getElementById('btn-start-game').style.display = isHost ? 'block' : 'none';
             document.getElementById('wait-message').style.display = isHost ? 'none' : 'block';
+        }
+    });
+
+    onDomReady(() => {
+        document.getElementById('join-mode-box').style.display = 'block';
+        clearCanvas();
+        setupCurrencyFormatting();
+        try {
+            const savedNickname = localStorage.getItem('partyGameNickname');
+            if (savedNickname) document.getElementById('nickname-input').value = savedNickname;
+        } catch (e) { /* 저장소 사용 불가 시 무시 */ }
+        tryRestoreActiveRoom();
+        const shapeSelect = document.getElementById('draw-shape-select');
+        if (shapeSelect) {
+            shapes.forEach((s, i) => {
+                const opt = document.createElement('option');
+                opt.value = String(i); opt.textContent = s.name;
+                shapeSelect.appendChild(opt);
+            });
         }
     });
 
@@ -6400,7 +6415,8 @@
                     if(sorted.length === 0) { scoreBoardEl.innerHTML = '<div style="color:#8E9AA8;">그림을 그린 후 아래 버튼을 눌러 제출하세요!</div>'; }
                     else { sorted.forEach(s => {
                         const row = document.createElement('div'); row.className = 'score-row';
-                        const imgTag = s.img ? `<img src="${s.img}" class="user-drawing-thumbnail" data-ep-onclick-fn="openImageModal" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([String(s.nickname), String(s.img)]))}">` : `<div class="user-drawing-thumbnail"></div>`;
+                        const safeImg = isSafeImageDataUrl(s.img) ? s.img : null;
+                        const imgTag = safeImg ? `<img src="${__epEscapeAttr(safeImg)}" class="user-drawing-thumbnail" data-ep-onclick-fn="openImageModal" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([String(s.nickname), String(safeImg)]))}">` : `<div class="user-drawing-thumbnail"></div>`;
                         row.innerHTML = __epSanitizeHtml(`<div class="score-info"><span>👤 ${escapeHtml(s.nickname)}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`);
                         scoreBoardEl.appendChild(row);
                     }); }

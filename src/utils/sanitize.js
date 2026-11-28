@@ -35,12 +35,22 @@ export function escapeAttr(value) {
   return escapeHtml(value);
 }
 
+const SAFE_RASTER_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=\s]+$/i;
+
+export function isSafeImageDataUrl(val) {
+  if (typeof val !== 'string') return false;
+  return SAFE_RASTER_DATA_URL_RE.test(val.trim());
+}
+
 export function isBadUrl(val) {
   const norm = String(val == null ? '' : val)
     .replace(/[\u0000-\u0020]+/g, '')
     .toLowerCase();
   if (norm.startsWith('javascript:') || norm.startsWith('vbscript:')) return true;
-  if (norm.startsWith('data:') && !norm.startsWith('data:image/')) return true;
+  if (norm.startsWith('data:')) {
+    if (norm.startsWith('data:image/svg+xml')) return true;
+    return !/^data:image\/(png|jpeg|jpg|webp|gif)[;,]/i.test(norm);
+  }
   return false;
 }
 

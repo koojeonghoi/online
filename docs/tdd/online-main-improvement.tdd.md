@@ -172,6 +172,18 @@ All files     |   97.61 |    80.76 |     100 |   97.61
 - **RED Checkpoint** (`3c9df1e`): `tests/unit/rummikub.test.js`에서 `turnSeq === 0` 즉시 종료 기대 → `expected false to be true`
 - **GREEN Fix & Verification**: `src/games/rummikub.js`에서 `turnSeq < order.length` 제한 제거 (덱 소진 종료·턴 가드는 유지), `npm run build && npm run test:coverage` 전체 18개 파일 / 69개 테스트 PASS 및 80%+ 커버리지 통과.
 
+---
+
+## 11. ECC `code-reviewer` + `build-fix` 전체 재점검 & TDD 수정
+- **Findings Resolved**:
+  1. **[CRITICAL · XSS/UI 훼손]** `pour`, `halli`, `yut`, `thief`, `sketch` 5개 게임의 `nick(id)` 및 그림 맞추기 참가자 입력 답안(`sketchGuessesAll`)·제시어·카테고리를 `nickHtml`/`escapeHtml`로 전수 이스케이프.
+  2. **[HIGH · XSS]** `isBadUrl`에서 `data:image/svg+xml` 차단, `isSafeImageDataUrl` 추가 및 `openImageModal`·`draw` 썸네일 URL 검증 + `__epEscapeAttr` 적용.
+  3. **[HIGH · Init Race]** `onDomReady()`를 `bindLoginControls()` 뒤로 이동해 자동 재입장(`tryRestoreActiveRoom`)이 `#btn-join-room` 리스너 등록 전에 클릭하는 레이스 제거.
+  4. **[HIGH · build-fix]** `scripts/build-standalone.mjs`에서 `replace()` 함수 리플레이서 전환(`$&`/`$'`/`$$` 손상 방지), 순환 참조·미존재 export·모듈 간 전역 심볼 충돌·`node --check` 구문 검증 내장.
+- **RED Checkpoint**: `9363100` (`tests/unit/code-review-fixes.test.js`, `tests/integration/code-review-integrity.test.js` — 9/9 failed)
+- **GREEN Verification**: `npm run build && npm run test:coverage` (**20 test files / 78 tests PASS**, Statements 98.15% / Branches 80.74% / Functions 98.18% / Lines 98.15%)
+
+
 
 
 
