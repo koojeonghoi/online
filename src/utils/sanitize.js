@@ -9,9 +9,9 @@ export const ALLOWED_DELEGATE_FNS = Object.freeze(
   ])
 );
 
-const BAD_TAG_RE = /^(script|iframe|object|embed|style|svg|math|form|base|meta|link)$/i;
-const BAD_TAG_BLOCK_RE = /<\s*(script|iframe|object|embed|style|svg|math|form)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi;
-const BAD_TAG_SINGLE_RE = /<\s*\/?\s*(script|iframe|object|embed|style|svg|math|form|base|meta|link)\b[^>]*\/?>/gi;
+const BAD_TAG_RE = /^(script|iframe|object|embed|style|math|form|base|meta|link|foreignobject|animate|animatetransform|animatemotion|set|feimage|use)$/i;
+const BAD_TAG_BLOCK_RE = /<\s*(script|iframe|object|embed|style|math|form|foreignobject|animate|animatetransform|animatemotion|set)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi;
+const BAD_TAG_SINGLE_RE = /<\s*\/?\s*(script|iframe|object|embed|style|math|form|base|meta|link|foreignobject|animate|animatetransform|animatemotion|set|feimage|use)\b[^>]*\/?>/gi;
 const URL_ATTRS = Object.freeze({
   href: 1,
   src: 1,

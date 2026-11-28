@@ -1580,6 +1580,15 @@
     import { shuffleArray, generateShortId } from './src/utils/random.js';
     import { applyBingoCall } from './src/games/bingo.js';
     import {
+        HG_WRONG_PENALTY,
+        hgFiveFruit,
+        hgDeckLen,
+        hgFlip,
+        hgRing,
+        hgStep,
+        getHalliBotFlipKey
+    } from './src/games/halli.js';
+    import {
         buildBaseballInitState,
         getBaseballRoles,
         resolveBaseballPitch
@@ -3451,11 +3460,6 @@
     const HG_COLORS = ['#ff5a6e', '#e8b800', '#9a5cf0', '#3fb34f'];
     const HG_COUNTS = [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5]; // 과일 1종 14장 (원본과 같은 분포)
     const HG_CARDS_PER_PLAYER = 6;   // 한 판 길이: 인원 × 6장 (원본은 56장 전부)
-    const HG_WRONG_PENALTY = 3;      // 잘못 쳤을 때 감점
-    const HG_END_DELAY_MS = 4000;    // 마지막 카드가 깔리고 이 시간이 지나면 종료
-    const HG_WINDOW_MS = 3000;       // 누군가 먼저 친 뒤, 나머지가 종을 누를 수 있는 시간 (못 누르면 한 모금)
-    const HG_RING_GRACE_MS = 1500;   // 종 정리가 끝난 직후 늦게 도착한 종은 벌점 없이 무시
-    const HG_COVER_GRACE_MS = 700;   // 5개가 된 카드가 다음 카드에 덮인 직후의 종도 벌점 없이 무시
     let hgLastRaw = null, hgRAF = null, hgActiveRoundKey = null, hgLastPollAt = 0, hgLastHtml = '', hgLastRingTapAt = 0, hgLastEventHtml = '', hgFxSeq = null;
     const hgBotHandled = new Set();
 
@@ -3470,137 +3474,6 @@
     function hgShuffle(arr) {
         for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
         return arr;
-    }
-
-    // 맨 위 카드들에서 합이 정확히 5인 과일 번호 (없으면 -1)
-    function hgFiveFruit(tops) {
-        const sum = [0, 0, 0, 0];
-        Object.values(tops || {}).forEach((c) => { if (c) sum[Math.floor(c / 10)] += c % 10; });
-        return sum.findIndex((v) => v === 5);
-    }
-
-    function hgDeckLen(room, id) { return ((room.hgDecks || {})[id] || []).length; }
-
-    function hgAdvanceTurn(room, at) {
-        const order = room.hgTurnOrder || [], players = room.players || {};
-        const n = order.length;
-        let idx = room.hgTurnIdx || 0;
-        for (let i = 1; i <= n; i++) {
-            const cand = (idx + i) % n;
-            if (players[order[cand]] && hgDeckLen(room, order[cand]) > 0) { idx = cand; break; }
-        }
-        room.hgTurnIdx = idx; room.hgTurnStart = at;
-    }
-
-    // 5개가 떠 있는데 아무도 못 쳤으면 '놓침' 이벤트 (전원 한 모금). 놓친 5개가 있었으면 true
-    function hgMarkMissed(room, at) {
-        const fruit = hgFiveFruit(room.hgTop);
-        if (fruit < 0) return false;
-        room.hgEventSeq = (room.hgEventSeq || 0) + 1;
-        room.hgEvent = { type: 'miss', fruit, at, seq: room.hgEventSeq };
-        return true;
-    }
-
-    function hgFlip(room, who, at) {
-        if (room.hgPhase !== 'play') return false;
-        const order = room.hgTurnOrder || [];
-        if (order[room.hgTurnIdx || 0] !== who) return false;
-        if (room.hgWin) return false; // 종 정리 중에는 새 카드를 뒤집을 수 없음
-        const deck = (room.hgDecks || {})[who] || [];
-        if (deck.length === 0) { hgAdvanceTurn(room, at); return true; }
-        if (hgMarkMissed(room, at)) room.hgGraceUntil = at + HG_COVER_GRACE_MS; // 놓친 5개를 덮는 순간
-        room.hgDecks = room.hgDecks || {};
-        room.hgDecks[who] = deck.slice(1);
-        room.hgTop = room.hgTop || {};
-        room.hgTop[who] = deck[0];
-        room.hgTable = (room.hgTable || 0) + 1;
-        room.hgFlipSeq = (room.hgFlipSeq || 0) + 1;
-        room.hgLastFlipAt = at;
-        hgAdvanceTurn(room, at);
-        return true;
-    }
-
-    // 종 정리: 1등은 안전. 못 누른 사람이 있으면 그 사람들이, 모두 눌렀다면 제일 늦게 누른 사람이 한 모금
-    function hgResolveWindow(room, at) {
-        const win = room.hgWin;
-        if (!win) return false;
-        const players = room.players || {};
-        const others = Object.keys(players).filter((id) => id !== win.who);
-        const pressed = Object.values(room.hgRingOrder || []).filter((id) => players[id] && id !== win.who);
-        const missed = others.filter((id) => !pressed.includes(id));
-        let losers = [], reason = '';
-        if (others.length > 0) {
-            if (missed.length > 0) { losers = missed; reason = 'miss'; }
-            else { losers = [pressed[pressed.length - 1]]; reason = 'slow'; }
-        }
-        room.hgWin = null; room.hgRingOrder = null;
-        room.hgGraceUntil = at + HG_RING_GRACE_MS;
-        if (losers.length > 0) {
-            room.hgEventSeq = (room.hgEventSeq || 0) + 1;
-            room.hgEvent = { type: 'drink', who: losers, reason, fruit: win.fruit, winner: win.who, n: win.n, at, seq: room.hgEventSeq };
-        }
-        return true;
-    }
-
-    function hgRing(room, who, at) {
-        if (room.hgPhase !== 'play' || !(room.players || {})[who]) return false;
-        room.hgScore = room.hgScore || {};
-        // 누군가 이미 쳐서 정리 중: 나머지는 눌린 순서만 기록 (오답 아님)
-        if (room.hgWin) {
-            const pressed = Object.values(room.hgRingOrder || []);
-            if (who === room.hgWin.who || pressed.includes(who)) return false;
-            pressed.push(who); room.hgRingOrder = pressed;
-            const others = Object.keys(room.players || {}).filter((id) => id !== room.hgWin.who);
-            if (others.every((id) => pressed.includes(id))) hgResolveWindow(room, at); // 전원이 눌렀으면 바로 정리
-            return true;
-        }
-        const fruit = hgFiveFruit(room.hgTop);
-        if (fruit >= 0) {
-            const gain = room.hgTable || 0;
-            room.hgScore[who] = (room.hgScore[who] || 0) + gain;
-            room.hgTable = 0; room.hgTop = null;
-            room.hgEventSeq = (room.hgEventSeq || 0) + 1;
-            room.hgEvent = { type: 'win', who, n: gain, fruit, at, seq: room.hgEventSeq };
-            room.hgWin = { who, fruit, n: gain, startAt: at, endAt: at + HG_WINDOW_MS };
-            room.hgRingOrder = null;
-            if (Object.keys(room.players || {}).every((id) => id === who)) hgResolveWindow(room, at); // 혼자면 바로 정리
-            return true;
-        }
-        if (at < (room.hgGraceUntil || 0)) return false; // 한 발 늦은 종: 벌점 없이 무시
-        const ev = room.hgEvent;
-        if (ev && ev.type === 'wrong' && ev.who === who && at - ev.at < 600) return false; // 연타 방지
-        room.hgScore[who] = (room.hgScore[who] || 0) - HG_WRONG_PENALTY;
-        room.hgEventSeq = (room.hgEventSeq || 0) + 1;
-        room.hgEvent = { type: 'wrong', who, at, seq: room.hgEventSeq };
-        return true;
-    }
-
-    function hgFinish(room, at) {
-        hgMarkMissed(room, at); // 마지막 카드에서 5개가 떴는데 아무도 못 쳤으면 이것도 놓친 것
-        const ids = Object.keys(room.players || {});
-        const score = room.hgScore || {};
-        const min = Math.min(...ids.map((id) => score[id] || 0));
-        let losers = ids.filter((id) => (score[id] || 0) === min);
-        const allTie = losers.length === ids.length;
-        if (allTie) losers = [ids[Math.floor(Math.random() * ids.length)]]; // 전원 동점이면 랜덤 1명
-        room.hgPhase = 'done';
-        room.hgLoserIds = losers; room.hgAllTie = allTie; room.hgResultKey = at;
-        room.roomLastLoserId = losers[Math.floor(Math.random() * losers.length)];
-        room.roomLoserPendingChoice = true;
-    }
-
-    // 시간이 지나면서 저절로 일어나야 하는 일(자리 비운 사람 건너뛰기, 종료). 카드는 차례인 사람이 직접 뒤집을 때만 넘어감
-    function hgStep(room, at) {
-        if (room.hgPhase !== 'play') return false;
-        if (room.hgWin && at >= room.hgWin.endAt) { hgResolveWindow(room, at); return true; } // 못 누른 사람 확정
-        const order = room.hgTurnOrder || [], players = room.players || {};
-        if (!order.some((id) => players[id] && hgDeckLen(room, id) > 0)) {
-            if (at - (room.hgLastFlipAt || 0) > HG_END_DELAY_MS) { hgFinish(room, at); return true; }
-            return false;
-        }
-        const cur = order[room.hgTurnIdx || 0];
-        if (!players[cur] || hgDeckLen(room, cur) === 0) { hgAdvanceTurn(room, at); return true; }
-        return false;
     }
 
     function hgStopLocal() {
@@ -3634,7 +3507,7 @@
         const players = data.players || {}, roundKey = data.hgRoundKey;
         const cur = (data.hgTurnOrder || [])[data.hgTurnIdx || 0];
         if (cur && players[cur]?.isBot && !data.hgWin) { // 종 정리 중에는 뒤집지 않음 (정리 끝나면 다시 예약됨)
-            const key = `${roundKey}_flip_${data.hgFlipSeq || 0}_${data.hgTurnStart}`;
+            const key = getHalliBotFlipKey(data);
             if (!hgBotHandled.has(key)) {
                 hgBotHandled.add(key);
                 setTimeout(() => hgTx((room) => hgFlip(room, cur, getServerNow())), botDelay(900, 1800));

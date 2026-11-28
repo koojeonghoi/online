@@ -21,14 +21,14 @@ describe('sanitize utilities (Phase 1 security)', () => {
     expect(escapeAttr('["a","<b>"]')).toBe('[&quot;a&quot;,&quot;&lt;b&gt;&quot;]');
   });
 
-  it('sanitizeHtml strips dangerous tags including style, svg, script, iframe, form, meta, base, link', () => {
+  it('sanitizeHtml strips dangerous tags including style, script, iframe, form, base and neutralizes svg onload', () => {
     const dirty =
-      '<style>body{display:none}</style><svg onload="alert(1)"></svg>' +
+      '<style>body{display:none}</style><svg onload="alert(1)"><foreignObject>x</foreignObject></svg>' +
       '<script>alert(1)</script><iframe src="https://evil.test"></iframe>' +
       '<form action="javascript:alert(1)"><input></form><base href="https://evil.test">' +
       '<span>safe</span>';
     const clean = sanitizeHtml(dirty);
-    expect(clean).not.toMatch(/<style|<svg|<script|<iframe|<form|<base/i);
+    expect(clean).not.toMatch(/<style|<script|<iframe|<form|<base|<foreignobject|onload/i);
     expect(clean).toContain('<span>safe</span>');
   });
 

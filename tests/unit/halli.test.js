@@ -4,6 +4,7 @@ import {
   hgFlip,
   hgRing,
   hgResolveWindow,
+  hgStep,
   getHalliBotFlipKey
 } from '../../src/games/halli.js';
 
@@ -100,5 +101,130 @@ describe('Halli Galli bell + bot turn recovery (bug reproducer)', () => {
     expect(hgRing(room, 'human', 1300)).toBe(true);
     expect(room.hgEvent.type).toBe('wrong');
     expect(getHalliBotFlipKey(room)).toBe(keyBefore);
+    // Debounce repeated wrong tap within 600ms
+    expect(hgRing(room, 'human', 1500)).toBe(false);
+  });
+
+  it('covers hgStep window timeout, empty-deck skip, second-player ring resolution, missed-5 flip, and game finish', () => {
+    // 1) Second player rings during active hgWin -> resolves immediately with 'slow' loser
+    const room1 = {
+      hgPhase: 'play',
+      hgRoundKey: 'r4',
+      players: { p1: {}, p2: {}, p3: {} },
+      hgTurnOrder: ['p1', 'p2', 'p3'],
+      hgTurnIdx: 1,
+      hgTurnStart: 1000,
+      hgFlipSeq: 1,
+      hgTop: { p1: 5 },
+      hgTable: 3,
+      hgScore: { p1: 0, p2: 0, p3: 0 },
+      hgWin: null
+    };
+    expect(hgRing(room1, 'p1', 1100)).toBe(true);
+    expect(hgRing(room1, 'p1', 1150)).toBe(false); // winner cannot ring again
+    expect(hgRing(room1, 'p2', 1200)).toBe(true);
+    expect(room1.hgWin).toBeTruthy(); // still waiting for p3
+    expect(hgRing(room1, 'p3', 1300)).toBe(true); // all others rang -> resolves immediately!
+    expect(room1.hgWin).toBeNull();
+    expect(room1.hgEvent.type).toBe('drink');
+    expect(room1.hgEvent.reason).toBe('slow');
+    expect(room1.hgEvent.who).toEqual(['p3']);
+    expect(room1.hgTurnStart).toBe(1300);
+    // Grace period after ring resolution ignores late tap
+    expect(hgRing(room1, 'p2', 1400)).toBe(false);
+
+    // 2) hgStep expires hgWin timeout -> resolves missed players
+    const room2 = {
+      hgPhase: 'play',
+      players: { p1: {}, p2: {} },
+      hgTurnOrder: ['p1', 'p2'],
+      hgTurnIdx: 0,
+      hgTurnStart: 1000,
+      hgDecks: { p1: [11], p2: [12] },
+      hgWin: { who: 'p1', fruit: 0, n: 2, startAt: 1000, endAt: 4000 }
+    };
+    expect(hgStep(room2, 3000)).toBe(false);
+    expect(hgStep(room2, 4000)).toBe(true);
+    expect(room2.hgWin).toBeNull();
+    expect(room2.hgEvent.reason).toBe('miss');
+
+    // 3) hgFlip covers missed 5 fruits and skips empty deck
+    const room3 = {
+      hgPhase: 'play',
+      players: { p1: {}, p2: {} },
+      hgTurnOrder: ['p1', 'p2'],
+      hgTurnIdx: 0,
+      hgTurnStart: 1000,
+      hgDecks: { p1: [12], p2: [] },
+      hgTop: { p1: 5 },
+      hgScore: { p1: 0, p2: 0 }
+    };
+    expect(hgFlip(room3, 'p1', 2000)).toBe(true);
+    expect(room3.hgEvent.type).toBe('miss');
+    expect(room3.hgGraceUntil).toBeGreaterThan(2000);
+
+    // 4) hgStep skips player with empty deck, then finishes game when all decks empty after delay
+    const room4 = {
+      hgPhase: 'play',
+      players: { p1: {}, p2: {} },
+      hgTurnOrder: ['p1', 'p2'],
+      hgTurnIdx: 0,
+      hgDecks: { p1: [], p2: [11] },
+      hgScore: { p1: 2, p2: 2 },
+      hgLastFlipAt: 1000
+    };
+    expect(hgStep(room4, 2000)).toBe(true);
+    expect(room4.hgTurnIdx).toBe(1);
+
+    room4.hgDecks.p2 = [];
+    expect(hgStep(room4, 2000)).toBe(false); // within HG_END_DELAY_MS
+    expect(hgStep(room4, 6000, () => 0)).toBe(true); // finishes game (allTie branch)
+    expect(room4.hgPhase).toBe('done');
+    expect(room4.hgAllTie).toBe(true);
+    expect(room4.roomLoserPendingChoice).toBe(true);
+
+    // 5) Guard branches: non-play phase, wrong turn, empty deck flip advance, solo win, non-tie finish
+    expect(hgFlip({ hgPhase: 'done' }, 'p1', 100)).toBe(false);
+    expect(hgFlip({ hgPhase: 'play', hgTurnOrder: ['p1', 'p2'], hgTurnIdx: 0 }, 'p2', 100)).toBe(false);
+    const emptyFlipRoom = {
+      hgPhase: 'play',
+      players: { p1: {}, p2: {} },
+      hgTurnOrder: ['p1', 'p2'],
+      hgTurnIdx: 0,
+      hgDecks: { p1: [], p2: [11] }
+    };
+    expect(hgFlip(emptyFlipRoom, 'p1', 200)).toBe(true);
+    expect(emptyFlipRoom.hgTurnIdx).toBe(1);
+
+    expect(hgResolveWindow({ hgWin: null }, 100)).toBe(false);
+    expect(hgRing({ hgPhase: 'done', players: { p1: {} } }, 'p1', 100)).toBe(false);
+    expect(hgRing({ hgPhase: 'play', players: {} }, 'p1', 100)).toBe(false);
+    expect(hgStep({ hgPhase: 'done' }, 100)).toBe(false);
+
+    // Solo player win resolves immediately
+    const soloRoom = {
+      hgPhase: 'play',
+      players: { solo: {} },
+      hgTop: { solo: 5 },
+      hgTable: 1,
+      hgTurnStart: 100
+    };
+    expect(hgRing(soloRoom, 'solo', 200)).toBe(true);
+    expect(soloRoom.hgWin).toBeNull();
+    expect(soloRoom.hgTurnStart).toBe(200);
+
+    // Non-tie finish picks unique lowest scorer
+    const nonTieRoom = {
+      hgPhase: 'play',
+      players: { p1: {}, p2: {} },
+      hgTurnOrder: ['p1', 'p2'],
+      hgTurnIdx: 0,
+      hgDecks: { p1: [], p2: [] },
+      hgScore: { p1: 5, p2: 1 },
+      hgLastFlipAt: 0
+    };
+    expect(hgStep(nonTieRoom, 5000, () => 0)).toBe(true);
+    expect(nonTieRoom.hgAllTie).toBe(false);
+    expect(nonTieRoom.hgLoserIds).toEqual(['p2']);
   });
 });

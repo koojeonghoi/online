@@ -150,4 +150,20 @@ All files     |   97.61 |    80.76 |     100 |   97.61
   - `tests/integration/standalone-file-protocol.test.js`: `file://` URL + `localStorage` `SecurityError` 환경 + 로컬 Mock Firebase로 실제 부트 → 방장 전환 → 방 생성 → 로비 진입(4자리 코드 표시)까지 통과 검증
   - Validation command: `npm run build && npm run test:coverage` (**16 test files / 62 tests PASS**, Statements 98.00% / Branches 81.10% / Functions 97.72% / Lines 98.00%)
 
+---
+
+## 9. Follow-up Bugfix TDD Cycle: 사다리타기·윷놀이 SVG 선 복구 및 할리갈리 봇 교착 수정
+- **Bug Report**: 사다리타기 사다리 미표시, 윷놀이 판 선 누락, 할리갈리 종 1회 타종 후 봇이 다음 카드를 뒤집지 않음.
+- **Root Causes**:
+  1. `src/utils/sanitize.js`의 `BAD_TAG_RE`에 `svg`가 포함되어 사다리타기·윷놀이의 정상 `<svg>` 보드 선까지 통째로 제거됨.
+  2. 할리갈리 `hgResolveWindow`가 종 정리 완료 시 `hgTurnStart`를 갱신하지 않아, 종 정리 중 취소된 봇 뒤집기 키가 `hgBotHandled`에 남아 재예약이 영구 차단됨.
+- **RED Checkpoint** (`9f7b10c`, `npm test -- tests/unit/svg-games-sanitize.test.js tests/unit/halli.test.js`):
+  - `svg-games-sanitize.test.js`: 2/3 failed (사다리 `<svg>` → `""`, 윷놀이 `<svg class="yut-lines">` 제거 확인)
+  - `halli.test.js`: failed to resolve `src/games/halli.js`
+- **GREEN Fix & Verification**:
+  - `src/utils/sanitize.js`: 안전한 SVG 도형 요소(`<svg>`, `<line>`, `<path>`, `<text>` 등)는 허용하되 `<foreignObject>`, `<animate>`, `<set>`, `<feImage>`, `<use>`, `<script>`, `on*`, `javascript:` 등 위험 태그·속성은 계속 차단.
+  - `src/games/halli.js` & `src/index.template.html`: 순수 로직 분리 및 `hgResolveWindow`에서 `room.hgTurnStart = Math.max((room.hgTurnStart || 0) + 1, at)` 갱신으로 봇 뒤집기 키 즉시 재발급.
+  - `npm run build && npm run test:coverage`로 standalone `index.html` 재빌드 및 전체 테스트·80%+ 커버리지 통과.
+
+
 
