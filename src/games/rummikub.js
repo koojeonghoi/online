@@ -109,8 +109,6 @@ export function canActOnRummiTurn(st, myId) {
 export function checkRummiLateMeldEnd(roomData, st, order, triggerId) {
   if (st.winnerId) return false;
   if (!order || order.length < 2) return false;
-  // 모든 참가자가 최소 한 번씩은 턴을 받은 뒤에만 최초 등록 꼴찌 조기 종료를 적용
-  if ((st.turnSeq || 0) < order.length) return false;
   const unmelded = order.filter((pid) => !(st.melded && st.melded[pid]));
   if (unmelded.length !== 1) return false;
   st.winnerId = triggerId;

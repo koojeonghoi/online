@@ -165,5 +165,13 @@ All files     |   97.61 |    80.76 |     100 |   97.61
   - `src/games/halli.js` & `src/index.template.html`: 순수 로직 분리 및 `hgResolveWindow`에서 `room.hgTurnStart = Math.max((room.hgTurnStart || 0) + 1, at)` 갱신으로 봇 뒤집기 키 즉시 재발급.
   - `npm run build && npm run test:coverage`로 standalone `index.html` 재빌드 및 전체 테스트·80%+ 커버리지 통과.
 
+---
+
+## 10. Follow-up Spec Restoration: 루미큐브 최초 등록 1명 잔여 시 즉시 종료 복구
+- **User Intent**: 루미큐브가 길어지지 않도록 30점 이상 최초 등록자는 벌칙 대상에서 빠지고, 미등록자가 1명만 남는 즉시 종료되는 원래 기획을 유지.
+- **RED Checkpoint** (`3c9df1e`): `tests/unit/rummikub.test.js`에서 `turnSeq === 0` 즉시 종료 기대 → `expected false to be true`
+- **GREEN Fix & Verification**: `src/games/rummikub.js`에서 `turnSeq < order.length` 제한 제거 (덱 소진 종료·턴 가드는 유지), `npm run build && npm run test:coverage` 전체 18개 파일 / 69개 테스트 PASS 및 80%+ 커버리지 통과.
+
+
 
 
