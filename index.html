@@ -9012,6 +9012,19 @@
         };
     }
 
+    // 최초 등록(minMeld점↑)을 안 한 사람이 1명만 남으면 그 사람이 꼴찌 → 즉시 종료 + 벌칙
+    function checkRummiLateMeldEnd(roomData, st, order, triggerId) {
+        if (st.winnerId) return false;
+        const unmelded = order.filter(pid => !(st.melded && st.melded[pid]));
+        if (unmelded.length !== 1) return false;
+        st.winnerId = triggerId;
+        st.loserId = unmelded[0];
+        st.endReason = 'lateMeld';
+        roomData.roomLastLoserId = unmelded[0];
+        roomData.roomLoserPendingChoice = true;
+        return true;
+    }
+
     function calcRummiHandPenalty(hand) {
         return (hand || []).reduce((sum, t) => sum + (t.joker ? 30 : t.num), 0);
     }
@@ -9051,11 +9064,13 @@
             const wNick = players[st.winnerId]?.nickname || '승자';
             const lNick = players[st.loserId]?.nickname || '패배자';
             resBox.style.display = 'block';
-            resBox.innerHTML = __epSanitizeHtml(`🏆 승자: <b>${wNick}</b> · 🍺 벌칙(최고 잔여점수): <b>${lNick}</b>`);
+            resBox.innerHTML = __epSanitizeHtml(st.endReason === 'lateMeld'
+                ? `🐢 최초 등록(${st.minMeld || 30}점↑) 꼴찌 · 🍺 벌칙: <b>${lNick}</b>`
+                : `🏆 승자: <b>${wNick}</b> · 🍺 벌칙(최고 잔여점수): <b>${lNick}</b>`);
             triggerExplosionEffect({
                 key: `rummi_${data.rummikubRoundKey}`,
                 title: '🀄 루미큐브 종료!',
-                message: `${lNick}님 벌칙 당첨!`
+                message: st.endReason === 'lateMeld' ? `${lNick}님 최초 등록 꼴찌! 벌칙 당첨!` : `${lNick}님 벌칙 당첨!`
             });
         } else {
             resBox.style.display = 'none';
@@ -9184,7 +9199,7 @@
                 st.loserId = loser;
                 roomData.roomLastLoserId = loser;
                 roomData.roomLoserPendingChoice = true;
-            } else {
+            } else if (!checkRummiLateMeldEnd(roomData, st, order, myId)) {
                 st.turnIdx = ((st.turnIdx || 0) + 1) % order.length;
                 st.turnSeq = (st.turnSeq || 0) + 1;
             }
@@ -9260,7 +9275,7 @@
                 st.loserId = loser;
                 roomData.roomLastLoserId = loser;
                 roomData.roomLoserPendingChoice = true;
-            } else {
+            } else if (!checkRummiLateMeldEnd(roomData, st, order, botId)) {
                 st.turnIdx = ((st.turnIdx || 0) + 1) % order.length;
                 st.turnSeq = (st.turnSeq || 0) + 1;
             }
