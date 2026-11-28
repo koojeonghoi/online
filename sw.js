@@ -12,6 +12,7 @@ const APP_SHELL_ASSETS = [
     './src/utils/audio.js',
     './src/utils/random.js',
     './src/core/room.js',
+    './src/core/login-controller.js',
     './src/games/baseball.js',
     './src/games/rummikub.js',
     './src/games/bingo.js'

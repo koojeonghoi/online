@@ -1575,6 +1575,7 @@
         createRoomSafely,
         joinRoomSafely
     } from './src/core/room.js';
+    import { onDomReady, bindLoginControls } from './src/core/login-controller.js';
     import { playTierSound } from './src/utils/audio.js';
     import { shuffleArray, generateShortId } from './src/utils/random.js';
     import { applyBingoCall } from './src/games/bingo.js';
@@ -1594,6 +1595,7 @@
     } from './src/games/rummikub.js';
 
     initClickDelegate(document, window);
+    window.__partyAppBooted = true;
     const roomSubManager = new RoomSubscriptionManager();
     /* STORAGE-START */
     function createSafeSessionStorage() {
@@ -5095,7 +5097,7 @@
     document.addEventListener('gesturestart', (e) => e.preventDefault());
     document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
 
-    window.addEventListener('DOMContentLoaded', () => {
+    onDomReady(() => {
         document.getElementById('join-mode-box').style.display = 'block';
         clearCanvas();
         setupCurrencyFormatting();
@@ -5142,15 +5144,6 @@
         return Number.isFinite(n) ? n : 0;
     }
 
-    document.getElementById('link-to-create').addEventListener('click', () => {
-        document.getElementById('join-mode-box').style.display = 'none';
-        document.getElementById('create-mode-box').style.display = 'block';
-    });
-    document.getElementById('link-to-join').addEventListener('click', () => {
-        document.getElementById('create-mode-box').style.display = 'none';
-        document.getElementById('join-mode-box').style.display = 'block';
-    });
-
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         const targetScreen = document.getElementById(screenId);
@@ -5166,7 +5159,7 @@
     window.selectGameMode = function(gameMode) {
         if (!canControlLobby) return alert("지금은 게임을 고를 수 없습니다!");
         update(ref(db, `rooms/${currentRoomCode}`), { selectedGame: gameMode });
-    }
+    };
 
     function updateTabUI(gameMode) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -5209,68 +5202,70 @@
         document.getElementById('global-image-modal').style.display = 'none';
     });
 
-    document.getElementById('btn-create-room').addEventListener('click', async () => {
-        const nickname = document.getElementById('nickname-input').value.trim();
-        if (!nickname) return alert('닉네임을 입력해주세요!');
-        try { localStorage.setItem('partyGameNickname', nickname); } catch (e) {}
-        myNickname = nickname;
-        myId = 'player_' + Math.random().toString(36).slice(2, 11);
-        const createdCode = await createRoomSafely({
-            nickname,
-            myId,
-            runRoomTransaction: (code, updater) =>
-                runTransaction(ref(db, `rooms/${code}`), updater, { applyLocally: false }),
-            onError: (err) => {
-                console.error('방 생성 실패:', err);
-                alert(err?.message || '방 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
-            }
-        });
-        if (!createdCode) return;
-        currentRoomCode = createdCode;
-        sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
-        isHost = true;
-        initRoomListener(currentRoomCode);
-        saveActiveRoom(currentRoomCode, nickname);
-        showScreen('lobby-screen');
-        document.getElementById('btn-start-game').style.display = 'block';
-        document.getElementById('wait-message').style.display = 'none';
-    });
+    bindLoginControls({
+        doc: document,
+        createRoom: async (nickname) => {
+            try { localStorage.setItem('partyGameNickname', nickname); } catch (e) {}
+            myNickname = nickname;
+            myId = generateShortId('player_');
+            const createdCode = await createRoomSafely({
+                nickname,
+                myId,
+                runRoomTransaction: (code, updater) =>
+                    runTransaction(ref(db, `rooms/${code}`), updater, { applyLocally: false }),
+                checkRoomExists: async (code) => {
+                    const snap = await get(ref(db, `rooms/${code}`));
+                    return snap.exists();
+                },
+                writeRoom: (code, payload) => set(ref(db, `rooms/${code}`), payload),
+                timeoutMs: 8000,
+                onError: (err) => {
+                    console.error('방 생성 실패:', err);
+                    alert(err?.message || '방 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
+                }
+            });
+            if (!createdCode) return null;
+            currentRoomCode = createdCode;
+            sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
+            return createdCode;
+        },
+        joinRoom: async (roomCode, nickname) => {
+            try { localStorage.setItem('partyGameNickname', nickname); } catch (e) {}
+            myNickname = nickname;
+            currentRoomCode = roomCode;
+            myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || generateShortId('player_');
+            sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
+            isHost = false;
 
-    document.getElementById('btn-join-room').addEventListener('click', async () => {
-        const nickname = document.getElementById('nickname-input').value.trim();
-        const roomCode = document.getElementById('room-code-input').value.trim();
-        if (!nickname || !roomCode) return alert('입력 값을 확인해주세요!');
-        try { localStorage.setItem('partyGameNickname', nickname); } catch (e) {}
-        myNickname = nickname;
-        currentRoomCode = roomCode;
-        myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).slice(2, 11));
-        sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
-        isHost = false;
-
-        const result = await joinRoomSafely({
-            roomCode,
-            nickname,
-            myId,
-            getRoom: async (code) => {
-                const snap = await get(ref(db, `rooms/${code}`));
-                return { exists: snap.exists(), val: snap.val() };
-            },
-            writePlayer: (code, pid, playerObj) => set(ref(db, `rooms/${code}/players/${pid}`), playerObj),
-            onError: (err) => {
-                console.error('방 참여 실패:', err);
-                alert('방에 참여하는 중 오류가 발생했습니다. 네트워크를 확인해주세요.');
+            const result = await joinRoomSafely({
+                roomCode,
+                nickname,
+                myId,
+                getRoom: async (code) => {
+                    const snap = await get(ref(db, `rooms/${code}`));
+                    return { exists: snap.exists(), val: snap.val() };
+                },
+                writePlayer: (code, pid, playerObj) => set(ref(db, `rooms/${code}/players/${pid}`), playerObj),
+                timeoutMs: 8000,
+                onError: (err) => {
+                    console.error('방 참여 실패:', err);
+                    alert(err?.message || '방에 참여하는 중 오류가 발생했습니다. 네트워크를 확인해주세요.');
+                }
+            });
+            if (!result.joined && result.reason === 'not_found') {
+                alert('존재하지 않는 방입니다.');
             }
-        });
-        if (!result.joined) {
-            if (result.reason === 'not_found') alert('존재하지 않는 방입니다.');
-            return;
+            return result;
+        },
+        onRoomEntered: ({ roomCode, nickname, isHost: hostFlag }) => {
+            currentRoomCode = roomCode;
+            isHost = !!hostFlag;
+            initRoomListener(roomCode);
+            saveActiveRoom(roomCode, nickname);
+            showScreen('lobby-screen');
+            document.getElementById('btn-start-game').style.display = isHost ? 'block' : 'none';
+            document.getElementById('wait-message').style.display = isHost ? 'none' : 'block';
         }
-        isHost = result.isHost;
-        initRoomListener(roomCode);
-        saveActiveRoom(roomCode, nickname);
-        showScreen('lobby-screen');
-        document.getElementById('btn-start-game').style.display = isHost ? 'block' : 'none';
-        document.getElementById('wait-message').style.display = isHost ? 'none' : 'block';
     });
 
     function initRoomListener(roomCode) {
@@ -9245,6 +9240,27 @@
         }
         e.preventDefault();
     });
+
+    // file:// 직접 열기 시 브라우저 ES Module CORS 차단 안내 (버튼 무반응 방지)
+    (function checkFileProtocolBoot() {
+        if (typeof window === 'undefined' || !window.location || window.location.protocol !== 'file:') return;
+        setTimeout(function () {
+            if (window.__partyAppBooted) return;
+            var login = document.getElementById('login-screen');
+            var msg = '로컬 파일(file://)로 직접 열면 브라우저 보안(CORS) 정책으로 ES 모듈이 차단되어 버튼이 동작하지 않습니다. 로컬 서버(예: npx serve .) 또는 GitHub Pages(http/https)에서 열어주세요.';
+            if (login && !document.getElementById('file-protocol-warning')) {
+                var warn = document.createElement('div');
+                warn.id = 'file-protocol-warning';
+                warn.style.cssText = 'margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#3A1F1F;border:1px solid #FF6B6B;color:#FFD5D5;font-size:12px;line-height:1.5;text-align:left;';
+                warn.textContent = '⚠️ ' + msg;
+                login.insertBefore(warn, login.firstChild);
+            }
+            ['link-to-create', 'btn-create-room', 'btn-join-room'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('click', function () { window.alert(msg); });
+            });
+        }, 300);
+    })();
 </script>
 </body>
 </html>
