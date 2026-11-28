@@ -15,7 +15,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght=400;700&display=swap" rel="stylesheet">
-    
+
     <style>
         :root {
             --primary-color: #5C9EFF;
@@ -27,7 +27,7 @@
             --input-bg: #252529;
             --secondary-btn: #4E5561;
             --accent-color: #FFD25C;
-            --success-color: #38E5A6; 
+            --success-color: #38E5A6;
             --success-bg: #1A2E26;
         }
 
@@ -298,7 +298,7 @@
             from { background: rgba(244, 63, 94, 0.95); }
             to { background: rgba(159, 18, 57, 0.97); }
         }
-        
+
         .role-box { padding: 20px; border-radius: 12px; font-size: 22px; font-weight: bold; margin: 20px 0; border: 2px solid transparent; }
         .role-box.liar { background-color: #3d1d1d; border-color: var(--danger-color); color: #ff8b8b; }
         .role-box.citizen { background-color: var(--success-bg); border-color: var(--success-color); color: #aeffc3; line-height: 1.6; }
@@ -353,7 +353,7 @@
         .custom-amount-row label { font-size: 14px; font-weight: bold; color: var(--text-color); width: 70px; text-align: left; }
         .custom-amount-row .input-wrapper { margin-bottom: 0; flex: 1; }
         .custom-amount-row input { padding: 8px 35px 8px 8px; font-size: 14px; }
-        
+
         /* 참여자용 심플 가로 버튼 셋 */
         .dutch-user-panel { background: #1E1E24; border: 2px dashed var(--accent-color); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
         .dutch-row-layout { display: flex; align-items: center; justify-content: space-between; background: #151518; padding: 10px 14px; border-radius: 8px; border: 1px solid #3A3A42; }
@@ -361,7 +361,7 @@
         .dutch-user-name { font-size: 14px; color: #8E9AA8; font-weight: bold; }
         .dutch-user-price { font-size: 18px; color: var(--accent-color); font-weight: 700; }
         .mini-action-btn { width: auto; padding: 8px 14px; font-size: 13px; font-weight: bold; border-radius: 6px; margin-bottom: 0; background-color: #FEE500; color: #121214; }
-        
+
         .mgmt-btn-group { display: flex; gap: 4px; }
         .btn-mgmt-mini { width: auto; padding: 5px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; margin-bottom: 0; border: none; cursor: pointer; }
         /* 🔫 러시안룰렛 슬롯 */
@@ -1355,7 +1355,7 @@
     <!-- 🍺 술값 아찔하게 몰아주기 게임 스크린 -->
     <div id="game-dutch-screen" class="screen">
         <h2>🍺 술값 아찔하게 몰아주기</h2>
-        
+
         <!-- 총무 세팅 패널 카드 -->
         <div id="dutch-host-panel" class="quiz-container" style="border-color: var(--accent-color); background: #1e1e24; display: none; text-align: left;">
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 10px; font-weight: bold;">👑 총무 방장 전용: 술값 세팅 파트</div>
@@ -1408,7 +1408,7 @@
             <div style="font-size: 13px; color: #8E9AA8; margin-bottom: 6px; font-weight: bold;">📊 실시간 술값 정산 현황</div>
             <div id="dutch-status-list">대기 중...</div>
         </div>
-        
+
         <button id="btn-back-lobby-dutch" class="secondary btn-back-lobby" style="margin-top: 15px;">대기실로 돌아가기</button>
     </div>
 
@@ -1565,6 +1565,134 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, set, onValue, update, get, runTransaction, remove, goOffline, goOnline, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
+    function __epSanitizeHtml(html) {
+      if (html == null) return "";
+      var str = String(html);
+      var badTags = /^(script|iframe|object|embed)$/i;
+      var urlAttrs = { href: 1, src: 1, "xlink:href": 1, action: 1, formaction: 1, poster: 1, data: 1 };
+      var isBadUrl = function (val) {
+        var norm = String(val).replace(/[\u0000-\u0020]+/g, "").toLowerCase();
+        if (norm.indexOf("javascript:") === 0 || norm.indexOf("vbscript:") === 0) return true;
+        if (norm.indexOf("data:") === 0 && norm.indexOf("data:image/") !== 0) return true;
+        return false;
+      };
+      var stripRegex = function (input) {
+        return String(input == null ? "" : input)
+          .replace(/<\s*(script|iframe|object|embed)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+          .replace(/<\s*\/?\s*(script|iframe|object|embed)\b[^>]*\/?>/gi, "")
+          .replace(/\s+(?:on[a-z]+|srcdoc)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+          .replace(/\s+(href|src|xlink:href|action|formaction|poster|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi, function (m, a, dq, sq, uq) {
+            var v = dq != null ? dq : (sq != null ? sq : uq);
+            return isBadUrl(v) ? "" : m;
+          });
+      };
+      var preCleaned = stripRegex(str);
+      if (typeof DOMParser !== "undefined") {
+        try {
+          var payload = preCleaned;
+          if (typeof trustedTypes !== "undefined" && typeof trustedTypes.createPolicy === "function") {
+            if (typeof __epSanitizeHtml._policy === "undefined") {
+              try {
+                __epSanitizeHtml._policy = trustedTypes.createPolicy("ep-sanitize-html", {
+                  createHTML: function (input) { return stripRegex(input); }
+                });
+              } catch (policyErr) {
+                __epSanitizeHtml._policy = null;
+              }
+            }
+            if (__epSanitizeHtml._policy && typeof __epSanitizeHtml._policy.createHTML === "function") {
+              payload = __epSanitizeHtml._policy.createHTML(preCleaned);
+            }
+          }
+          var doc = new DOMParser().parseFromString(payload, "text/html");
+          if (doc && doc.body) {
+            var walk = function (root) {
+              var nodes = Array.prototype.slice.call(root.childNodes || []);
+              for (var i = 0; i < nodes.length; i++) {
+                var node = nodes[i];
+                if (node && node.nodeType === 1) {
+                  var tag = String(node.tagName || "").toLowerCase();
+                  if (badTags.test(tag)) {
+                    if (node.parentNode) node.parentNode.removeChild(node);
+                    continue;
+                  }
+                  var attrs = Array.prototype.slice.call(node.attributes || []);
+                  for (var j = 0; j < attrs.length; j++) {
+                    var name = String(attrs[j].name || "").toLowerCase();
+                    var val = attrs[j].value;
+                    if (name.indexOf("on") === 0 || name === "srcdoc") {
+                      node.removeAttribute(attrs[j].name);
+                    } else if (Object.prototype.hasOwnProperty.call(urlAttrs, name) && isBadUrl(val)) {
+                      node.removeAttribute(attrs[j].name);
+                    }
+                  }
+                  if (tag === "template" && node.content) {
+                    walk(node.content);
+                  }
+                  walk(node);
+                }
+              }
+            };
+            walk(doc.body);
+            return doc.body.innerHTML;
+          }
+        } catch (parseErr) {
+          // Fall back to regex sanitizer below.
+        }
+      }
+      return preCleaned;
+    }
+
+    function __epEscapeAttr(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    (function __epInitOnclickDelegate() {
+      if (typeof document === "undefined" || !document || typeof document.addEventListener !== "function" || document.__epOnclickBound) return;
+      document.__epOnclickBound = true;
+      var isBlocked = function (key) {
+        return !key || key === "__proto__" || key === "constructor" || key === "prototype";
+      };
+      document.addEventListener("click", function (event) {
+        var base = event && event.target;
+        if (base && base.nodeType === 3) base = base.parentElement;
+        var el = base && base.closest ? base.closest("[data-ep-onclick-fn]") : null;
+        if (!el) return;
+        var fnPath = el.getAttribute("data-ep-onclick-fn");
+        if (!fnPath) return;
+        var parts = fnPath.split(".");
+        if (parts[0] === "window") parts.shift();
+        if (!parts.length) return;
+        var ctx = typeof window !== "undefined" ? window : globalThis;
+        for (var i = 0; i < parts.length - 1; i++) {
+          var seg = parts[i];
+          if (isBlocked(seg) || ctx == null) return;
+          if (Object.prototype.hasOwnProperty.call(Object.prototype, seg) && !Object.prototype.hasOwnProperty.call(ctx, seg)) return;
+          ctx = ctx[seg];
+        }
+        var leaf = parts[parts.length - 1];
+        if (isBlocked(leaf) || ctx == null) return;
+        if (Object.prototype.hasOwnProperty.call(Object.prototype, leaf) && !Object.prototype.hasOwnProperty.call(ctx, leaf)) return;
+        var fn = ctx[leaf];
+        if (typeof fn !== "function") return;
+        var args = [];
+        var rawArgs = el.getAttribute("data-ep-onclick-args");
+        if (rawArgs) {
+          try {
+            var parsed = JSON.parse(rawArgs);
+            if (Array.isArray(parsed)) args = parsed;
+          } catch (err) {
+            return;
+          }
+        }
+        fn.apply(ctx, args);
+      });
+    })();
     /* STORAGE-START */
     function createSafeSessionStorage() {
         const mem = new Map();
@@ -3355,7 +3483,7 @@
             const names = Object.values(d.pourLoserIds || {}).map(nick).join(', ');
             status = `💦 <b>${names}</b>님 물이 넘쳤어요!`;
         }
-        document.getElementById('pour-status').innerHTML = status;
+        document.getElementById('pour-status').innerHTML = __epSanitizeHtml(status);
 
         // 내 버튼
         const btn = document.getElementById('btn-pour-hold');
@@ -3400,7 +3528,7 @@
             } else if (phase === 'done' && loserSet.has(id)) { icon = '💦'; right = '패배!'; color = 'var(--danger-color)'; }
             return `<div class="score-row"><span>${icon} ${i + 1}. ${nick(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${color};">${right}</span></div>`;
         }).join('');
-        if (rows !== pourLastListHtml) { pourLastListHtml = rows; document.getElementById('pour-player-list').innerHTML = rows || '대기 중...'; }
+        if (rows !== pourLastListHtml) { pourLastListHtml = rows; document.getElementById('pour-player-list').innerHTML = __epSanitizeHtml(rows || '대기 중...'); }
 
         // 시간이 지나면 저절로 일어나야 하는 일(넘침 등)은 누구든 감지해서 처리 — 트랜잭션이 중복 처리를 막아줌
         if (now - pourLastPollAt > 250) {
@@ -3646,7 +3774,7 @@
         document.querySelectorAll('.hg-fx').forEach((el) => el.remove());
         const fx = document.createElement('div');
         fx.className = `hg-fx ${cls}`;
-        fx.innerHTML = `<div class="hg-fx-emoji">${emoji}</div><div class="hg-fx-title">${title}</div><div class="hg-fx-sub">${sub}</div>`;
+        fx.innerHTML = __epSanitizeHtml(`<div class="hg-fx-emoji">${emoji}</div><div class="hg-fx-title">${title}</div><div class="hg-fx-sub">${sub}</div>`);
         document.body.appendChild(fx);
         setTimeout(() => fx.remove(), ms);
         if (cls === 'drink') {
@@ -3730,8 +3858,8 @@
         const html = `${status}\u0001${tiles}\u0001${d.hgTable || 0}`;
         if (html !== hgLastHtml) {
             hgLastHtml = html;
-            document.getElementById('hg-status').innerHTML = status;
-            document.getElementById('hg-board').innerHTML = tiles;
+            document.getElementById('hg-status').innerHTML = __epSanitizeHtml(status);
+            document.getElementById('hg-board').innerHTML = __epSanitizeHtml(tiles);
         }
 
         // 최근 종 결과는 다음 결과가 나올 때까지 남겨둠 — 성공이면 나머지 전원이 마시는 시간
@@ -3752,7 +3880,7 @@
         if (evKey !== hgLastEventHtml) {
             hgLastEventHtml = evKey;
             const evEl = document.getElementById('hg-event');
-            evEl.innerHTML = evHtml;
+            evEl.innerHTML = __epSanitizeHtml(evHtml);
             evEl.classList.toggle('drink', evDrink);
         }
         if (ev && ev.seq !== hgFxSeq) {
@@ -4004,7 +4132,7 @@
         if (yutActiveRoundKey !== roundKey) {
             yutStopLocal();
             yutActiveRoundKey = roundKey; yutBotHandled.clear();
-            document.getElementById('yut-board').innerHTML = yutBuildBoard(data);
+            document.getElementById('yut-board').innerHTML = __epSanitizeHtml(yutBuildBoard(data));
         }
         yutLastRaw = data;
         yutScheduleBots(data);
@@ -4047,7 +4175,7 @@
         } else {
             status = `⏳ <b>${nick(curId)}</b>님이 던질 차례예요`;
         }
-        if (status !== yutLastStatusHtml) { yutLastStatusHtml = status; document.getElementById('yut-status').innerHTML = status; }
+        if (status !== yutLastStatusHtml) { yutLastStatusHtml = status; document.getElementById('yut-status').innerHTML = __epSanitizeHtml(status); }
 
         // 윷가락
         const faces = last && revealed ? Object.values(last.sticks || {}) : null; // 공개된 윷가락 면 (true=평평)
@@ -4070,7 +4198,7 @@
             if (last.bonus) boxHtml += '<div>🎁 한 번 더 던져요!</div>';
             if (last.penalty) boxHtml += `<div class="yut-pen">🍺 벌칙 칸! ${nick(last.who)}님 — ${last.penalty}</div>`;
         }
-        if (boxHtml !== yutLastBoxHtml) { yutLastBoxHtml = boxHtml; document.getElementById('yut-last').innerHTML = boxHtml; }
+        if (boxHtml !== yutLastBoxHtml) { yutLastBoxHtml = boxHtml; document.getElementById('yut-last').innerHTML = __epSanitizeHtml(boxHtml); }
 
         // 말 위치 / 순서·상태 목록
         yutUpdatePieces(v, ids, curId, d.yutPhase === 'play');
@@ -4082,7 +4210,7 @@
             else if (done && loserSet.has(id)) { icon = '💦'; right = `패배! (${dist}칸 남음)`; color = 'var(--danger-color)'; }
             return `<div class="score-row"><span>${icon} ${i + 1}. ${nick(id)}${id === myId ? ' (나)' : ''}</span><span style="color:${color};">${right}</span></div>`;
         }).join('');
-        if (rows !== yutLastListHtml) { yutLastListHtml = rows; document.getElementById('yut-player-list').innerHTML = rows || '대기 중...'; }
+        if (rows !== yutLastListHtml) { yutLastListHtml = rows; document.getElementById('yut-player-list').innerHTML = __epSanitizeHtml(rows || '대기 중...'); }
 
         // 내 버튼
         const btn = document.getElementById('btn-yut-throw');
@@ -4248,7 +4376,7 @@
     function thiefSet(id, html) {
         if (thiefCache[id] === html) return;
         thiefCache[id] = html;
-        document.getElementById(id).innerHTML = html;
+        document.getElementById(id).innerHTML = __epSanitizeHtml(html);
     }
 
     function thiefStopLocal() {
@@ -4586,7 +4714,7 @@
     function sketchSetHtml(id, html) {
         if (sketchCache[id] === html) return;
         sketchCache[id] = html;
-        document.getElementById(id).innerHTML = html;
+        document.getElementById(id).innerHTML = __epSanitizeHtml(html);
     }
     function sketchSetStyle(id, prop, val) {
         const el = document.getElementById(id);
@@ -5365,14 +5493,14 @@
                 if(data.selectedGame === 'liar') {
                     showScreen('game-liar-screen');
                     const rd = document.getElementById('role-display');
-                    if(data.liarId === myId) { rd.innerHTML = `🕵️‍♂️ 당신은 라이어입니다!<br>제시어 카테고리 [${data.category}]`; rd.className = "role-box liar"; }
-                    else { rd.innerHTML = `제시어 카테고리 [${data.category}]<br>🍕 정답 단어: ${data.word}`; rd.className = "role-box citizen"; }
-                } 
+                    if(data.liarId === myId) { rd.innerHTML = __epSanitizeHtml(`🕵️‍♂️ 당신은 라이어입니다!<br>제시어 카테고리 [${data.category}]`); rd.className = "role-box liar"; }
+                    else { rd.innerHTML = __epSanitizeHtml(`제시어 카테고리 [${data.category}]<br>🍕 정답 단어: ${data.word}`); rd.className = "role-box citizen"; }
+                }
                 else if (data.selectedGame === 'draw') {
                     showScreen('game-draw-screen');
                     currentShapeIndex = normalizeShapeIndex(data.targetShapeIndex);
                     document.getElementById('target-shape-text').innerText = `목표 도형: ${shapes[currentShapeIndex].name}`;
-                    document.getElementById('preview-svg').innerHTML = shapes[currentShapeIndex].svg;
+                    document.getElementById('preview-svg').innerHTML = __epSanitizeHtml(shapes[currentShapeIndex].svg);
 
                     // 새 라운드(새 도형)가 시작되면 캔버스와 제출 잠금 상태를 초기화
                     if (drawSeenRoundKey !== data.drawRoundKey) {
@@ -5411,11 +5539,11 @@
                     }
                     const scoreBoardEl = document.getElementById('draw-score-list'); scoreBoardEl.innerHTML = '';
                     const sorted = Object.keys(scores).map(id => ({ nickname: players[id]?.nickname || '참가자', score: scores[id], img: images[id] || null })).sort((a,b) => b.score - a.score);
-                    if(sorted.length === 0) { scoreBoardEl.innerHTML = '<div style="color:#8E9AA8;">그림을 그린 후 아래 버튼을 눌러 제출하세요!</div>'; } 
+                    if(sorted.length === 0) { scoreBoardEl.innerHTML = '<div style="color:#8E9AA8;">그림을 그린 후 아래 버튼을 눌러 제출하세요!</div>'; }
                     else { sorted.forEach(s => {
                         const row = document.createElement('div'); row.className = 'score-row';
-                        const imgTag = s.img ? `<img src="${s.img}" class="user-drawing-thumbnail" onclick="openImageModal('${s.nickname}', '${s.img}')">` : `<div class="user-drawing-thumbnail"></div>`;
-                        row.innerHTML = `<div class="score-info"><span>👤 ${s.nickname}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`;
+                        const imgTag = s.img ? `<img src="${s.img}" class="user-drawing-thumbnail" data-ep-onclick-fn="openImageModal" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([String(s.nickname), String(s.img)]))}">` : `<div class="user-drawing-thumbnail"></div>`;
+                        row.innerHTML = __epSanitizeHtml(`<div class="score-info"><span>👤 ${s.nickname}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`);
                         scoreBoardEl.appendChild(row);
                     }); }
                 }
@@ -5436,7 +5564,7 @@
                     const statusTextEl = document.getElementById('bomb-status-text');
                     const bombIcon = document.getElementById('bomb-icon');
                     if(data.bombExploded) {
-                        bombIcon.innerText = "💥"; statusTextEl.innerHTML = `🚨 [${holderNick}] 폭사!`;
+                        bombIcon.innerText = "💥"; statusTextEl.textContent = `🚨 [${holderNick}] 폭사!`;
                         document.getElementById('quiz-box').style.display = 'none';
                         triggerExplosionEffect({
                             key: `bomb_${data.bombExplodeAt}`,
@@ -5445,8 +5573,8 @@
                         });
                     } else {
                         bombIcon.innerText = "💣";
-                        if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; const quizKey = `${data.bombHolderId}_${data.bombPassSeq || 0}`; if (lastBombQuizKey !== quizKey) { lastBombQuizKey = quizKey; generateQuiz(); } } 
-                        else { statusTextEl.innerHTML = `👤 폭탄 소지자: ${holderNick}`; document.getElementById('quiz-box').style.display = 'none'; }
+                        if (data.bombHolderId === myId) { statusTextEl.innerHTML = `🔥 내 차례입니다! 문제를 푸세요! 🔥`; document.getElementById('quiz-box').style.display = 'block'; const quizKey = `${data.bombHolderId}_${data.bombPassSeq || 0}`; if (lastBombQuizKey !== quizKey) { lastBombQuizKey = quizKey; generateQuiz(); } }
+                        else { statusTextEl.textContent = `👤 폭탄 소지자: ${holderNick}`; document.getElementById('quiz-box').style.display = 'none'; }
                         if (isHost && players[data.bombHolderId]?.isBot) {
                             const botKey = `${data.bombHolderId}_${data.bombPassSeq || 0}`;
                             if (lastBotBombAutoKey !== botKey) {
@@ -5478,7 +5606,7 @@
                     const statusEl = document.getElementById('boxfind-status-text');
                     if (data.boxFindExploded) {
                         const loserNick = players[data.boxFindLoserId]?.nickname || '???';
-                        statusEl.innerHTML = `🚨 [${loserNick}] 폭탄 발견! 벌주 당첨!`;
+                        statusEl.textContent = `🚨 [${loserNick}] 폭탄 발견! 벌주 당첨!`;
                         triggerExplosionEffect({
                             key: `boxfind_${data.boxFindRoundKey || ''}_${data.boxFindLoserId}`,
                             title: '💥 BOOM! 💥',
@@ -5488,7 +5616,7 @@
                     } else if (curPlayerId === myId) {
                         statusEl.innerHTML = `🔥 내 차례입니다! 상자를 골라 터치하세요!`;
                     } else {
-                        statusEl.innerHTML = `👤 ${players[curPlayerId]?.nickname || '???'}님의 차례입니다`;
+                        statusEl.textContent = `👤 ${players[curPlayerId]?.nickname || '???'}님의 차례입니다`;
                     }
                     let protectInfoEl = document.getElementById('boxfind-protect-info');
                     if (!protectInfoEl) {
@@ -5534,12 +5662,12 @@
                         const hasAns = speedAnswers[id];
                         const badgeClass = hasAns ? 'success' : 'waiting';
                         const badgeText = hasAns ? `성공! (${speedAnswers[id]}) 🎉` : '입력 중.. 💬';
-                        row.innerHTML = `<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`;
+                        row.innerHTML = __epSanitizeHtml(`<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`);
                         liveContainer.appendChild(row);
                     });
                     const expBox = document.getElementById('speed-explosion-box');
                     if (data.speedLoserId) {
-                        expBox.innerHTML = `💥 초성 대결 탈락 완료! 💥<br><span style="color:var(--accent-color); font-size:22px;">🚨 ${players[data.speedLoserId]?.nickname || "참가자"} 탈락! 벌칙 확정! 🚨</span>`;
+                        expBox.innerHTML = __epSanitizeHtml(`💥 초성 대결 탈락 완료! 💥<br><span style="color:var(--accent-color); font-size:22px;">🚨 ${players[data.speedLoserId]?.nickname || "참가자"} 탈락! 벌칙 확정! 🚨</span>`);
                         expBox.style.display = 'block'; document.getElementById('btn-submit-speed').disabled = true;
                         if(data.speedLoserId === myId) {
                             triggerExplosionEffect({
@@ -5651,7 +5779,7 @@
                     listEl.innerHTML = sorted.length === 0 ? '대기 중...' : '';
                     sorted.forEach((s, idx) => {
                         const row = document.createElement('div'); row.className = 'score-row';
-                        row.innerHTML = `<span>${idx===0?'🥇':'👤'} ${s.nickname}</span><span style="color:var(--success-color);">${s.value.toFixed(2)} (오차 ${s.error.toFixed(2)})</span>`;
+                        row.innerHTML = __epSanitizeHtml(`<span>${idx===0?'🥇':'👤'} ${s.nickname}</span><span style="color:var(--success-color);">${s.value.toFixed(2)} (오차 ${s.error.toFixed(2)})</span>`);
                         listEl.appendChild(row);
                     });
 
@@ -5713,7 +5841,7 @@
                     rows.forEach(r => {
                         const row = document.createElement('div'); row.className = 'score-row';
                         const isLoser = loserIds.includes(r.id);
-                        row.innerHTML = `<span>${isLoser ? '🍺' : '👤'} ${r.nickname}</span><span style="color:${isLoser ? 'var(--danger-color)' : 'var(--success-color)'};">${r.label}</span>`;
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${r.nickname}</span><span style="color:${isLoser ? 'var(--danger-color)' : 'var(--success-color)'};">${r.label}</span>`);
                         diceListEl.appendChild(row);
                     });
 
@@ -5808,7 +5936,7 @@
                             labelHtml = submitted ? '✅ 제출완료' : '⏳ 대기중';
                             color = submitted ? 'var(--success-color)' : '#8E9AA8';
                         }
-                        row.innerHTML = `<span>${isLoser ? '🍺' : '👤'} ${nickname}</span><span style="color:${color};">${labelHtml}</span>`;
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${nickname}</span><span style="color:${color};">${labelHtml}</span>`);
                         rpsListEl.appendChild(row);
                     });
 
@@ -5902,7 +6030,7 @@
                             labelHtml = submitted ? '✅ 제출완료' : '⏳ 대기중';
                             color = submitted ? 'var(--success-color)' : '#8E9AA8';
                         }
-                        row.innerHTML = `<span>${isLoser ? '🍺' : '👤'} ${nickname}</span><span style="color:${color};">${labelHtml}</span>`;
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${nickname}</span><span style="color:${color};">${labelHtml}</span>`);
                         chamListEl.appendChild(row);
                     });
 
@@ -5997,7 +6125,7 @@
                             label = `${(x.r.elapsedMs / 1000).toFixed(2)}초 (${swSigned(x.r.diffMs)})${isLoser ? ' · 패배!' : ''}`;
                             color = isLoser ? 'var(--danger-color)' : 'var(--success-color)';
                         }
-                        row.innerHTML = `<span>${isLoser ? '🍺' : '👤'} ${x.nickname}</span><span style="color:${color};">${label}</span>`;
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${x.nickname}</span><span style="color:${color};">${label}</span>`);
                         swListEl.appendChild(row);
                     });
 
@@ -6058,7 +6186,7 @@
                         if (timerEl) timerEl.textContent = '🍺';
                         const loserNick = players[loserId]?.nickname || '참가자';
                         const penaltyText = data.drinkPenaltyText || '한 잔 마시기';
-                        if (statusEl) statusEl.innerHTML = `🍺 <b>${loserNick}</b>님 당첨!<br>${penaltyText}${loserId === myId ? '<br><span style="font-size:12px; color:#8E9AA8;">마시고 나서 다음 타이머를 정해주세요.</span>' : ''}`;
+                        if (statusEl) statusEl.innerHTML = __epSanitizeHtml(`🍺 <b>${loserNick}</b>님 당첨!<br>${penaltyText}${loserId === myId ? '<br><span style="font-size:12px; color:#8E9AA8;">마시고 나서 다음 타이머를 정해주세요.</span>' : ''}`);
                         if (loserId === myId) {
                             if (pickBox) pickBox.style.display = 'block';
                             if (waitBox) waitBox.style.display = 'none';
@@ -6149,11 +6277,11 @@
                         slotsEl.appendChild(s);
                     }
 
-                    document.getElementById('rouletteTurnText').innerHTML = roundOver
+                    document.getElementById('rouletteTurnText').innerHTML = __epSanitizeHtml(roundOver
                         ? `💀 <strong>${players[data.roomLastLoserId]?.nickname || '참가자'}</strong>님이 총알에 맞았어요! 다음 게임을 고르는 중...`
                         : (isMyTurn
                             ? '🎯 당신의 차례입니다! 방아쇠를 당기세요!'
-                            : `⏳ <strong>${players[currentPid]?.nickname || '참가자'}</strong>님의 차례를 기다려주세요...`);
+                            : `⏳ <strong>${players[currentPid]?.nickname || '참가자'}</strong>님의 차례를 기다려주세요...`));
 
                     document.getElementById('btn-roulette-pull').disabled = !isMyTurn;
 
@@ -6238,7 +6366,7 @@
                     rows.forEach(r => {
                         const row = document.createElement('div'); row.className = 'score-row';
                         const isLoser = loserRow && r.id === loserRow.id;
-                        row.innerHTML = `<span>${isLoser?'🍺':'👤'} ${r.nickname}</span><span style="color:${isLoser?'var(--danger-color)':'var(--success-color)'};">${r.label}</span>`;
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser?'🍺':'👤'} ${r.nickname}</span><span style="color:${isLoser?'var(--danger-color)':'var(--success-color)'};">${r.label}</span>`);
                         sfListEl.appendChild(row);
                     });
                     document.getElementById('speedFingerFinalMsg').textContent = loserRow ? `🍺 ${loserRow.nickname}님 마시기!` : '';
@@ -6246,7 +6374,7 @@
                 else if (data.selectedGame === 'dutch') {
                     showScreen('game-dutch-screen');
                     document.getElementById('dutch-host-panel').style.display = isHost ? 'block' : 'none';
-                    
+
                     const totalAmount = data.dutchTotal || 0;
                     const distributedBills = data.dutchDistributedBills || [];
                     const confirmedUsers = data.dutchConfirmedUsers || {};
@@ -6265,7 +6393,7 @@
                             }
                         });
                     }
-                    
+
                     document.getElementById('dutch-total-display').innerText = totalAmount.toLocaleString();
 
                     const remainingRow = document.getElementById('dutch-remaining-row');
@@ -6276,18 +6404,18 @@
                     } else {
                         remainingRow.style.display = 'none';
                     }
-                    
+
                     // 1. 참여자용 가로 보드 로직 수정 (쪼는 맛 처리)
                     if (distributedBills && distributedBills.length > 0) {
                         const myIdx = playerIds.indexOf(myId);
                         const myBill = distributedBills[myIdx] || 0;
                         const hasPeeked = peekedUsers[myId] === true;
-                        
+
                         document.getElementById('dutch-user-board').style.display = 'block';
                         document.getElementById('dutch-my-name-display').innerText = `${myNickname}님의 정산 정보`;
-                        
+
                         const actionBtn = document.getElementById('btn-dutch-action');
-                        
+
                         if (!hasPeeked) {
                             // 아직 안 깠을 때
                             document.getElementById('dutch-my-price-display').innerText = `❓ 탭해서 확인`;
@@ -6313,44 +6441,44 @@
                     // 2. 가로형 실시간 현황 리스트 (금액 오픈 상태 실시간 마스킹 반영)
                     const statusListEl = document.getElementById('dutch-status-list');
                     statusListEl.innerHTML = '';
-                    
+
                     playerIds.forEach((id, idx) => {
                         const row = document.createElement('div');
                         row.className = 'score-row';
-                        
+
                         const userBill = distributedBills[idx] || 0;
                         const isConfirmed = confirmedUsers[id] === true;
                         const isPeeked = peekedUsers[id] === true;
-                        
+
                         // 정보 필드
                         const infoDiv = document.createElement('div');
                         infoDiv.className = 'score-info';
-                        
+
                         // 남이 열어봤는지 여부에 따라 금액 마스킹 ("???" 처리하여 실시간 긴장감 유지)
                         const displayPriceText = isPeeked ? `${userBill.toLocaleString()}원` : `🙈 확인 중...`;
-                        
+
                         let userStatusIcon = '⏳';
                         if (isConfirmed) userStatusIcon = '✅';
                         else if (isPeeked) userStatusIcon = '👀';
 
-                        infoDiv.innerHTML = `<span>👤 ${players[id].nickname} ${userStatusIcon}</span><span style="color:var(--accent-color);">${displayPriceText}</span>`;
+                        infoDiv.innerHTML = __epSanitizeHtml(`<span>👤 ${players[id].nickname} ${userStatusIcon}</span><span style="color:var(--accent-color);">${displayPriceText}</span>`);
                         row.appendChild(infoDiv);
-                        
+
                         // 스위치 관리 버튼 컴포넌트
                         const actionDiv = document.createElement('div');
                         if (isHost) {
                             actionDiv.className = 'mgmt-btn-group';
-                            actionDiv.innerHTML = `
-                                <button class="btn-mgmt-mini" style="background-color:var(--success-color); color:#121214;" onclick="changeDutchStatus('${id}', true)">확인</button>
-                                <button class="btn-mgmt-mini" style="background-color:var(--danger-color); color:white;" onclick="changeDutchStatus('${id}', false)">취소</button>
-                            `;
+                            actionDiv.innerHTML = __epSanitizeHtml(`
+                                <button class="btn-mgmt-mini" style="background-color:var(--success-color); color:#121214;" data-ep-onclick-fn="changeDutchStatus" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([String(id), true]))}">확인</button>
+                                <button class="btn-mgmt-mini" style="background-color:var(--danger-color); color:white;" data-ep-onclick-fn="changeDutchStatus" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([String(id), false]))}">취소</button>
+                            `);
                         } else {
                             let badgeClass = 'waiting';
                             let badgeText = '대기';
                             if (isConfirmed) { badgeClass = 'success'; badgeText = '완료'; }
                             else if (isPeeked) { badgeClass = 'peeking'; badgeText = '오픈'; }
-                            
-                            actionDiv.innerHTML = `<span class="status-badge ${badgeClass}">${badgeText}</span>`;
+
+                            actionDiv.innerHTML = __epSanitizeHtml(`<span class="status-badge ${badgeClass}">${badgeText}</span>`);
                         }
                         row.appendChild(actionDiv);
                         statusListEl.appendChild(row);
@@ -6403,12 +6531,12 @@
                         const path = data.godPath || [];
                         const pathText = path.map(id => players[id]?.nickname || '???').join(' → ');
                         const loserNick = players[data.godLoserResult]?.nickname || '???';
-                        statusBox.innerHTML = `☠️ ${startNick}님부터 <b>${data.godNumber}</b>칸 이동!<br><span style="font-size:12px; color:#8E9AA8;">${pathText}</span><br>최종 지목: <b>${loserNick}</b>님 벌칙입니다 🍻`;
+                        statusBox.innerHTML = __epSanitizeHtml(`☠️ ${startNick}님부터 <b>${data.godNumber}</b>칸 이동!<br><span style="font-size:12px; color:#8E9AA8;">${pathText}</span><br>최종 지목: <b>${loserNick}</b>님 벌칙입니다 🍻`);
                         statusBox.className = 'role-box liar';
                     } else if (!allDesignated) {
                         const doneCount = playerIds.filter(id => !!targets[id]).length;
                         if (targets[myId]) {
-                            statusBox.innerHTML = `✅ 지목 완료! 다른 사람들을 기다리는 중 (${doneCount}/${playerIds.length})`;
+                            statusBox.textContent = `✅ 지목 완료! 다른 사람들을 기다리는 중 (${doneCount}/${playerIds.length})`;
                             statusBox.className = 'role-box citizen';
                             const changeBtn = document.createElement('button');
                             changeBtn.type = 'button'; changeBtn.textContent = '🔄 다시 지목하기';
@@ -6416,7 +6544,7 @@
                             changeBtn.onclick = () => update(ref(db, `rooms/${currentRoomCode}/godTargets`), { [myId]: null });
                             targetListEl.appendChild(changeBtn);
                         } else {
-                            statusBox.innerHTML = `🤫 다른 참가자를 한 명 몰래 지목하세요. (${doneCount}/${playerIds.length}명 완료)<br><span style="font-size:12px; color:#8E9AA8;">벌칙이 시작되면 ${startNick}님부터 지목한 사람을 따라 이동해요.</span>`;
+                            statusBox.innerHTML = __epSanitizeHtml(`🤫 다른 참가자를 한 명 몰래 지목하세요. (${doneCount}/${playerIds.length}명 완료)<br><span style="font-size:12px; color:#8E9AA8;">벌칙이 시작되면 ${startNick}님부터 지목한 사람을 따라 이동해요.</span>`);
                             statusBox.className = 'role-box liar';
                             playerIds.filter(id => id !== myId).forEach(id => {
                                 const b = document.createElement('button');
@@ -6456,7 +6584,7 @@
                         const pathText = path.map(id => players[id]?.nickname || '???').join(' → ');
                         const curNick = players[data.godCurrentId]?.nickname || '???';
                         const isMyTurn = data.godCurrentId === myId;
-                        statusBox.innerHTML = `☠️ 진행 중 (${data.godStep}/${data.godNumber})<br><span style="font-size:13px;">${pathText}</span>`;
+                        statusBox.innerHTML = __epSanitizeHtml(`☠️ 진행 중 (${data.godStep}/${data.godNumber})<br><span style="font-size:13px;">${pathText}</span>`);
                         statusBox.className = 'role-box liar';
                         if (isMyTurn) {
                             const nextBtn = document.createElement('button');
@@ -6500,7 +6628,7 @@
                         if (f > 0) activeIds.push(id);
                         const row = document.createElement('div');
                         row.style.cssText = 'display:flex; justify-content:space-between; padding:6px 10px; background:#1c1c20; border-radius:8px; font-size:13px;';
-                        row.innerHTML = `<span>${players[id]?.nickname || '참가자'}${id === myId ? ' (나)' : ''}</span><span>${f > 0 ? '✋'.repeat(f) : '💀 탈락'}</span>`;
+                        row.innerHTML = __epSanitizeHtml(`<span>${players[id]?.nickname || '참가자'}${id === myId ? ' (나)' : ''}</span><span>${f > 0 ? '✋'.repeat(f) : '💀 탈락'}</span>`);
                         listEl.appendChild(row);
                     });
 
@@ -6584,9 +6712,9 @@
                     document.getElementById('bingo-status-text').innerText = `📢 부른 숫자 ${calledCount}/25 · ${linesToLose}줄 완성되면 벌칙!`;
                     const turnTextEl = document.getElementById('bingo-turn-text');
                     if (turnTextEl) {
-                        turnTextEl.innerHTML = isMyCallTurn
+                        turnTextEl.innerHTML = __epSanitizeHtml(isMyCallTurn
                             ? '🎯 <strong>당신의 차례!</strong> 아직 안 부른 숫자를 내 보드에서 눌러주세요'
-                            : `⏳ <strong>${players[bingoCallerId]?.nickname || '참가자'}</strong>님이 번호를 부를 차례예요`;
+                            : `⏳ <strong>${players[bingoCallerId]?.nickname || '참가자'}</strong>님이 번호를 부를 차례예요`);
                     }
 
                     // 내 보드 렌더링 — 내 차례일 때만 아직 안 부른 칸을 눌러서 번호를 부를 수 있음
@@ -6763,7 +6891,7 @@
                                 svg += `<text x="${colX(c)}" y="${svgHeight - 8}" font-size="16" text-anchor="middle" style="fill:${fillColor};">${text}</text>`;
                             }
                             svg += `</svg>`;
-                            wrapEl.innerHTML = svg;
+                            wrapEl.innerHTML = __epSanitizeHtml(svg);
                         } else {
                             wrapEl.innerHTML = '';
                         }
@@ -6799,7 +6927,7 @@
                             if (isPenalty) penaltyIds.push(id);
                             const row = document.createElement('div');
                             row.className = 'ladder-result-row' + (isPenalty ? ' penalty' : '');
-                            row.innerHTML = `<span>${players[id]?.nickname || '참가자'}${id === myId ? ' (나)' : ''}</span><span>${isPenalty ? '💥 벌칙!' : '⭕ 안전'}</span>`;
+                            row.innerHTML = __epSanitizeHtml(`<span>${players[id]?.nickname || '참가자'}${id === myId ? ' (나)' : ''}</span><span>${isPenalty ? '💥 벌칙!' : '⭕ 안전'}</span>`);
                             resultListEl.appendChild(row);
                         });
                         if (penaltyIds.length > 0) {
@@ -6813,8 +6941,8 @@
                 }
                 document.querySelectorAll('.btn-back-lobby').forEach(btn => btn.style.display = isHost ? 'block' : 'none');
             }
-            if(data.status === 'waiting') { 
-                showScreen('lobby-screen'); clearCanvas(); 
+            if(data.status === 'waiting') {
+                showScreen('lobby-screen'); clearCanvas();
                 stopTimingLoop(); timingActiveRoundKey = null;
                 swResetLocal();
                 pourStopLocal();
@@ -6943,7 +7071,7 @@
         const container = document.getElementById('dutch-custom-inputs-container'); container.innerHTML = '';
         for (let i = 1; i <= count; i++) {
             const row = document.createElement('div'); row.className = 'custom-amount-row';
-            row.innerHTML = `<label>${i}등 금액:</label><div class="input-wrapper"><input type="text" class="dutch-custom-input" placeholder="직접 입력"><span class="input-unit">원</span></div>`;
+            row.innerHTML = __epSanitizeHtml(`<label>${i}등 금액:</label><div class="input-wrapper"><input type="text" class="dutch-custom-input" placeholder="직접 입력"><span class="input-unit">원</span></div>`);
             container.appendChild(row);
         }
         document.querySelectorAll('.dutch-custom-input').forEach(input => {
@@ -6994,10 +7122,10 @@
         }
         finalResults.push(remaining); finalResults.sort(() => Math.random() - 0.5);
         // 분배 시점에는 peekedUsers(오픈여부)와 confirmedUsers(완납여부)를 모두 밀어버림
-        update(ref(db, `rooms/${currentRoomCode}`), { 
-            dutchTotal: total, 
-            dutchDistributedBills: finalResults, 
-            dutchConfirmedUsers: null, 
+        update(ref(db, `rooms/${currentRoomCode}`), {
+            dutchTotal: total,
+            dutchDistributedBills: finalResults,
+            dutchConfirmedUsers: null,
             dutchPeekedUsers: null,
             dutchCustomActive: false,
             dutchRemaining: null
@@ -7011,10 +7139,10 @@
         let finalResults = [];
         document.querySelectorAll('.dutch-custom-input').forEach(input => { finalResults.push(getCleanNumber(input.value)); });
         finalResults.sort(() => Math.random() - 0.5);
-        update(ref(db, `rooms/${currentRoomCode}`), { 
-            dutchTotal: total, 
-            dutchDistributedBills: finalResults, 
-            dutchConfirmedUsers: null, 
+        update(ref(db, `rooms/${currentRoomCode}`), {
+            dutchTotal: total,
+            dutchDistributedBills: finalResults,
+            dutchConfirmedUsers: null,
             dutchPeekedUsers: null,
             dutchCustomActive: false,
             dutchRemaining: null
@@ -7251,7 +7379,7 @@
                 const bIdx = d.balanceIndex || 0;
                 const label = choice === 'A' ? balancePool[bIdx].a : balancePool[bIdx].b;
                 document.getElementById('balance-result-hint').innerText = `🔎 [${label}] 선택자 (${names.length}명)`;
-                document.getElementById('balance-winners-list').innerHTML = names.length > 0 ? names.map(n => `👤 ${n}`).join('<br>') : '아무도 선택하지 않았어요.';
+                document.getElementById('balance-winners-list').innerHTML = __epSanitizeHtml(names.length > 0 ? names.map(n => `👤 ${n}`).join('<br>') : '아무도 선택하지 않았어요.');
             }
         });
     }
@@ -7558,7 +7686,7 @@
             const isLoser = data.opBombLoserId === id;
             const badgeClass = isSolved ? 'success' : 'waiting';
             const badgeText = isLoser ? '💥 꼴찌 탈락!' : (isSolved ? `${rankIdx + 1}등 탈출! 🎉` : '풀이 중.. 🧮');
-            row.innerHTML = `<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`;
+            row.innerHTML = __epSanitizeHtml(`<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`);
             liveEl.appendChild(row);
         });
 
@@ -7566,7 +7694,7 @@
         if (data.opBombLoserId) {
             const loserNick = players[data.opBombLoserId]?.nickname || '참가자';
             const ops = puzzle.sampleOps || ['+', '+'];
-            expBox.innerHTML = `💥 사칙연산 폭탄 종료! 💥<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${loserNick}님 꼴찌 당첨! 🚨</span><div style="font-size:13px; color:#EAEAEA; margin-top:6px;">예시 정답: (${puzzle.a} ${ops[0]} ${puzzle.b}) ${ops[1]} ${puzzle.c} = ${puzzle.target}</div>`;
+            expBox.innerHTML = __epSanitizeHtml(`💥 사칙연산 폭탄 종료! 💥<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${loserNick}님 꼴찌 당첨! 🚨</span><div style="font-size:13px; color:#EAEAEA; margin-top:6px;">예시 정답: (${puzzle.a} ${ops[0]} ${puzzle.b}) ${ops[1]} ${puzzle.c} = ${puzzle.target}</div>`);
             expBox.style.display = 'block';
             setOpBombKeypadDisabled(true);
             triggerExplosionEffect({
@@ -7848,9 +7976,9 @@
             document.getElementById('idiom-category-badge').textContent = puzzle.category === 'idiom' ? '📜 사자성어' : '💬 속담';
             const blankHtml = `<span class="idiom-blank">${puzzle.category === 'idiom' ? '□□' : '???'}</span>`;
             const sep = puzzle.category === 'idiom' ? '' : ' ';
-            document.getElementById('idiom-question-display').innerHTML = puzzle.blankPos === 0
+            document.getElementById('idiom-question-display').innerHTML = __epSanitizeHtml(puzzle.blankPos === 0
                 ? `${blankHtml}${sep}${puzzle.back}`
-                : `${puzzle.front}${sep}${blankHtml}`;
+                : `${puzzle.front}${sep}${blankHtml}`);
 
             const choicesBox = document.getElementById('idiom-choices-box');
             choicesBox.innerHTML = '';
@@ -7879,7 +8007,7 @@
             const isLoser = data.idiomLoserId === id;
             const badgeClass = isSolved ? 'success' : 'waiting';
             const badgeText = isLoser ? '💥 꼴찌 탈락!' : (isSolved ? `${rankIdx + 1}등 탈출! 🎉` : '고르는 중.. 📜');
-            row.innerHTML = `<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`;
+            row.innerHTML = __epSanitizeHtml(`<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`);
             liveEl.appendChild(row);
         });
 
@@ -7889,7 +8017,7 @@
             refreshIdiomButtonsDisabled(true);
             const loserNick = players[data.idiomLoserId]?.nickname || '참가자';
             const fullAnswer = puzzle.category === 'idiom' ? `${puzzle.front}${puzzle.back}` : `${puzzle.front} ${puzzle.back}`;
-            expBox.innerHTML = `⌛ 퀴즈 종료! ⌛<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${loserNick}님 꼴찌 당첨! 🚨</span><div style="font-size:14px; color:#EAEAEA; margin-top:6px;">정답: <strong>${fullAnswer}</strong></div>`;
+            expBox.innerHTML = __epSanitizeHtml(`⌛ 퀴즈 종료! ⌛<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${loserNick}님 꼴찌 당첨! 🚨</span><div style="font-size:14px; color:#EAEAEA; margin-top:6px;">정답: <strong>${fullAnswer}</strong></div>`);
             expBox.style.display = 'block';
             triggerExplosionEffect({
                 key: `idiom_${data.idiomRoundKey}_${data.idiomLoserId}`,
@@ -8589,7 +8717,7 @@
     document.querySelectorAll('.btn-back-lobby').forEach(btn => {
         btn.addEventListener('click', () => window.funResetRound());
         btn.addEventListener('click', () => {
-            update(ref(db, `rooms/${currentRoomCode}`), { 
+            update(ref(db, `rooms/${currentRoomCode}`), {
                 status: 'waiting', word: '', drawScores: null, drawImages: null, drawRoundKey: null, bombExploded: false, speedAnswers: null, speedLoserId: null, balanceVotes: null, balanceRevealed: false,
                 bombExplodeAt: null,
                 dutchTotal: null, dutchDistributedBills: null, dutchConfirmedUsers: null, dutchPeekedUsers: null, dutchCustomActive: false, dutchRemaining: null,
@@ -8649,7 +8777,7 @@
             const loserNames = loserIds.map(id => players[id]?.nickname || '알수없음').join(', ');
             statusEl.innerText = data.nunchiReason || `${loserNames} 패배!`;
             resBox.style.display = 'block';
-            resBox.innerHTML = `🍺 벌칙 당첨: <b>${loserNames}</b><br><span style="font-size:13px;">${data.nunchiReason || ''}</span>`;
+            resBox.innerHTML = __epSanitizeHtml(`🍺 벌칙 당첨: <b>${loserNames}</b><br><span style="font-size:13px;">${data.nunchiReason || ''}</span>`);
             triggerExplosionEffect({
                 key: `nunchi_${data.nunchiRoundKey}`,
                 title: '👀 눈치게임 종료!',
@@ -8661,14 +8789,14 @@
         }
 
         const grid = document.getElementById('nunchi-player-grid');
-        grid.innerHTML = playerIds.map(pid => {
+        grid.innerHTML = __epSanitizeHtml(playerIds.map(pid => {
             const nick = players[pid]?.nickname || '익명';
             const isLoser = loserIds.includes(pid);
             const sh = shouts[pid];
             const cls = isLoser ? 'loser' : (sh ? 'done' : '');
             const tag = isLoser ? '💥 패배' : (sh ? `✅ ${sh.num}` : '대기 중');
             return `<div class="nunchi-pchip ${cls}"><div>${nick}</div><div style="margin-top:3px;font-size:11px;opacity:0.85;">${tag}</div></div>`;
-        }).join('');
+        }).join(''));
 
         // 호스트가 봇 자동 외침 예약
         if (!finished && isHost) {
@@ -8866,18 +8994,18 @@
         document.getElementById('rummi-meld-info').innerText = myMelded ? '최초 등록 완료 ✅' : `최초 등록: ${st.minMeld || 30}점↑ 필요`;
         document.getElementById('rummi-turn-pts').innerText = isMyTurn ? `이번 턴 ${rummiDraftPts}점` : `${players[curPid]?.nickname || ''} 차례`;
 
-        document.getElementById('rummi-pbar').innerHTML = turnOrder.map((pid, idx) => {
+        document.getElementById('rummi-pbar').innerHTML = __epSanitizeHtml(turnOrder.map((pid, idx) => {
             const cnt = (st.hands && st.hands[pid] ? st.hands[pid].length : 0);
             const mel = st.melded && st.melded[pid] ? '✓' : '';
             return `<div class="rummi-pcard ${!st.winnerId && idx === st.turnIdx ? 'turn' : ''}"><div><b>${players[pid]?.nickname || '익명'}</b></div><div style="color:#9ca3af;">${cnt}장 ${mel}</div></div>`;
-        }).join('');
+        }).join(''));
 
         const resBox = document.getElementById('rummi-result-box');
         if (st.winnerId) {
             const wNick = players[st.winnerId]?.nickname || '승자';
             const lNick = players[st.loserId]?.nickname || '패배자';
             resBox.style.display = 'block';
-            resBox.innerHTML = `🏆 승자: <b>${wNick}</b> · 🍺 벌칙(최고 잔여점수): <b>${lNick}</b>`;
+            resBox.innerHTML = __epSanitizeHtml(`🏆 승자: <b>${wNick}</b> · 🍺 벌칙(최고 잔여점수): <b>${lNick}</b>`);
             triggerExplosionEffect({
                 key: `rummi_${data.rummikubRoundKey}`,
                 title: '🀄 루미큐브 종료!',
@@ -8907,17 +9035,17 @@
         if (board.length === 0) {
             bEl.innerHTML = '<div style="margin:auto;color:#8E9AA8;font-size:12px;">테이블이 비어 있습니다. 3장 이상 선택해 내려놓으세요.</div>';
         } else {
-            bEl.innerHTML = board.map((g, gi) => `
-                <div class="rummi-group ${g.isNew ? 'staged' : ''}" onclick="window.rummiAppendToGroup(${gi})">
+            bEl.innerHTML = __epSanitizeHtml(board.map((g, gi) => `
+                <div class="rummi-group ${g.isNew ? 'staged' : ''}" data-ep-onclick-fn="rummiAppendToGroup" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([gi]))}">
                     ${(g.tiles || []).map(t => `<div class="rummi-tile sm ${t.color}">${t.joker ? '★' : t.num}</div>`).join('')}
                 </div>
-            `).join('');
+            `).join(''));
         }
 
         const rEl = document.getElementById('rummi-rack');
-        rEl.innerHTML = hand.map(t => `
-            <div class="rummi-tile ${t.color} ${rummiSelectedIds.has(t.id) ? 'selected' : ''}" onclick="window.rummiToggleTile(${t.id})">${t.joker ? '★' : t.num}</div>
-        `).join('');
+        rEl.innerHTML = __epSanitizeHtml(hand.map(t => `
+            <div class="rummi-tile ${t.color} ${rummiSelectedIds.has(t.id) ? 'selected' : ''}" data-ep-onclick-fn="rummiToggleTile" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([t.id]))}">${t.joker ? '★' : t.num}</div>
+        `).join(''));
 
         document.getElementById('btn-rummi-place').disabled = !isMyTurn || rummiSelectedIds.size < 3;
         document.getElementById('btn-rummi-undo').disabled = !isMyTurn || rummiDraftPts === 0;
@@ -9165,12 +9293,12 @@
         const sumB = scoresB.reduce((a, b) => a + (b || 0), 0);
         const cols = Array.from({ length: maxInn }, (_, i) => i + 1);
 
-        document.getElementById('bb-scoreboard').innerHTML = `
+        document.getElementById('bb-scoreboard').innerHTML = __epSanitizeHtml(`
             <thead><tr><th>팀</th>${cols.map(c => `<th>${c}</th>`).join('')}<th class="tot">R</th></tr></thead>
             <tbody>
                 <tr><td><b>청팀</b></td>${cols.map((_, i) => `<td>${scoresA[i] ?? '-'}</td>`).join('')}<td class="tot">${sumA}</td></tr>
                 <tr><td><b>백팀</b></td>${cols.map((_, i) => `<td>${scoresB[i] ?? '-'}</td>`).join('')}<td class="tot">${sumB}</td></tr>
-            </tbody>`;
+            </tbody>`);
 
         document.getElementById('bb-inning-title').innerText = st.winnerTeam ? '🏆 경기 종료' : `${st.inning}회${st.half === 'top' ? '초 (청팀 공격)' : '말 (백팀 공격)'}`;
         document.getElementById('bb-matchup-text').innerText = `타자: ${players[batterId]?.nickname || '-'}  vs  투수: ${players[pitcherId]?.nickname || '-'}`;
@@ -9180,7 +9308,7 @@
         document.getElementById('bb-base-3').classList.toggle('on', !!bases[2]);
         document.getElementById('bb-bso').innerText = `B ${st.balls || 0}  ·  S ${st.strikes || 0}  ·  O ${st.outs || 0}`;
         document.getElementById('bb-last-play').innerText = st.lastPlay || '';
-        document.getElementById('bb-log-box').innerHTML = (st.logs || []).slice(0, 10).map(l => `<div style="padding:2px 0;">${l}</div>`).join('');
+        document.getElementById('bb-log-box').innerHTML = __epSanitizeHtml((st.logs || []).slice(0, 10).map(l => `<div style="padding:2px 0;">${l}</div>`).join(''));
 
         const resBox = document.getElementById('bb-result-box');
         const ctrl = document.getElementById('bb-control-area');
@@ -9188,7 +9316,7 @@
             const loseTeamLabel = st.winnerTeam === 'A' ? '백팀' : (st.winnerTeam === 'B' ? '청팀' : '무승부(양팀 원샷!)');
             const loserNick = players[st.loserId]?.nickname || '';
             resBox.style.display = 'block';
-            resBox.innerHTML = `🍺 벌칙 팀: <b>${loseTeamLabel}</b>${loserNick ? ` (대표: ${loserNick})` : ''}`;
+            resBox.innerHTML = __epSanitizeHtml(`🍺 벌칙 팀: <b>${loseTeamLabel}</b>${loserNick ? ` (대표: ${loserNick})` : ''}`);
             ctrl.style.display = 'none';
             triggerExplosionEffect({
                 key: `baseball_${data.baseballRoundKey}`,
@@ -9239,12 +9367,12 @@
     }
 
     function drawBbControls(opts, disabled) {
-        document.getElementById('bb-zone-grid').innerHTML = BB_ZONES.map((z, i) => `
-            <button type="button" class="bb-zone-btn ${bbSelectedZone === i ? 'selected' : ''}" ${disabled ? 'disabled' : ''} onclick="window.bbPickZone(${i})">${z}</button>
-        `).join('');
-        document.getElementById('bb-opt-row').innerHTML = opts.map(o => `
-            <button type="button" class="bb-opt-btn ${bbSelectedOpt === o.id ? 'selected' : ''}" ${disabled ? 'disabled' : ''} onclick="window.bbPickOpt('${o.id}')">${o.label}</button>
-        `).join('');
+        document.getElementById('bb-zone-grid').innerHTML = __epSanitizeHtml(BB_ZONES.map((z, i) => `
+            <button type="button" class="bb-zone-btn ${bbSelectedZone === i ? 'selected' : ''}" ${disabled ? 'disabled' : ''} data-ep-onclick-fn="bbPickZone" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([i]))}">${z}</button>
+        `).join(''));
+        document.getElementById('bb-opt-row').innerHTML = __epSanitizeHtml(opts.map(o => `
+            <button type="button" class="bb-opt-btn ${bbSelectedOpt === o.id ? 'selected' : ''}" ${disabled ? 'disabled' : ''} data-ep-onclick-fn="bbPickOpt" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([String(o.id)]))}">${o.label}</button>
+        `).join(''));
     }
 
     window.bbPickZone = function(i) {
