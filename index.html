@@ -7463,7 +7463,7 @@
         if (isPenaltyActive) return;
         const a1=Math.floor(Math.random()*8)+4, b1=Math.floor(Math.random()*7)+3, c1=Math.floor(Math.random()*25)+5;
         document.getElementById('quiz-question-text').innerText = `(${a1} × ${b1}) - ${c1} = ?`; currentAnswer = (a1*b1)-c1;
-        const opts = new Set([currentAnswer]); while(opts.size < 4) { const f = currentAnswer + [-10, -5, -1, 1, 2, 5][Math.floor(Math.random()*6)]; if(f > 0) opts.add(f); }
+        const opts = new Set([currentAnswer]); while(opts.size < 4) { const f = currentAnswer + [-10, -5, -1, 1, 2, 5][Math.floor(Math.random()*6)]; opts.add(f); }
         const box = document.getElementById('quiz-options-box'); box.innerHTML = '';
         Array.from(opts).sort(() => Math.random() - 0.5).forEach(o => {
             const b = document.createElement('button'); b.className = 'quiz-btn'; b.innerText = o;
