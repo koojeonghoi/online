@@ -6,11 +6,15 @@ const htmlPath = path.resolve(process.cwd(), 'index.html');
 const html = fs.readFileSync(htmlPath, 'utf8');
 
 describe('Phase 3 index.html game logic and cleanup integration', () => {
-  it('imports baseball, rummikub, bingo, and random modules', () => {
-    expect(html).toMatch(/from\s+['"]\.\/src\/games\/baseball\.js['"]/);
-    expect(html).toMatch(/from\s+['"]\.\/src\/games\/rummikub\.js['"]/);
-    expect(html).toMatch(/from\s+['"]\.\/src\/games\/bingo\.js['"]/);
-    expect(html).toMatch(/from\s+['"]\.\/src\/utils\/random\.js['"]/);
+  it('imports baseball, rummikub, bingo, and random modules in template and inlines them in index.html', () => {
+    const templateHtml = fs.readFileSync(path.resolve(process.cwd(), 'src', 'index.template.html'), 'utf8');
+    expect(templateHtml).toMatch(/from\s+['"]\.\/src\/games\/baseball\.js['"]/);
+    expect(templateHtml).toMatch(/from\s+['"]\.\/src\/games\/rummikub\.js['"]/);
+    expect(templateHtml).toMatch(/from\s+['"]\.\/src\/games\/bingo\.js['"]/);
+    expect(templateHtml).toMatch(/from\s+['"]\.\/src\/utils\/random\.js['"]/);
+    expect(html).toContain('function resolveBaseballPitch(');
+    expect(html).toContain('function applyRummiDrawPass(');
+    expect(html).toContain('function applyBingoCall(');
   });
 
   it('uses drawRoundKey instead of targetShapeIndex for draw bot deduplication key', () => {

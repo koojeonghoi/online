@@ -1564,35 +1564,936 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, set, onValue, update, get, runTransaction, remove, goOffline, goOnline, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-    import {
-        escapeHtml,
-        escapeAttr as __epEscapeAttr,
-        sanitizeHtml as __epSanitizeHtml,
-        initClickDelegate
-    } from './src/utils/sanitize.js';
-    import {
-        RoomSubscriptionManager,
-        createRoomSafely,
-        joinRoomSafely
-    } from './src/core/room.js';
-    import { onDomReady, bindLoginControls } from './src/core/login-controller.js';
-    import { playTierSound } from './src/utils/audio.js';
-    import { shuffleArray, generateShortId } from './src/utils/random.js';
-    import { applyBingoCall } from './src/games/bingo.js';
-    import {
-        buildBaseballInitState,
-        getBaseballRoles,
-        resolveBaseballPitch
-    } from './src/games/baseball.js';
-    import {
-        RUMMI_COLORS,
-        evaluateRummiMeld,
-        buildRummikubInitState,
-        checkRummiLateMeldEnd,
-        calcRummiHandPenalty,
-        canActOnRummiTurn,
-        applyRummiDrawPass
-    } from './src/games/rummikub.js';
+    /* INLINED-LOCAL-MODULES-START */
+    // --- src/utils/sanitize.js ---
+    const ALLOWED_DELEGATE_FNS = Object.freeze(
+      new Set([
+        'openImageModal',
+        'changeDutchStatus',
+        'rummiAppendToGroup',
+        'rummiToggleTile',
+        'bbPickZone',
+        'bbPickOpt'
+      ])
+    );
+
+    const BAD_TAG_RE = /^(script|iframe|object|embed|style|svg|math|form|base|meta|link)$/i;
+    const BAD_TAG_BLOCK_RE = /<\s*(script|iframe|object|embed|style|svg|math|form)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi;
+    const BAD_TAG_SINGLE_RE = /<\s*\/?\s*(script|iframe|object|embed|style|svg|math|form|base|meta|link)\b[^>]*\/?>/gi;
+    const URL_ATTRS = Object.freeze({
+      href: 1,
+      src: 1,
+      'xlink:href': 1,
+      action: 1,
+      formaction: 1,
+      poster: 1,
+      data: 1
+    });
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+
+    function isBadUrl(val) {
+      const norm = String(val == null ? '' : val)
+        .replace(/[\u0000-\u0020]+/g, '')
+        .toLowerCase();
+      if (norm.startsWith('javascript:') || norm.startsWith('vbscript:')) return true;
+      if (norm.startsWith('data:') && !norm.startsWith('data:image/')) return true;
+      return false;
+    }
+
+    function normalizeDelegateFnName(raw) {
+      if (!raw) return '';
+      return String(raw).trim().replace(/^window\./, '');
+    }
+
+    function stripDangerousWithRegex(input, allowDelegateAttrs, allowedFns) {
+      let out = String(input == null ? '' : input)
+        .replace(BAD_TAG_BLOCK_RE, '')
+        .replace(BAD_TAG_SINGLE_RE, '')
+        .replace(/\s+(?:on[a-z]+|srcdoc)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .replace(
+          /\s+(href|src|xlink:href|action|formaction|poster|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi,
+          (m, _attr, dq, sq, uq) => {
+            const val = dq != null ? dq : sq != null ? sq : uq;
+            return isBadUrl(val) ? '' : m;
+          }
+        );
+
+      if (!allowDelegateAttrs) {
+        out = out.replace(
+          /\s+data-ep-onclick-(?:fn|args)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+          ''
+        );
+      } else {
+        out = out.replace(
+          /\s+data-ep-onclick-fn\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi,
+          (m, dq, sq, uq) => {
+            const fnName = normalizeDelegateFnName(dq != null ? dq : sq != null ? sq : uq);
+            return allowedFns.has(fnName) ? m : '';
+          }
+        );
+      }
+      return out;
+    }
+
+    function cleanElementTree(root, allowDelegateAttrs, allowedFns) {
+      const nodes = Array.from(root.childNodes || []);
+      for (const node of nodes) {
+        if (!node || node.nodeType !== 1) continue;
+        const tag = String(node.tagName || '').toLowerCase();
+        if (BAD_TAG_RE.test(tag)) {
+          if (node.parentNode) node.parentNode.removeChild(node);
+          continue;
+        }
+
+        const rawFn = node.getAttribute('data-ep-onclick-fn');
+        const normalizedFn = normalizeDelegateFnName(rawFn);
+        const delegateAllowed = allowDelegateAttrs && allowedFns.has(normalizedFn);
+        if (!delegateAllowed) {
+          node.removeAttribute('data-ep-onclick-fn');
+          node.removeAttribute('data-ep-onclick-args');
+        }
+
+        const attrs = Array.from(node.attributes || []);
+        for (const attr of attrs) {
+          const name = String(attr.name || '').toLowerCase();
+          if (name.startsWith('on') || name === 'srcdoc') {
+            node.removeAttribute(attr.name);
+          } else if (Object.prototype.hasOwnProperty.call(URL_ATTRS, name) && isBadUrl(attr.value)) {
+            node.removeAttribute(attr.name);
+          }
+        }
+
+        if (tag === 'template' && node.content) {
+          cleanElementTree(node.content, allowDelegateAttrs, allowedFns);
+        }
+        cleanElementTree(node, allowDelegateAttrs, allowedFns);
+      }
+    }
+
+    function sanitizeHtml(html, options = {}) {
+      if (html == null) return '';
+      const allowDelegateAttrs = options.allowDelegateAttrs !== false;
+      const allowedFns = options.allowedFns || ALLOWED_DELEGATE_FNS;
+      const preCleaned = stripDangerousWithRegex(html, allowDelegateAttrs, allowedFns);
+
+      if (typeof DOMParser !== 'undefined') {
+        try {
+          const doc = new DOMParser().parseFromString(preCleaned, 'text/html');
+          if (doc && doc.body) {
+            cleanElementTree(doc.body, allowDelegateAttrs, allowedFns);
+            return doc.body.innerHTML;
+          }
+        } catch {
+          // Fall back to regex-cleaned output
+        }
+      }
+      return preCleaned;
+    }
+
+    function isBlockedKey(key) {
+      return !key || key === '__proto__' || key === 'constructor' || key === 'prototype';
+    }
+
+    function createClickDelegate(rootWindow, allowedFns = ALLOWED_DELEGATE_FNS) {
+      return function handleDelegatedClick(event) {
+        let base = event && event.target;
+        if (base && base.nodeType === 3) base = base.parentElement;
+        const el = base && typeof base.closest === 'function' ? base.closest('[data-ep-onclick-fn]') : null;
+        if (!el) return;
+
+        const fnName = normalizeDelegateFnName(el.getAttribute('data-ep-onclick-fn'));
+        if (!fnName || isBlockedKey(fnName) || fnName.includes('.') || !allowedFns.has(fnName)) {
+          return;
+        }
+
+        const ctx = rootWindow || (typeof window !== 'undefined' ? window : globalThis);
+        if (!ctx || !Object.prototype.hasOwnProperty.call(ctx, fnName)) return;
+        const fn = ctx[fnName];
+        if (typeof fn !== 'function') return;
+
+        let args = [];
+        const rawArgs = el.getAttribute('data-ep-onclick-args');
+        if (rawArgs) {
+          try {
+            const parsed = JSON.parse(rawArgs);
+            if (!Array.isArray(parsed)) return;
+            args = parsed;
+          } catch {
+            return;
+          }
+        }
+        fn.apply(ctx, args);
+      };
+    }
+
+    function initClickDelegate(doc = document, win = window, allowedFns = ALLOWED_DELEGATE_FNS) {
+      if (!doc || typeof doc.addEventListener !== 'function' || doc.__epOnclickBound) return;
+      doc.__epOnclickBound = true;
+      doc.addEventListener('click', createClickDelegate(win, allowedFns));
+    }
+    // --- src/core/room.js ---
+    class RoomSubscriptionManager {
+      constructor() {
+        this._unsubscribe = null;
+      }
+
+      replace(nextUnsubscribe) {
+        this.clear();
+        this._unsubscribe = typeof nextUnsubscribe === 'function' ? nextUnsubscribe : null;
+      }
+
+      clear() {
+        if (typeof this._unsubscribe === 'function') {
+          try {
+            this._unsubscribe();
+          } catch {
+            // Ignore teardown errors from closed connections
+          }
+        }
+        this._unsubscribe = null;
+      }
+
+      isActive() {
+        return typeof this._unsubscribe === 'function';
+      }
+    }
+
+    function generateFourDigitCode(rng = Math.random) {
+      return String(1000 + Math.floor(rng() * 9000));
+    }
+
+    function withTimeout(promise, timeoutMs, message) {
+      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+      let timer = null;
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(message || '서버 응답 시간이 초과되었습니다. 네트워크를 확인 후 다시 시도해주세요.'));
+        }, timeoutMs);
+      });
+      return Promise.race([promise, timeoutPromise]).finally(() => {
+        if (timer !== null) clearTimeout(timer);
+      });
+    }
+
+    async function createUniqueRoomCode({
+      generateCode = generateFourDigitCode,
+      runRoomTransaction,
+      checkRoomExists,
+      writeRoom,
+      payload,
+      maxAttempts = 12,
+      timeoutMs = 8000
+    }) {
+      let useFallback = typeof runRoomTransaction !== 'function';
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const candidate = String(generateCode());
+
+        if (!useFallback) {
+          try {
+            const result = await withTimeout(
+              runRoomTransaction(candidate, (existing) => {
+                if (existing != null) return undefined;
+                return payload;
+              }),
+              timeoutMs,
+              '방 생성 요청 시간이 초과되었습니다. 네트워크를 확인 후 다시 시도해주세요.'
+            );
+            if (result && result.committed) {
+              return candidate;
+            }
+            continue;
+          } catch (err) {
+            if (typeof checkRoomExists === 'function' && typeof writeRoom === 'function') {
+              useFallback = true;
+            } else {
+              throw err;
+            }
+          }
+        }
+
+        if (useFallback && typeof checkRoomExists === 'function' && typeof writeRoom === 'function') {
+          const exists = await withTimeout(
+            checkRoomExists(candidate),
+            timeoutMs,
+            '방 코드 확인 시간이 초과되었습니다. 네트워크를 확인 후 다시 시도해주세요.'
+          );
+          if (!exists) {
+            await withTimeout(
+              writeRoom(candidate, payload),
+              timeoutMs,
+              '방 저장 시간이 초과되었습니다. 네트워크를 확인 후 다시 시도해주세요.'
+            );
+            return candidate;
+          }
+        }
+      }
+
+      throw new Error('사용 가능한 방 코드를 찾지 못했습니다. 잠시 후 다시 시도해주세요.');
+    }
+
+    let createRoomInFlight = false;
+    let joinRoomInFlight = false;
+
+    async function createRoomSafely({
+      nickname,
+      myId,
+      generateCode = generateFourDigitCode,
+      runRoomTransaction,
+      checkRoomExists,
+      writeRoom,
+      maxAttempts = 12,
+      timeoutMs = 8000,
+      onError
+    }) {
+      if (createRoomInFlight) return null;
+      createRoomInFlight = true;
+      try {
+        const payload = {
+          status: 'waiting',
+          hostId: myId,
+          selectedGame: 'liar',
+          players: { [myId]: { nickname, isHost: true } }
+        };
+        return await createUniqueRoomCode({
+          generateCode,
+          runRoomTransaction,
+          checkRoomExists,
+          writeRoom,
+          payload,
+          maxAttempts,
+          timeoutMs
+        });
+      } catch (err) {
+        if (typeof onError === 'function') onError(err);
+        return null;
+      } finally {
+        createRoomInFlight = false;
+      }
+    }
+
+    async function joinRoomSafely({
+      roomCode,
+      nickname,
+      myId,
+      getRoom,
+      writePlayer,
+      timeoutMs = 8000,
+      onError
+    }) {
+      if (joinRoomInFlight) return { joined: false, reason: 'busy' };
+      joinRoomInFlight = true;
+      try {
+        const snap = await withTimeout(
+          getRoom(roomCode),
+          timeoutMs,
+          '방 정보를 불러오는 시간이 초과되었습니다. 네트워크를 확인해주세요.'
+        );
+        if (!snap || !snap.exists) {
+          return { joined: false, reason: 'not_found' };
+        }
+        const roomVal = snap.val || {};
+        const isHost = roomVal.hostId === myId;
+        await withTimeout(
+          writePlayer(roomCode, myId, { nickname, isHost }),
+          timeoutMs,
+          '방 참여 요청 시간이 초과되었습니다. 네트워크를 확인해주세요.'
+        );
+        return { joined: true, isHost };
+      } catch (err) {
+        if (typeof onError === 'function') onError(err);
+        return { joined: false, reason: 'error', error: err };
+      } finally {
+        joinRoomInFlight = false;
+      }
+    }
+    // --- src/core/login-controller.js ---
+    function onDomReady(callback, doc = document) {
+      if (typeof callback !== 'function' || !doc) return;
+      if (doc.readyState && doc.readyState !== 'loading') {
+        callback();
+        return;
+      }
+      doc.addEventListener('DOMContentLoaded', callback, { once: true });
+    }
+
+    function bindLoginControls({
+      doc = document,
+      createRoom,
+      joinRoom,
+      onRoomEntered,
+      alertFn = (msg) => alert(msg)
+    }) {
+      const joinBox = doc.getElementById('join-mode-box');
+      const createBox = doc.getElementById('create-mode-box');
+      const linkToCreate = doc.getElementById('link-to-create');
+      const linkToJoin = doc.getElementById('link-to-join');
+      const nicknameInput = doc.getElementById('nickname-input');
+      const roomCodeInput = doc.getElementById('room-code-input');
+      const createBtn = doc.getElementById('btn-create-room');
+      const joinBtn = doc.getElementById('btn-join-room');
+
+      if (linkToCreate && joinBox && createBox) {
+        linkToCreate.addEventListener('click', () => {
+          joinBox.style.display = 'none';
+          createBox.style.display = 'block';
+        });
+      }
+
+      if (linkToJoin && joinBox && createBox) {
+        linkToJoin.addEventListener('click', () => {
+          createBox.style.display = 'none';
+          joinBox.style.display = 'block';
+        });
+      }
+
+      if (createBtn && nicknameInput) {
+        createBtn.addEventListener('click', async () => {
+          if (createBtn.disabled) return;
+          const nickname = nicknameInput.value.trim();
+          if (!nickname) {
+            alertFn('닉네임을 입력해주세요!');
+            return;
+          }
+          const prevText = createBtn.textContent;
+          createBtn.disabled = true;
+          createBtn.textContent = '방 생성 중...';
+          try {
+            const roomCode = await createRoom(nickname);
+            if (roomCode && typeof onRoomEntered === 'function') {
+              onRoomEntered({ roomCode, nickname, isHost: true });
+            }
+          } finally {
+            createBtn.disabled = false;
+            createBtn.textContent = prevText;
+          }
+        });
+      }
+
+      if (joinBtn && nicknameInput && roomCodeInput) {
+        joinBtn.addEventListener('click', async () => {
+          if (joinBtn.disabled) return;
+          const nickname = nicknameInput.value.trim();
+          const roomCode = roomCodeInput.value.trim();
+          if (!nickname || !roomCode) {
+            alertFn('입력 값을 확인해주세요!');
+            return;
+          }
+          const prevText = joinBtn.textContent;
+          joinBtn.disabled = true;
+          joinBtn.textContent = '참여 중...';
+          try {
+            const result = await joinRoom(roomCode, nickname);
+            if (result && result.joined && typeof onRoomEntered === 'function') {
+              onRoomEntered({ roomCode, nickname, isHost: !!result.isHost });
+            }
+          } finally {
+            joinBtn.disabled = false;
+            joinBtn.textContent = prevText;
+          }
+        });
+      }
+    }
+    // --- src/utils/audio.js ---
+    function playTierSound(funState, tier, AudioContextCtor) {
+      if (!funState || funState.muted) return;
+      try {
+        const AC =
+          AudioContextCtor ||
+          (typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext));
+        if (!funState.audioCtx) {
+          if (!AC) return;
+          funState.audioCtx = new AC();
+        }
+        const ctx = funState.audioCtx;
+        if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+          const resumed = ctx.resume();
+          if (resumed && typeof resumed.catch === 'function') resumed.catch(() => {});
+        }
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = tier === 'perfect' ? 880 : tier === 'good' ? 660 : 180;
+        osc.type = tier === 'miss' ? 'sawtooth' : 'sine';
+        gain.gain.value = 0.08;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      } catch {
+        // Ignore Web Audio failures in unsupported or locked environments
+      }
+    }
+    // --- src/utils/random.js ---
+    function shuffleArray(arr, rng = Math.random) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function generateShortId(prefix = 'id_', rng = Math.random) {
+      return prefix + rng().toString(36).slice(2, 11);
+    }
+    // --- src/games/bingo.js ---
+    function applyBingoCall(roomData, num, myId) {
+      if (!roomData || roomData.selectedGame !== 'bingo' || roomData.status !== 'playing') {
+        return undefined;
+      }
+      const called = roomData.bingoCalled || {};
+      if (called[num]) return undefined;
+
+      const turnOrder =
+        roomData.bingoTurnOrder && roomData.bingoTurnOrder.length
+          ? roomData.bingoTurnOrder
+          : Object.keys(roomData.players || {});
+      if (turnOrder.length === 0) return undefined;
+
+      const turnIdx = (roomData.bingoTurnIdx || 0) % turnOrder.length;
+      if (turnOrder[turnIdx] !== myId) return undefined;
+
+      called[num] = true;
+      roomData.bingoCalled = called;
+      roomData.bingoTurnIdx = (turnIdx + 1) % turnOrder.length;
+      return roomData;
+    }
+    // --- src/games/baseball.js ---
+    function buildBaseballInitState(pIds, maxInnings, rng = Math.random) {
+      const shuffled = shuffleArray(pIds, rng);
+      const teamA = [];
+      const teamB = [];
+      shuffled.forEach((pid, idx) => (idx % 2 === 0 ? teamA : teamB).push(pid));
+      if (teamB.length === 0 && teamA.length > 0) teamB.push(teamA[0]);
+      return {
+        maxInnings: maxInnings || 3,
+        teamA,
+        teamB,
+        batterIdxA: 0,
+        batterIdxB: 0,
+        pitcherIdxA: 0,
+        pitcherIdxB: 0,
+        inning: 1,
+        half: 'top',
+        scoresA: [0],
+        scoresB: [],
+        balls: 0,
+        strikes: 0,
+        outs: 0,
+        bases: [false, false, false],
+        pending: {},
+        seq: 0,
+        lastPlay: '경기 시작! 투수와 타자가 코스를 선택하세요.',
+        logs: ['⚾ 종이야구 술자리 팀전 시작!'],
+        winnerTeam: null,
+        loserId: null
+      };
+    }
+
+    function getBaseballRoles(st) {
+      const attTeam = st.half === 'top' ? st.teamA || [] : st.teamB || [];
+      const defTeam = st.half === 'top' ? st.teamB || [] : st.teamA || [];
+      const bIdx = st.half === 'top' ? st.batterIdxA || 0 : st.batterIdxB || 0;
+      const pIdx = st.half === 'top' ? st.pitcherIdxB || 0 : st.pitcherIdxA || 0;
+      return {
+        batterId: attTeam[bIdx % Math.max(1, attTeam.length)],
+        pitcherId: defTeam[pIdx % Math.max(1, defTeam.length)]
+      };
+    }
+
+    function sumScores(arr) {
+      return (arr || []).reduce((acc, v) => acc + (v || 0), 0);
+    }
+
+    function finishBaseballGame(roomData, st, sA, sB, walkOff = false) {
+      st.winnerTeam = sA > sB ? 'A' : sB > sA ? 'B' : 'DRAW';
+      if (st.winnerTeam === 'DRAW') {
+        st.loserId = null;
+        roomData.roomLastLoserId = null;
+        roomData.roomLoserPendingChoice = false;
+        st.lastPlay = `🤝 무승부 경기 종료! 청팀 ${sA} : ${sB} 백팀`;
+      } else {
+        const loseTeam = st.winnerTeam === 'A' ? st.teamB : st.teamA;
+        st.loserId = (loseTeam && loseTeam[0]) || null;
+        roomData.roomLastLoserId = st.loserId;
+        roomData.roomLoserPendingChoice = !!st.loserId;
+        st.lastPlay = walkOff
+          ? `🎉 끝내기 승리! 경기 종료! 청팀 ${sA} : ${sB} 백팀`
+          : `🏆 경기 종료! 청팀 ${sA} : ${sB} 백팀`;
+      }
+      st.logs.unshift(st.lastPlay);
+    }
+
+    function resolveBaseballPitch(roomData, st, rng = Math.random) {
+      const p = st.pending.pitcher;
+      const b = st.pending.batter;
+      const px = p.zone % 3;
+      const py = Math.floor(p.zone / 3);
+      const bx = b.zone % 3;
+      const by = Math.floor(b.zone / 3);
+      const dist = Math.abs(px - bx) + Math.abs(py - by);
+      const isBall = p.option === 'ball';
+      st.bases = st.bases || [false, false, false];
+      st.scoresA = st.scoresA || [0];
+      st.scoresB = st.scoresB || [];
+      st.logs = st.logs || [];
+
+      const maxInn = st.maxInnings || 3;
+
+      const addRun = (n) => {
+        if (n <= 0) return;
+        const arr = st.half === 'top' ? st.scoresA : st.scoresB;
+        const idx = st.inning - 1;
+        arr[idx] = (arr[idx] || 0) + n;
+      };
+
+      const advance = (cnt, isWalk = false) => {
+        let runs = 0;
+        if (isWalk) {
+          if (st.bases[0] && st.bases[1] && st.bases[2]) runs++;
+          if (st.bases[0] && st.bases[1]) st.bases[2] = true;
+          if (st.bases[0]) st.bases[1] = true;
+          st.bases[0] = true;
+        } else {
+          for (let i = 2; i >= 0; i--) {
+            if (st.bases[i]) {
+              st.bases[i] = false;
+              if (i + cnt >= 3) runs++;
+              else st.bases[i + cnt] = true;
+            }
+          }
+          if (cnt >= 4) runs++;
+          else st.bases[cnt - 1] = true;
+        }
+        addRun(runs);
+        return runs;
+      };
+
+      const checkWalkOff = () => {
+        if (st.half !== 'bottom' || st.inning < maxInn) return false;
+        const sA = sumScores(st.scoresA);
+        const sB = sumScores(st.scoresB);
+        if (sB > sA) {
+          finishBaseballGame(roomData, st, sA, sB, true);
+          return true;
+        }
+        return false;
+      };
+
+      const nextBatter = () => {
+        if (st.half === 'top') st.batterIdxA = (st.batterIdxA || 0) + 1;
+        else st.batterIdxB = (st.batterIdxB || 0) + 1;
+      };
+
+      const recordOut = (msg) => {
+        st.outs = (st.outs || 0) + 1;
+        st.balls = 0;
+        st.strikes = 0;
+        nextBatter();
+        st.lastPlay = `${msg} (${st.outs}아웃)`;
+        st.logs.unshift(`❌ ${st.lastPlay}`);
+        if (st.outs >= 3) {
+          st.outs = 0;
+          st.bases = [false, false, false];
+          const sA = sumScores(st.scoresA);
+          const sB = sumScores(st.scoresB);
+          if (st.half === 'top') {
+            if (st.inning >= maxInn && sB > sA) {
+              finishBaseballGame(roomData, st, sA, sB, false);
+              return;
+            }
+            st.half = 'bottom';
+            st.scoresB[st.inning - 1] = 0;
+            st.pitcherIdxA = (st.pitcherIdxA || 0) + 1;
+            st.logs.unshift(`🔄 공수 교대! ${st.inning}회말 시작`);
+          } else if (st.inning >= maxInn) {
+            finishBaseballGame(roomData, st, sA, sB, false);
+          } else {
+            st.inning += 1;
+            st.half = 'top';
+            st.scoresA[st.inning - 1] = 0;
+            st.pitcherIdxB = (st.pitcherIdxB || 0) + 1;
+            st.logs.unshift(`🔄 공수 교대! ${st.inning}회초 시작`);
+          }
+        }
+      };
+
+      if (b.option === 'take') {
+        if (isBall || rng() < 0.35) {
+          st.balls = (st.balls || 0) + 1;
+          if (st.balls >= 4) {
+            const r = advance(1, true);
+            st.balls = 0;
+            st.strikes = 0;
+            nextBatter();
+            st.lastPlay = `🚶 볼넷 출루!${r ? ` (+${r}득점)` : ''}`;
+            st.logs.unshift(st.lastPlay);
+            checkWalkOff();
+          } else {
+            st.lastPlay = `🟢 볼! (${st.balls}B)`;
+            st.logs.unshift(st.lastPlay);
+          }
+        } else {
+          st.strikes = (st.strikes || 0) + 1;
+          if (st.strikes >= 3) recordOut('루킹 삼진 아웃');
+          else {
+            st.lastPlay = `🟡 스트라이크! (${st.strikes}S)`;
+            st.logs.unshift(st.lastPlay);
+          }
+        }
+      } else if (isBall && dist > 0) {
+        st.strikes = (st.strikes || 0) + 1;
+        if (st.strikes >= 3) recordOut('헛스윙 삼진 아웃');
+        else {
+          st.lastPlay = `💨 유인구 헛스윙! (${st.strikes}S)`;
+          st.logs.unshift(st.lastPlay);
+        }
+      } else if (dist === 0) {
+        const roll = rng();
+        let bases = 1;
+        let txt = '👏 중전 안타!';
+        if (b.option === 'power') {
+          if (roll < 0.45) {
+            bases = 4;
+            txt = '💥 초대형 홈런!!';
+          } else if (roll < 0.8) {
+            bases = 2;
+            txt = '🔥 2루타!';
+          } else {
+            bases = 3;
+            txt = '⚡ 3루타!';
+          }
+        } else {
+          if (roll < 0.2) {
+            bases = 4;
+            txt = '💥 홈런!!';
+          } else if (roll < 0.55) {
+            bases = 2;
+            txt = '🔥 2루타!';
+          }
+        }
+        const r = advance(bases);
+        st.balls = 0;
+        st.strikes = 0;
+        nextBatter();
+        st.lastPlay = `${txt}${r ? ` (+${r}득점!)` : ''}`;
+        st.logs.unshift(st.lastPlay);
+        checkWalkOff();
+      } else if (dist === 1) {
+        const roll = rng();
+        if (b.option === 'contact' && roll < 0.5) {
+          const r = advance(1);
+          st.balls = 0;
+          st.strikes = 0;
+          nextBatter();
+          st.lastPlay = `👏 빗맞은 안타!${r ? ` (+${r}득점)` : ''}`;
+          st.logs.unshift(st.lastPlay);
+          checkWalkOff();
+        } else if (roll < 0.78) {
+          if ((st.strikes || 0) < 2) st.strikes = (st.strikes || 0) + 1;
+          st.lastPlay = `⚾ 파울! (${st.strikes}S)`;
+          st.logs.unshift(st.lastPlay);
+        } else {
+          recordOut('내야 땅볼/뜬공 아웃');
+        }
+      } else {
+        if (rng() < 0.35) recordOut('외야 플라이 아웃');
+        else {
+          st.strikes = (st.strikes || 0) + 1;
+          if (st.strikes >= 3) recordOut('헛스윙 삼진 아웃');
+          else {
+            st.lastPlay = `💨 코스 불일치 헛스윙! (${st.strikes}S)`;
+            st.logs.unshift(st.lastPlay);
+          }
+        }
+      }
+
+      st.pending = {};
+      st.seq = (st.seq || 0) + 1;
+      if (st.logs.length > 25) st.logs = st.logs.slice(0, 25);
+    }
+    // --- src/games/rummikub.js ---
+    const RUMMI_COLORS = ['red', 'blue', 'orange', 'black'];
+
+    function createRummiDeck(rng = Math.random) {
+      const deck = [];
+      let uid = 1;
+      for (let c = 0; c < 2; c++) {
+        for (const color of RUMMI_COLORS) {
+          for (let num = 1; num <= 13; num++) {
+            deck.push({ id: uid++, color, num, joker: false });
+          }
+        }
+      }
+      deck.push({ id: uid++, color: 'joker', num: 0, joker: true });
+      deck.push({ id: uid++, color: 'joker', num: 0, joker: true });
+      return shuffleArray(deck, rng);
+    }
+
+    function evaluateRummiMeld(tiles) {
+      if (!tiles || tiles.length < 3) return { valid: false, points: 0, sorted: tiles };
+      const jokers = tiles.filter((t) => t.joker);
+      const normals = tiles.filter((t) => !t.joker);
+      if (normals.length === 0) return { valid: false, points: 0, sorted: tiles };
+
+      if (tiles.length <= 4) {
+        const n = normals[0].num;
+        const colors = new Set(normals.map((t) => t.color));
+        if (normals.every((t) => t.num === n) && colors.size === normals.length) {
+          return {
+            valid: true,
+            points: n * tiles.length,
+            sorted: [
+              ...normals.sort((a, b) => RUMMI_COLORS.indexOf(a.color) - RUMMI_COLORS.indexOf(b.color)),
+              ...jokers
+            ]
+          };
+        }
+      }
+
+      const col = normals[0].color;
+      if (normals.every((t) => t.color === col)) {
+        const sn = [...normals].sort((a, b) => a.num - b.num);
+        for (let i = 1; i < sn.length; i++) {
+          if (sn[i].num === sn[i - 1].num) return { valid: false, points: 0, sorted: tiles };
+        }
+        let gaps = 0;
+        for (let i = 1; i < sn.length; i++) gaps += sn[i].num - sn[i - 1].num - 1;
+        if (gaps <= jokers.length && tiles.length <= 13) {
+          const extra = jokers.length - gaps;
+          const highAdd = Math.min(extra, 13 - sn[sn.length - 1].num);
+          const lowAdd = extra - highAdd;
+          const start = sn[0].num - lowAdd;
+          if (start >= 1) {
+            let pts = 0;
+            let ji = 0;
+            let ni = 0;
+            const arranged = [];
+            for (let v = start; v < start + tiles.length; v++) {
+              pts += v;
+              if (ni < sn.length && sn[ni].num === v) arranged.push(sn[ni++]);
+              else arranged.push(jokers[ji++]);
+            }
+            return { valid: true, points: pts, sorted: arranged };
+          }
+        }
+      }
+
+      return { valid: false, points: 0, sorted: tiles };
+    }
+
+    function buildRummikubInitState(pIds, minMeld, rng = Math.random) {
+      const deck = createRummiDeck(rng);
+      const perPlayer = Math.min(14, Math.floor((deck.length - 10) / Math.max(1, pIds.length)));
+      const hands = {};
+      const melded = {};
+      pIds.forEach((pid) => {
+        const h = [];
+        for (let k = 0; k < perPlayer; k++) h.push(deck.pop());
+        h.sort((a, b) => RUMMI_COLORS.indexOf(a.color) - RUMMI_COLORS.indexOf(b.color) || a.num - b.num);
+        hands[pid] = h;
+        melded[pid] = false;
+      });
+      return {
+        deck,
+        board: [],
+        hands,
+        melded,
+        turnOrder: pIds,
+        turnIdx: 0,
+        turnSeq: 0,
+        consecutivePasses: 0,
+        minMeld: minMeld || 30,
+        winnerId: null,
+        loserId: null
+      };
+    }
+
+    function calcRummiHandPenalty(hand) {
+      return (hand || []).reduce((sum, t) => sum + (t.joker ? 30 : t.num), 0);
+    }
+
+    function canActOnRummiTurn(st, myId) {
+      if (!st || st.winnerId) return false;
+      const order = st.turnOrder || [];
+      return order[st.turnIdx || 0] === myId;
+    }
+
+    function checkRummiLateMeldEnd(roomData, st, order, triggerId) {
+      if (st.winnerId) return false;
+      if (!order || order.length < 2) return false;
+      // 모든 참가자가 최소 한 번씩은 턴을 받은 뒤에만 최초 등록 꼴찌 조기 종료를 적용
+      if ((st.turnSeq || 0) < order.length) return false;
+      const unmelded = order.filter((pid) => !(st.melded && st.melded[pid]));
+      if (unmelded.length !== 1) return false;
+      st.winnerId = triggerId;
+      st.loserId = unmelded[0];
+      st.endReason = 'lateMeld';
+      roomData.roomLastLoserId = unmelded[0];
+      roomData.roomLoserPendingChoice = true;
+      return true;
+    }
+
+    function applyRummiDrawPass(roomData, actorId) {
+      const st = roomData?.rummikubState;
+      if (!st || st.winnerId) return undefined;
+      const order = st.turnOrder || [];
+      if (order.length === 0 || order[st.turnIdx || 0] !== actorId) return undefined;
+
+      st.deck = st.deck || [];
+      st.hands = st.hands || {};
+      st.hands[actorId] = st.hands[actorId] || [];
+
+      if (st.deck.length > 0) {
+        st.hands[actorId].push(st.deck.pop());
+        st.consecutivePasses = 0;
+      } else {
+        st.consecutivePasses = (st.consecutivePasses || 0) + 1;
+        if (st.consecutivePasses >= order.length) {
+          let minPen = Infinity;
+          let maxPen = -1;
+          let winner = order[0];
+          let loser = order[0];
+          order.forEach((pid) => {
+            const pen = calcRummiHandPenalty(st.hands[pid]);
+            if (pen < minPen) {
+              minPen = pen;
+              winner = pid;
+            }
+            if (pen > maxPen) {
+              maxPen = pen;
+              loser = pid;
+            }
+          });
+          st.winnerId = winner;
+          st.loserId = loser;
+          st.endReason = 'deckEmpty';
+          roomData.roomLastLoserId = loser;
+          roomData.roomLoserPendingChoice = true;
+          st.turnSeq = (st.turnSeq || 0) + 1;
+          return roomData;
+        }
+      }
+
+      st.turnIdx = ((st.turnIdx || 0) + 1) % order.length;
+      st.turnSeq = (st.turnSeq || 0) + 1;
+      return roomData;
+    }
+    const __epEscapeAttr = escapeAttr;
+    const __epSanitizeHtml = sanitizeHtml;
+    /* INLINED-LOCAL-MODULES-END */
 
     initClickDelegate(document, window);
     window.__partyAppBooted = true;

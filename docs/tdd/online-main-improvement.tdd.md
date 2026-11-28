@@ -136,3 +136,18 @@ All files     |   97.61 |    80.76 |     100 |   97.61
   - `index.html`, `sw.js`: `onDomReady`/`bindLoginControls` 연동, `window.__partyAppBooted` + `file://` CORS 경고 배너/클릭 안내 추가, `sw.js`에 `./src/core/login-controller.js` 프리캐시 등록
   - Validation command: `npm run test:coverage` (14 test files / 59 tests PASS, 80%+ 전 항목 통과)
 
+---
+
+## 8. Follow-up Feature TDD Cycle: `file://` 직접 열기 지원 (Standalone 인라인 번들)
+- **Requirement**: `src/` 모듈 구조와 단위 테스트(커버리지 80%+)를 유지하면서, 탐색기에서 `index.html`을 `file://`로 직접 더블클릭해 열어도 CORS 차단 없이 방 생성·게임이 정상 동작해야 함.
+- **RED Checkpoint** (`391fa84`, `npm test -- tests/unit/build-standalone.test.js tests/integration/standalone-file-protocol.test.js`):
+  - `tests/unit/build-standalone.test.js`: failed to resolve `scripts/build-standalone.mjs`
+  - `tests/integration/standalone-file-protocol.test.js`: 2/2 failed (`index.html`에 상대 경로 `./src/...` import 잔존)
+- **GREEN Fix & Verification**:
+  - `src/index.template.html`: 모듈형 원본 템플릿으로 분리
+  - `scripts/build-standalone.mjs` (`npm run build`): 위상 정렬 순서로 로컬 `./src/**/*.js` 모듈을 `index.html`에 인라인 번들링 (HTTPS Firebase CDN import만 유지, 상대 경로 import 0건)
+  - `sw.js`: 캐시 `party-games-shell-v4` 갱신 및 앱 셸 자산 정합화
+  - `tests/integration/standalone-file-protocol.test.js`: `file://` URL + `localStorage` `SecurityError` 환경 + 로컬 Mock Firebase로 실제 부트 → 방장 전환 → 방 생성 → 로비 진입(4자리 코드 표시)까지 통과 검증
+  - Validation command: `npm run build && npm run test:coverage` (**16 test files / 62 tests PASS**, Statements 98.00% / Branches 81.10% / Functions 97.72% / Lines 98.00%)
+
+

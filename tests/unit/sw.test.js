@@ -40,7 +40,7 @@ function createSwHarness({ fetchImpl, initialCache = {}, oldCacheKeys = [] } = {
     },
     caches: {
       open: vi.fn(async () => mockCache),
-      keys: vi.fn(async () => [...oldCacheKeys, 'party-games-shell-v3']),
+      keys: vi.fn(async () => [...oldCacheKeys, 'party-games-shell-v4']),
       delete: vi.fn(async (k) => { deletedCaches.push(k); return true; }),
       match: vi.fn(async (req) => {
         const key = typeof req === 'string' ? req : req.url;

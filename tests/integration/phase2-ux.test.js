@@ -50,7 +50,9 @@ describe('Phase 2 UX and browser compatibility fixes', () => {
     expect(fire(plainDiv)).toBe(true);
   });
 
-  it('imports playTierSound from src/utils/audio.js in index.html', () => {
-    expect(html).toMatch(/from\s+['"]\.\/src\/utils\/audio\.js['"]/);
+  it('imports playTierSound from src/utils/audio.js in template and bundles it into index.html', () => {
+    const templateHtml = fs.readFileSync(path.resolve(process.cwd(), 'src', 'index.template.html'), 'utf8');
+    expect(templateHtml).toMatch(/from\s+['"]\.\/src\/utils\/audio\.js['"]/);
+    expect(html).toContain('function playTierSound(');
   });
 });

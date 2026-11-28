@@ -3,19 +3,11 @@
 // 오프라인 앱 셸 폴백(네트워크 우선 + 캐시 폴백)을 함께 제공합니다.
 
 const CACHE_PREFIX = 'party-games-shell-';
-const CACHE_NAME = `${CACHE_PREFIX}v3`;
+const CACHE_NAME = `${CACHE_PREFIX}v4`;
 const APP_SHELL_ASSETS = [
     './',
     './index.html',
-    './manifest.json',
-    './src/utils/sanitize.js',
-    './src/utils/audio.js',
-    './src/utils/random.js',
-    './src/core/room.js',
-    './src/core/login-controller.js',
-    './src/games/baseball.js',
-    './src/games/rummikub.js',
-    './src/games/bingo.js'
+    './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {

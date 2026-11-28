@@ -120,8 +120,10 @@ describe('host create-room UI flow and boot resilience (local mocks only)', () =
     });
   });
 
-  it('index.html uses login-controller and includes a classic file:// CORS notice guard', () => {
-    expect(html).toMatch(/from\s+['"]\.\/src\/core\/login-controller\.js['"]/);
+  it('index.html uses login-controller and includes a classic file:// fallback notice guard', () => {
+    const templateHtml = fs.readFileSync(path.resolve(process.cwd(), 'src', 'index.template.html'), 'utf8');
+    expect(templateHtml).toMatch(/from\s+['"]\.\/src\/core\/login-controller\.js['"]/);
+    expect(html).toContain('function bindLoginControls(');
     expect(html).toContain('window.__partyAppBooted = true');
     expect(html).toContain('file-protocol-warning');
 

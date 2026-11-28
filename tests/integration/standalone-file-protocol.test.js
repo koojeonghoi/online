@@ -94,7 +94,11 @@ describe('standalone index.html file:// direct-open compatibility (local mocks o
 
     globalThis.window = dom.window;
     globalThis.document = dom.window.document;
-    globalThis.localStorage = dom.window.localStorage;
+    // On file:// opaque origins, accessing localStorage throws SecurityError; simulate that cleanly
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() { throw new DOMException('localStorage is not available for opaque origins', 'SecurityError'); }
+    });
     globalThis.DOMParser = dom.window.DOMParser;
     globalThis.history = dom.window.history;
     globalThis.alert = () => {};
@@ -122,7 +126,18 @@ describe('standalone index.html file:// direct-open compatibility (local mocks o
     } finally {
       createdIntervals.forEach((id) => clearInterval(id));
       globalThis.setInterval = origSetInterval;
-      Object.assign(globalThis, prevGlobals);
+      Object.defineProperty(globalThis, 'localStorage', {
+        configurable: true,
+        writable: true,
+        value: prevGlobals.localStorage
+      });
+      globalThis.window = prevGlobals.window;
+      globalThis.document = prevGlobals.document;
+      globalThis.DOMParser = prevGlobals.DOMParser;
+      globalThis.history = prevGlobals.history;
+      globalThis.alert = prevGlobals.alert;
+      globalThis.confirm = prevGlobals.confirm;
+      globalThis.CSS = prevGlobals.CSS;
       fs.unlinkSync(tmpMod);
     }
   });
