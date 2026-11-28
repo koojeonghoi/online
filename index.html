@@ -1564,135 +1564,20 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, set, onValue, update, get, runTransaction, remove, goOffline, goOnline, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import {
+        escapeHtml,
+        escapeAttr as __epEscapeAttr,
+        sanitizeHtml as __epSanitizeHtml,
+        initClickDelegate
+    } from './src/utils/sanitize.js';
+    import {
+        RoomSubscriptionManager,
+        createRoomSafely,
+        joinRoomSafely
+    } from './src/core/room.js';
 
-    function __epSanitizeHtml(html) {
-      if (html == null) return "";
-      var str = String(html);
-      var badTags = /^(script|iframe|object|embed)$/i;
-      var urlAttrs = { href: 1, src: 1, "xlink:href": 1, action: 1, formaction: 1, poster: 1, data: 1 };
-      var isBadUrl = function (val) {
-        var norm = String(val).replace(/[\u0000-\u0020]+/g, "").toLowerCase();
-        if (norm.indexOf("javascript:") === 0 || norm.indexOf("vbscript:") === 0) return true;
-        if (norm.indexOf("data:") === 0 && norm.indexOf("data:image/") !== 0) return true;
-        return false;
-      };
-      var stripRegex = function (input) {
-        return String(input == null ? "" : input)
-          .replace(/<\s*(script|iframe|object|embed)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
-          .replace(/<\s*\/?\s*(script|iframe|object|embed)\b[^>]*\/?>/gi, "")
-          .replace(/\s+(?:on[a-z]+|srcdoc)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-          .replace(/\s+(href|src|xlink:href|action|formaction|poster|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi, function (m, a, dq, sq, uq) {
-            var v = dq != null ? dq : (sq != null ? sq : uq);
-            return isBadUrl(v) ? "" : m;
-          });
-      };
-      var preCleaned = stripRegex(str);
-      if (typeof DOMParser !== "undefined") {
-        try {
-          var payload = preCleaned;
-          if (typeof trustedTypes !== "undefined" && typeof trustedTypes.createPolicy === "function") {
-            if (typeof __epSanitizeHtml._policy === "undefined") {
-              try {
-                __epSanitizeHtml._policy = trustedTypes.createPolicy("ep-sanitize-html", {
-                  createHTML: function (input) { return stripRegex(input); }
-                });
-              } catch (policyErr) {
-                __epSanitizeHtml._policy = null;
-              }
-            }
-            if (__epSanitizeHtml._policy && typeof __epSanitizeHtml._policy.createHTML === "function") {
-              payload = __epSanitizeHtml._policy.createHTML(preCleaned);
-            }
-          }
-          var doc = new DOMParser().parseFromString(payload, "text/html");
-          if (doc && doc.body) {
-            var walk = function (root) {
-              var nodes = Array.prototype.slice.call(root.childNodes || []);
-              for (var i = 0; i < nodes.length; i++) {
-                var node = nodes[i];
-                if (node && node.nodeType === 1) {
-                  var tag = String(node.tagName || "").toLowerCase();
-                  if (badTags.test(tag)) {
-                    if (node.parentNode) node.parentNode.removeChild(node);
-                    continue;
-                  }
-                  var attrs = Array.prototype.slice.call(node.attributes || []);
-                  for (var j = 0; j < attrs.length; j++) {
-                    var name = String(attrs[j].name || "").toLowerCase();
-                    var val = attrs[j].value;
-                    if (name.indexOf("on") === 0 || name === "srcdoc") {
-                      node.removeAttribute(attrs[j].name);
-                    } else if (Object.prototype.hasOwnProperty.call(urlAttrs, name) && isBadUrl(val)) {
-                      node.removeAttribute(attrs[j].name);
-                    }
-                  }
-                  if (tag === "template" && node.content) {
-                    walk(node.content);
-                  }
-                  walk(node);
-                }
-              }
-            };
-            walk(doc.body);
-            return doc.body.innerHTML;
-          }
-        } catch (parseErr) {
-          // Fall back to regex sanitizer below.
-        }
-      }
-      return preCleaned;
-    }
-
-    function __epEscapeAttr(value) {
-      return String(value == null ? "" : value)
-        .replace(/&/g, "&amp;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
-
-    (function __epInitOnclickDelegate() {
-      if (typeof document === "undefined" || !document || typeof document.addEventListener !== "function" || document.__epOnclickBound) return;
-      document.__epOnclickBound = true;
-      var isBlocked = function (key) {
-        return !key || key === "__proto__" || key === "constructor" || key === "prototype";
-      };
-      document.addEventListener("click", function (event) {
-        var base = event && event.target;
-        if (base && base.nodeType === 3) base = base.parentElement;
-        var el = base && base.closest ? base.closest("[data-ep-onclick-fn]") : null;
-        if (!el) return;
-        var fnPath = el.getAttribute("data-ep-onclick-fn");
-        if (!fnPath) return;
-        var parts = fnPath.split(".");
-        if (parts[0] === "window") parts.shift();
-        if (!parts.length) return;
-        var ctx = typeof window !== "undefined" ? window : globalThis;
-        for (var i = 0; i < parts.length - 1; i++) {
-          var seg = parts[i];
-          if (isBlocked(seg) || ctx == null) return;
-          if (Object.prototype.hasOwnProperty.call(Object.prototype, seg) && !Object.prototype.hasOwnProperty.call(ctx, seg)) return;
-          ctx = ctx[seg];
-        }
-        var leaf = parts[parts.length - 1];
-        if (isBlocked(leaf) || ctx == null) return;
-        if (Object.prototype.hasOwnProperty.call(Object.prototype, leaf) && !Object.prototype.hasOwnProperty.call(ctx, leaf)) return;
-        var fn = ctx[leaf];
-        if (typeof fn !== "function") return;
-        var args = [];
-        var rawArgs = el.getAttribute("data-ep-onclick-args");
-        if (rawArgs) {
-          try {
-            var parsed = JSON.parse(rawArgs);
-            if (Array.isArray(parsed)) args = parsed;
-          } catch (err) {
-            return;
-          }
-        }
-        fn.apply(ctx, args);
-      });
-    })();
+    initClickDelegate(document, window);
+    const roomSubManager = new RoomSubscriptionManager();
     /* STORAGE-START */
     function createSafeSessionStorage() {
         const mem = new Map();
@@ -2549,6 +2434,7 @@
     };
     window.confirmLeaveRoom = async function () {
         leavingRoom = true;
+        roomSubManager.clear();
         try { if (window.funResetRound) window.funResetRound(); } catch (e) {}
         document.getElementById('leave-confirm-modal').style.display = 'none';
         const code = currentRoomCode;
@@ -3796,7 +3682,7 @@
         document.querySelectorAll('.hg-fx').forEach((el) => el.remove());
         const fx = document.createElement('div');
         fx.className = `hg-fx ${cls}`;
-        fx.innerHTML = __epSanitizeHtml(`<div class="hg-fx-emoji">${emoji}</div><div class="hg-fx-title">${title}</div><div class="hg-fx-sub">${sub}</div>`);
+        fx.innerHTML = __epSanitizeHtml(`<div class="hg-fx-emoji">${escapeHtml(emoji)}</div><div class="hg-fx-title">${escapeHtml(title)}</div><div class="hg-fx-sub">${escapeHtml(sub)}</div>`);
         document.body.appendChild(fx);
         setTimeout(() => fx.remove(), ms);
         if (cls === 'drink') {
@@ -5334,52 +5220,73 @@
         document.getElementById('global-image-modal').style.display = 'none';
     });
 
-    document.getElementById('btn-create-room').addEventListener('click', () => {
+    document.getElementById('btn-create-room').addEventListener('click', async () => {
         const nickname = document.getElementById('nickname-input').value.trim();
-        if(!nickname) return alert('닉네임을 입력해주세요!');
+        if (!nickname) return alert('닉네임을 입력해주세요!');
         try { localStorage.setItem('partyGameNickname', nickname); } catch (e) {}
-        myNickname = nickname; currentRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
-        myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
+        myNickname = nickname;
+        myId = 'player_' + Math.random().toString(36).slice(2, 11);
+        const createdCode = await createRoomSafely({
+            nickname,
+            myId,
+            runRoomTransaction: (code, updater) =>
+                runTransaction(ref(db, `rooms/${code}`), updater, { applyLocally: false }),
+            onError: (err) => {
+                console.error('방 생성 실패:', err);
+                alert(err?.message || '방 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
+            }
+        });
+        if (!createdCode) return;
+        currentRoomCode = createdCode;
         sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
         isHost = true;
-
-        set(ref(db, `rooms/${currentRoomCode}`), {
-            status: 'waiting', hostId: myId, selectedGame: 'liar',
-            players: { [myId]: { nickname: nickname, isHost: true } }
-        }).then(() => {
-            initRoomListener(currentRoomCode); saveActiveRoom(currentRoomCode, nickname); showScreen('lobby-screen');
-            document.getElementById('btn-start-game').style.display = 'block';
-            document.getElementById('wait-message').style.display = 'none';
-        });
+        initRoomListener(currentRoomCode);
+        saveActiveRoom(currentRoomCode, nickname);
+        showScreen('lobby-screen');
+        document.getElementById('btn-start-game').style.display = 'block';
+        document.getElementById('wait-message').style.display = 'none';
     });
 
-    document.getElementById('btn-join-room').addEventListener('click', () => {
+    document.getElementById('btn-join-room').addEventListener('click', async () => {
         const nickname = document.getElementById('nickname-input').value.trim();
         const roomCode = document.getElementById('room-code-input').value.trim();
-        if(!nickname || !roomCode) return alert('입력 값을 확인해주세요!');
+        if (!nickname || !roomCode) return alert('입력 값을 확인해주세요!');
         try { localStorage.setItem('partyGameNickname', nickname); } catch (e) {}
-        myNickname = nickname; currentRoomCode = roomCode;
-        myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).substr(2, 9));
+        myNickname = nickname;
+        currentRoomCode = roomCode;
+        myId = sessionStorage.getItem(`partyGameId_${currentRoomCode}`) || ('player_' + Math.random().toString(36).slice(2, 11));
         sessionStorage.setItem(`partyGameId_${currentRoomCode}`, myId);
         isHost = false;
 
-        get(ref(db, `rooms/${roomCode}`)).then((snapshot) => {
-            if (!snapshot.exists()) return alert('존재하지 않는 방입니다.');
-            const roomVal = snapshot.val() || {};
-            // 새로고침/탭 재접속 등으로 다시 참가하는 경우, 원래 방장이었다면 방장 권한을 잃지 않도록 함
-            const reallyIsHost = roomVal.hostId === myId;
-            isHost = reallyIsHost;
-            set(ref(db, `rooms/${roomCode}/players/${myId}`), { nickname: nickname, isHost: reallyIsHost }).then(() => {
-                initRoomListener(roomCode); saveActiveRoom(roomCode, nickname); showScreen('lobby-screen');
-                document.getElementById('btn-start-game').style.display = reallyIsHost ? 'block' : 'none';
-                document.getElementById('wait-message').style.display = reallyIsHost ? 'none' : 'block';
-            });
+        const result = await joinRoomSafely({
+            roomCode,
+            nickname,
+            myId,
+            getRoom: async (code) => {
+                const snap = await get(ref(db, `rooms/${code}`));
+                return { exists: snap.exists(), val: snap.val() };
+            },
+            writePlayer: (code, pid, playerObj) => set(ref(db, `rooms/${code}/players/${pid}`), playerObj),
+            onError: (err) => {
+                console.error('방 참여 실패:', err);
+                alert('방에 참여하는 중 오류가 발생했습니다. 네트워크를 확인해주세요.');
+            }
         });
+        if (!result.joined) {
+            if (result.reason === 'not_found') alert('존재하지 않는 방입니다.');
+            return;
+        }
+        isHost = result.isHost;
+        initRoomListener(roomCode);
+        saveActiveRoom(roomCode, nickname);
+        showScreen('lobby-screen');
+        document.getElementById('btn-start-game').style.display = isHost ? 'block' : 'none';
+        document.getElementById('wait-message').style.display = isHost ? 'none' : 'block';
     });
 
     function initRoomListener(roomCode) {
         document.getElementById('display-room-code').innerText = roomCode;
-        onValue(ref(db, `rooms/${roomCode}`), (snapshot) => {
+        roomSubManager.replace(onValue(ref(db, `rooms/${roomCode}`), (snapshot) => {
             const data = snapshot.val(); if(!data) return;
             // ⚠️ 방장 여부는 매번 room의 hostId(고정값)를 기준으로 다시 계산함.
             // (탭이 새로고침되거나 참가하기로 재접속하면서 isHost가 false로 초기화되는 걸 방지 —
@@ -5515,8 +5422,8 @@
                 if(data.selectedGame === 'liar') {
                     showScreen('game-liar-screen');
                     const rd = document.getElementById('role-display');
-                    if(data.liarId === myId) { rd.innerHTML = __epSanitizeHtml(`🕵️‍♂️ 당신은 라이어입니다!<br>제시어 카테고리 [${data.category}]`); rd.className = "role-box liar"; }
-                    else { rd.innerHTML = __epSanitizeHtml(`제시어 카테고리 [${data.category}]<br>🍕 정답 단어: ${data.word}`); rd.className = "role-box citizen"; }
+                    if(data.liarId === myId) { rd.innerHTML = __epSanitizeHtml(`🕵️‍♂️ 당신은 라이어입니다!<br>제시어 카테고리 [${escapeHtml(data.category)}]`); rd.className = "role-box liar"; }
+                    else { rd.innerHTML = __epSanitizeHtml(`제시어 카테고리 [${escapeHtml(data.category)}]<br>🍕 정답 단어: ${escapeHtml(data.word)}`); rd.className = "role-box citizen"; }
                 }
                 else if (data.selectedGame === 'draw') {
                     showScreen('game-draw-screen');
@@ -5565,7 +5472,7 @@
                     else { sorted.forEach(s => {
                         const row = document.createElement('div'); row.className = 'score-row';
                         const imgTag = s.img ? `<img src="${s.img}" class="user-drawing-thumbnail" data-ep-onclick-fn="openImageModal" data-ep-onclick-args="${__epEscapeAttr(JSON.stringify([String(s.nickname), String(s.img)]))}">` : `<div class="user-drawing-thumbnail"></div>`;
-                        row.innerHTML = __epSanitizeHtml(`<div class="score-info"><span>👤 ${s.nickname}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`);
+                        row.innerHTML = __epSanitizeHtml(`<div class="score-info"><span>👤 ${escapeHtml(s.nickname)}</span><span style="color:var(--accent-color);">${s.score}점</span></div>${imgTag}`);
                         scoreBoardEl.appendChild(row);
                     }); }
                 }
@@ -5685,12 +5592,12 @@
                         const hasAns = speedAnswers[id];
                         const badgeClass = hasAns ? 'success' : 'waiting';
                         const badgeText = hasAns ? `성공! (${speedAnswers[id]}) 🎉` : '입력 중.. 💬';
-                        row.innerHTML = __epSanitizeHtml(`<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`);
+                        row.innerHTML = __epSanitizeHtml(`<span>👤 ${escapeHtml(players[id].nickname)}</span><span class="status-badge ${badgeClass}">${escapeHtml(badgeText)}</span>`);
                         liveContainer.appendChild(row);
                     });
                     const expBox = document.getElementById('speed-explosion-box');
                     if (data.speedLoserId) {
-                        expBox.innerHTML = __epSanitizeHtml(`💥 초성 대결 탈락 완료! 💥<br><span style="color:var(--accent-color); font-size:22px;">🚨 ${players[data.speedLoserId]?.nickname || "참가자"} 탈락! 벌칙 확정! 🚨</span>`);
+                        expBox.innerHTML = __epSanitizeHtml(`💥 초성 대결 탈락 완료! 💥<br><span style="color:var(--accent-color); font-size:22px;">🚨 ${escapeHtml(players[data.speedLoserId]?.nickname || "참가자")} 탈락! 벌칙 확정! 🚨</span>`);
                         expBox.style.display = 'block'; document.getElementById('btn-submit-speed').disabled = true;
                         if(data.speedLoserId === myId) {
                             triggerExplosionEffect({
@@ -5802,7 +5709,7 @@
                     listEl.innerHTML = sorted.length === 0 ? '대기 중...' : '';
                     sorted.forEach((s, idx) => {
                         const row = document.createElement('div'); row.className = 'score-row';
-                        row.innerHTML = __epSanitizeHtml(`<span>${idx===0?'🥇':'👤'} ${s.nickname}</span><span style="color:var(--success-color);">${s.value.toFixed(2)} (오차 ${s.error.toFixed(2)})</span>`);
+                        row.innerHTML = __epSanitizeHtml(`<span>${idx===0?'🥇':'👤'} ${escapeHtml(s.nickname)}</span><span style="color:var(--success-color);">${s.value.toFixed(2)} (오차 ${s.error.toFixed(2)})</span>`);
                         listEl.appendChild(row);
                     });
 
@@ -5864,7 +5771,7 @@
                     rows.forEach(r => {
                         const row = document.createElement('div'); row.className = 'score-row';
                         const isLoser = loserIds.includes(r.id);
-                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${r.nickname}</span><span style="color:${isLoser ? 'var(--danger-color)' : 'var(--success-color)'};">${r.label}</span>`);
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${escapeHtml(r.nickname)}</span><span style="color:${isLoser ? 'var(--danger-color)' : 'var(--success-color)'};">${r.label}</span>`);
                         diceListEl.appendChild(row);
                     });
 
@@ -5959,7 +5866,7 @@
                             labelHtml = submitted ? '✅ 제출완료' : '⏳ 대기중';
                             color = submitted ? 'var(--success-color)' : '#8E9AA8';
                         }
-                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${nickname}</span><span style="color:${color};">${labelHtml}</span>`);
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${escapeHtml(nickname)}</span><span style="color:${color};">${labelHtml}</span>`);
                         rpsListEl.appendChild(row);
                     });
 
@@ -6053,7 +5960,7 @@
                             labelHtml = submitted ? '✅ 제출완료' : '⏳ 대기중';
                             color = submitted ? 'var(--success-color)' : '#8E9AA8';
                         }
-                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${nickname}</span><span style="color:${color};">${labelHtml}</span>`);
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${escapeHtml(nickname)}</span><span style="color:${color};">${labelHtml}</span>`);
                         chamListEl.appendChild(row);
                     });
 
@@ -6148,7 +6055,7 @@
                             label = `${(x.r.elapsedMs / 1000).toFixed(2)}초 (${swSigned(x.r.diffMs)})${isLoser ? ' · 패배!' : ''}`;
                             color = isLoser ? 'var(--danger-color)' : 'var(--success-color)';
                         }
-                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${x.nickname}</span><span style="color:${color};">${label}</span>`);
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser ? '🍺' : '👤'} ${escapeHtml(x.nickname)}</span><span style="color:${color};">${label}</span>`);
                         swListEl.appendChild(row);
                     });
 
@@ -6209,7 +6116,7 @@
                         if (timerEl) timerEl.textContent = '🍺';
                         const loserNick = players[loserId]?.nickname || '참가자';
                         const penaltyText = data.drinkPenaltyText || '한 잔 마시기';
-                        if (statusEl) statusEl.innerHTML = __epSanitizeHtml(`🍺 <b>${loserNick}</b>님 당첨!<br>${penaltyText}${loserId === myId ? '<br><span style="font-size:12px; color:#8E9AA8;">마시고 나서 다음 타이머를 정해주세요.</span>' : ''}`);
+                        if (statusEl) statusEl.innerHTML = __epSanitizeHtml(`🍺 <b>${escapeHtml(loserNick)}</b>님 당첨!<br>${escapeHtml(penaltyText)}${loserId === myId ? '<br><span style="font-size:12px; color:#8E9AA8;">마시고 나서 다음 타이머를 정해주세요.</span>' : ''}`);
                         if (loserId === myId) {
                             if (pickBox) pickBox.style.display = 'block';
                             if (waitBox) waitBox.style.display = 'none';
@@ -6389,7 +6296,7 @@
                     rows.forEach(r => {
                         const row = document.createElement('div'); row.className = 'score-row';
                         const isLoser = loserRow && r.id === loserRow.id;
-                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser?'🍺':'👤'} ${r.nickname}</span><span style="color:${isLoser?'var(--danger-color)':'var(--success-color)'};">${r.label}</span>`);
+                        row.innerHTML = __epSanitizeHtml(`<span>${isLoser?'🍺':'👤'} ${escapeHtml(r.nickname)}</span><span style="color:${isLoser?'var(--danger-color)':'var(--success-color)'};">${r.label}</span>`);
                         sfListEl.appendChild(row);
                     });
                     document.getElementById('speedFingerFinalMsg').textContent = loserRow ? `🍺 ${loserRow.nickname}님 마시기!` : '';
@@ -6484,7 +6391,7 @@
                         if (isConfirmed) userStatusIcon = '✅';
                         else if (isPeeked) userStatusIcon = '👀';
 
-                        infoDiv.innerHTML = __epSanitizeHtml(`<span>👤 ${players[id].nickname} ${userStatusIcon}</span><span style="color:var(--accent-color);">${displayPriceText}</span>`);
+                        infoDiv.innerHTML = __epSanitizeHtml(`<span>👤 ${escapeHtml(players[id].nickname)} ${userStatusIcon}</span><span style="color:var(--accent-color);">${displayPriceText}</span>`);
                         row.appendChild(infoDiv);
 
                         // 스위치 관리 버튼 컴포넌트
@@ -6554,7 +6461,7 @@
                         const path = data.godPath || [];
                         const pathText = path.map(id => players[id]?.nickname || '???').join(' → ');
                         const loserNick = players[data.godLoserResult]?.nickname || '???';
-                        statusBox.innerHTML = __epSanitizeHtml(`☠️ ${startNick}님부터 <b>${data.godNumber}</b>칸 이동!<br><span style="font-size:12px; color:#8E9AA8;">${pathText}</span><br>최종 지목: <b>${loserNick}</b>님 벌칙입니다 🍻`);
+                        statusBox.innerHTML = __epSanitizeHtml(`☠️ ${escapeHtml(startNick)}님부터 <b>${data.godNumber}</b>칸 이동!<br><span style="font-size:12px; color:#8E9AA8;">${escapeHtml(pathText)}</span><br>최종 지목: <b>${escapeHtml(loserNick)}</b>님 벌칙입니다 🍻`);
                         statusBox.className = 'role-box liar';
                     } else if (!allDesignated) {
                         const doneCount = playerIds.filter(id => !!targets[id]).length;
@@ -6567,7 +6474,7 @@
                             changeBtn.onclick = () => update(ref(db, `rooms/${currentRoomCode}/godTargets`), { [myId]: null });
                             targetListEl.appendChild(changeBtn);
                         } else {
-                            statusBox.innerHTML = __epSanitizeHtml(`🤫 다른 참가자를 한 명 몰래 지목하세요. (${doneCount}/${playerIds.length}명 완료)<br><span style="font-size:12px; color:#8E9AA8;">벌칙이 시작되면 ${startNick}님부터 지목한 사람을 따라 이동해요.</span>`);
+                            statusBox.innerHTML = __epSanitizeHtml(`🤫 다른 참가자를 한 명 몰래 지목하세요. (${doneCount}/${playerIds.length}명 완료)<br><span style="font-size:12px; color:#8E9AA8;">벌칙이 시작되면 ${escapeHtml(startNick)}님부터 지목한 사람을 따라 이동해요.</span>`);
                             statusBox.className = 'role-box liar';
                             playerIds.filter(id => id !== myId).forEach(id => {
                                 const b = document.createElement('button');
@@ -6607,7 +6514,7 @@
                         const pathText = path.map(id => players[id]?.nickname || '???').join(' → ');
                         const curNick = players[data.godCurrentId]?.nickname || '???';
                         const isMyTurn = data.godCurrentId === myId;
-                        statusBox.innerHTML = __epSanitizeHtml(`☠️ 진행 중 (${data.godStep}/${data.godNumber})<br><span style="font-size:13px;">${pathText}</span>`);
+                        statusBox.innerHTML = __epSanitizeHtml(`☠️ 진행 중 (${data.godStep}/${data.godNumber})<br><span style="font-size:13px;">${escapeHtml(pathText)}</span>`);
                         statusBox.className = 'role-box liar';
                         if (isMyTurn) {
                             const nextBtn = document.createElement('button');
@@ -6651,7 +6558,7 @@
                         if (f > 0) activeIds.push(id);
                         const row = document.createElement('div');
                         row.style.cssText = 'display:flex; justify-content:space-between; padding:6px 10px; background:#1c1c20; border-radius:8px; font-size:13px;';
-                        row.innerHTML = __epSanitizeHtml(`<span>${players[id]?.nickname || '참가자'}${id === myId ? ' (나)' : ''}</span><span>${f > 0 ? '✋'.repeat(f) : '💀 탈락'}</span>`);
+                        row.innerHTML = __epSanitizeHtml(`<span>${escapeHtml(players[id]?.nickname || '참가자')}${id === myId ? ' (나)' : ''}</span><span>${f > 0 ? '✋'.repeat(f) : '💀 탈락'}</span>`);
                         listEl.appendChild(row);
                     });
 
@@ -6950,7 +6857,7 @@
                             if (isPenalty) penaltyIds.push(id);
                             const row = document.createElement('div');
                             row.className = 'ladder-result-row' + (isPenalty ? ' penalty' : '');
-                            row.innerHTML = __epSanitizeHtml(`<span>${players[id]?.nickname || '참가자'}${id === myId ? ' (나)' : ''}</span><span>${isPenalty ? '💥 벌칙!' : '⭕ 안전'}</span>`);
+                            row.innerHTML = __epSanitizeHtml(`<span>${escapeHtml(players[id]?.nickname || '참가자')}${id === myId ? ' (나)' : ''}</span><span>${isPenalty ? '💥 벌칙!' : '⭕ 안전'}</span>`);
                             resultListEl.appendChild(row);
                         });
                         if (penaltyIds.length > 0) {
@@ -6991,7 +6898,7 @@
                 const drawSubmitBtn = document.getElementById('btn-submit-score');
                 if (drawSubmitBtn) { drawSubmitBtn.disabled = false; drawSubmitBtn.innerText = '📐 내 그림 제출하고 채점받기'; }
             }
-        });
+        }));
     }
 
     window.changeDutchStatus = function(targetPlayerId, statusBoolean) {
@@ -7402,7 +7309,7 @@
                 const bIdx = d.balanceIndex || 0;
                 const label = choice === 'A' ? balancePool[bIdx].a : balancePool[bIdx].b;
                 document.getElementById('balance-result-hint').innerText = `🔎 [${label}] 선택자 (${names.length}명)`;
-                document.getElementById('balance-winners-list').innerHTML = __epSanitizeHtml(names.length > 0 ? names.map(n => `👤 ${n}`).join('<br>') : '아무도 선택하지 않았어요.');
+                document.getElementById('balance-winners-list').innerHTML = __epSanitizeHtml(names.length > 0 ? names.map(n => `👤 ${escapeHtml(n)}`).join('<br>') : '아무도 선택하지 않았어요.');
             }
         });
     }
@@ -7732,7 +7639,7 @@
             const isLoser = data.opBombLoserId === id;
             const badgeClass = isSolved ? 'success' : 'waiting';
             const badgeText = isLoser ? '💥 꼴찌 탈락!' : (isSolved ? `${rankIdx + 1}등 탈출! 🎉` : '풀이 중.. 🧮');
-            row.innerHTML = __epSanitizeHtml(`<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`);
+            row.innerHTML = __epSanitizeHtml(`<span>👤 ${escapeHtml(players[id].nickname)}</span><span class="status-badge ${badgeClass}">${escapeHtml(badgeText)}</span>`);
             liveEl.appendChild(row);
         });
 
@@ -7740,7 +7647,7 @@
         if (data.opBombLoserId) {
             const loserNick = players[data.opBombLoserId]?.nickname || '참가자';
             const ops = puzzle.sampleOps || ['+', '+'];
-            expBox.innerHTML = __epSanitizeHtml(`💥 사칙연산 폭탄 종료! 💥<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${loserNick}님 꼴찌 당첨! 🚨</span><div style="font-size:13px; color:#EAEAEA; margin-top:6px;">예시 정답: (${puzzle.a} ${ops[0]} ${puzzle.b}) ${ops[1]} ${puzzle.c} = ${puzzle.target}</div>`);
+            expBox.innerHTML = __epSanitizeHtml(`💥 사칙연산 폭탄 종료! 💥<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${escapeHtml(loserNick)}님 꼴찌 당첨! 🚨</span><div style="font-size:13px; color:#EAEAEA; margin-top:6px;">예시 정답: (${puzzle.a} ${ops[0]} ${puzzle.b}) ${ops[1]} ${puzzle.c} = ${puzzle.target}</div>`);
             expBox.style.display = 'block';
             setOpBombKeypadDisabled(true);
             triggerExplosionEffect({
@@ -8053,7 +7960,7 @@
             const isLoser = data.idiomLoserId === id;
             const badgeClass = isSolved ? 'success' : 'waiting';
             const badgeText = isLoser ? '💥 꼴찌 탈락!' : (isSolved ? `${rankIdx + 1}등 탈출! 🎉` : '고르는 중.. 📜');
-            row.innerHTML = __epSanitizeHtml(`<span>👤 ${players[id].nickname}</span><span class="status-badge ${badgeClass}">${badgeText}</span>`);
+            row.innerHTML = __epSanitizeHtml(`<span>👤 ${escapeHtml(players[id].nickname)}</span><span class="status-badge ${badgeClass}">${escapeHtml(badgeText)}</span>`);
             liveEl.appendChild(row);
         });
 
@@ -8063,7 +7970,7 @@
             refreshIdiomButtonsDisabled(true);
             const loserNick = players[data.idiomLoserId]?.nickname || '참가자';
             const fullAnswer = puzzle.category === 'idiom' ? `${puzzle.front}${puzzle.back}` : `${puzzle.front} ${puzzle.back}`;
-            expBox.innerHTML = __epSanitizeHtml(`⌛ 퀴즈 종료! ⌛<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${loserNick}님 꼴찌 당첨! 🚨</span><div style="font-size:14px; color:#EAEAEA; margin-top:6px;">정답: <strong>${fullAnswer}</strong></div>`);
+            expBox.innerHTML = __epSanitizeHtml(`⌛ 퀴즈 종료! ⌛<br><span style="color:var(--accent-color); font-size:21px;">🚨 ${escapeHtml(loserNick)}님 꼴찌 당첨! 🚨</span><div style="font-size:14px; color:#EAEAEA; margin-top:6px;">정답: <strong>${escapeHtml(fullAnswer)}</strong></div>`);
             expBox.style.display = 'block';
             triggerExplosionEffect({
                 key: `idiom_${data.idiomRoundKey}_${data.idiomLoserId}`,
@@ -8823,7 +8730,7 @@
             const loserNames = loserIds.map(id => players[id]?.nickname || '알수없음').join(', ');
             statusEl.innerText = data.nunchiReason || `${loserNames} 패배!`;
             resBox.style.display = 'block';
-            resBox.innerHTML = __epSanitizeHtml(`🍺 벌칙 당첨: <b>${loserNames}</b><br><span style="font-size:13px;">${data.nunchiReason || ''}</span>`);
+            resBox.innerHTML = __epSanitizeHtml(`🍺 벌칙 당첨: <b>${escapeHtml(loserNames)}</b><br><span style="font-size:13px;">${escapeHtml(data.nunchiReason || '')}</span>`);
             triggerExplosionEffect({
                 key: `nunchi_${data.nunchiRoundKey}`,
                 title: '👀 눈치게임 종료!',
@@ -8841,7 +8748,7 @@
             const sh = shouts[pid];
             const cls = isLoser ? 'loser' : (sh ? 'done' : '');
             const tag = isLoser ? '💥 패배' : (sh ? `✅ ${sh.num}` : '대기 중');
-            return `<div class="nunchi-pchip ${cls}"><div>${nick}</div><div style="margin-top:3px;font-size:11px;opacity:0.85;">${tag}</div></div>`;
+            return `<div class="nunchi-pchip ${cls}"><div>${escapeHtml(nick)}</div><div style="margin-top:3px;font-size:11px;opacity:0.85;">${tag}</div></div>`;
         }).join(''));
 
         // 호스트가 봇 자동 외침 예약
@@ -9056,7 +8963,7 @@
         document.getElementById('rummi-pbar').innerHTML = __epSanitizeHtml(turnOrder.map((pid, idx) => {
             const cnt = (st.hands && st.hands[pid] ? st.hands[pid].length : 0);
             const mel = st.melded && st.melded[pid] ? '✓' : '';
-            return `<div class="rummi-pcard ${!st.winnerId && idx === st.turnIdx ? 'turn' : ''}"><div><b>${players[pid]?.nickname || '익명'}</b></div><div style="color:#9ca3af;">${cnt}장 ${mel}</div></div>`;
+            return `<div class="rummi-pcard ${!st.winnerId && idx === st.turnIdx ? 'turn' : ''}"><div><b>${escapeHtml(players[pid]?.nickname || '익명')}</b></div><div style="color:#9ca3af;">${cnt}장 ${mel}</div></div>`;
         }).join(''));
 
         const resBox = document.getElementById('rummi-result-box');
@@ -9065,8 +8972,8 @@
             const lNick = players[st.loserId]?.nickname || '패배자';
             resBox.style.display = 'block';
             resBox.innerHTML = __epSanitizeHtml(st.endReason === 'lateMeld'
-                ? `🐢 최초 등록(${st.minMeld || 30}점↑) 꼴찌 · 🍺 벌칙: <b>${lNick}</b>`
-                : `🏆 승자: <b>${wNick}</b> · 🍺 벌칙(최고 잔여점수): <b>${lNick}</b>`);
+                ? `🐢 최초 등록(${st.minMeld || 30}점↑) 꼴찌 · 🍺 벌칙: <b>${escapeHtml(lNick)}</b>`
+                : `🏆 승자: <b>${escapeHtml(wNick)}</b> · 🍺 벌칙(최고 잔여점수): <b>${escapeHtml(lNick)}</b>`);
             triggerExplosionEffect({
                 key: `rummi_${data.rummikubRoundKey}`,
                 title: '🀄 루미큐브 종료!',
@@ -9369,7 +9276,7 @@
         document.getElementById('bb-base-3').classList.toggle('on', !!bases[2]);
         document.getElementById('bb-bso').innerText = `B ${st.balls || 0}  ·  S ${st.strikes || 0}  ·  O ${st.outs || 0}`;
         document.getElementById('bb-last-play').innerText = st.lastPlay || '';
-        document.getElementById('bb-log-box').innerHTML = __epSanitizeHtml((st.logs || []).slice(0, 10).map(l => `<div style="padding:2px 0;">${l}</div>`).join(''));
+        document.getElementById('bb-log-box').innerHTML = __epSanitizeHtml((st.logs || []).slice(0, 10).map(l => `<div style="padding:2px 0;">${escapeHtml(l)}</div>`).join(''));
 
         const resBox = document.getElementById('bb-result-box');
         const ctrl = document.getElementById('bb-control-area');
@@ -9377,7 +9284,7 @@
             const loseTeamLabel = st.winnerTeam === 'A' ? '백팀' : (st.winnerTeam === 'B' ? '청팀' : '무승부(양팀 원샷!)');
             const loserNick = players[st.loserId]?.nickname || '';
             resBox.style.display = 'block';
-            resBox.innerHTML = __epSanitizeHtml(`🍺 벌칙 팀: <b>${loseTeamLabel}</b>${loserNick ? ` (대표: ${loserNick})` : ''}`);
+            resBox.innerHTML = __epSanitizeHtml(`🍺 벌칙 팀: <b>${escapeHtml(loseTeamLabel)}</b>${loserNick ? ` (대표: ${escapeHtml(loserNick)})` : ''}`);
             ctrl.style.display = 'none';
             triggerExplosionEffect({
                 key: `baseball_${data.baseballRoundKey}`,
