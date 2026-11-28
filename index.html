@@ -2664,6 +2664,29 @@
         return Math.floor(Math.random() * shapes.length);
     }
 
+    // 💣 접속 끊긴(화면 꺼짐/앱 이탈) 사람에게 폭탄이 넘어가 멈추는 문제 방지:
+    // 폭탄 게임 중 각 폰이 4초마다 lastSeen을 기록하고, 패스할 때 12초 넘게 신호 없는 사람은 건너뜀.
+    // (lastSeen이 없는 봇 등은 접속 중으로 간주 / 전원이 끊긴 상태면 원래대로 바로 다음 사람)
+    const BOMB_AWAY_MS = 12000;
+    function nextBombHolderId(roomData, fromId) {
+        const pIds = Object.keys(roomData.players || {});
+        const myIdx = pIds.indexOf(fromId);
+        if (myIdx === -1) return null;
+        const now = getServerNow();
+        for (let i = 1; i < pIds.length; i++) {
+            const cand = pIds[(myIdx + i) % pIds.length];
+            const seen = roomData.players[cand] && roomData.players[cand].lastSeen;
+            if (!seen || now - seen <= BOMB_AWAY_MS) return cand;
+        }
+        return pIds[(myIdx + 1) % pIds.length];
+    }
+    function bombHeartbeat() {
+        if (!currentRoomCode || !myId || !latestPlayers || !latestPlayers[myId]) return;
+        if (document.visibilityState !== 'visible') return;
+        update(ref(db, `rooms/${currentRoomCode}/players/${myId}`), { lastSeen: getServerNow() }).catch(() => {});
+    }
+    setInterval(() => { if (currentBombExplodeAt) bombHeartbeat(); }, 4000);
+
     let bombExplosionTimer = null;
     function scheduleBombExplosion(explodeAt) {
         if (bombExplosionTimer) { clearTimeout(bombExplosionTimer); bombExplosionTimer = null; }
@@ -2791,10 +2814,9 @@
             const curKey = `${roomData.bombHolderId}_${roomData.bombPassSeq || 0}`;
             if (curKey !== expectedKey) return undefined; // 이미 상태가 바뀜 (터짐/다른 소지자)
             if (!roomData.players?.[botId]?.isBot) return undefined;
-            const pIds = Object.keys(roomData.players || {});
-            const myIdx = pIds.indexOf(botId);
-            if (myIdx === -1) return undefined;
-            roomData.bombHolderId = pIds[(myIdx + 1) % pIds.length];
+            const nextId = nextBombHolderId(roomData, botId);
+            if (!nextId) return undefined;
+            roomData.bombHolderId = nextId;
             roomData.bombPassSeq = (roomData.bombPassSeq || 0) + 1;
             return roomData;
         }, { applyLocally: false }).then((res) => {
@@ -5556,6 +5578,7 @@
                         lastBombGameStartKey = data.bombExplodeAt;
                         lastBombQuizKey = null;
                         lastBotBombAutoKey = null;
+                        setTimeout(bombHeartbeat, 0);
                     }
                     if (bombExplosionAttemptKey !== data.bombExplodeAt) bombExplosionAttemptKey = null;
                     currentBombExplodeAt = data.bombExploded ? null : data.bombExplodeAt;
@@ -7409,7 +7432,34 @@
         });
     });
 
+    // 정답 → 폭탄 넘기기. 서버 응답이 늦거나 실패해도 화면이 멈춘 채로 남지 않도록 재시도/복구한다.
+    let bombPassPending = false;
+    function bombPassFailed() {
+        bombPassPending = false;
+        document.querySelectorAll('#quiz-options-box button').forEach((btn) => { btn.disabled = false; });
+        const st = document.getElementById('bomb-status-text');
+        if (st && currentBombExplodeAt) st.innerHTML = '🔥 내 차례입니다! 문제를 푸세요! 🔥';
+    }
+    function submitBombPass(attempt) {
+        runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
+            if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'bomb' || roomData.bombExploded) return undefined;
+            if (roomData.bombHolderId !== myId) return undefined; // 이미 소지자가 바뀐 상태(터짐 등) - 아무 것도 하지 않음
+            const nextId = nextBombHolderId(roomData, myId);
+            if (!nextId) return undefined;
+            roomData.bombHolderId = nextId;
+            roomData.bombPassSeq = (roomData.bombPassSeq || 0) + 1;
+            return roomData;
+        }, { applyLocally: false }).then((res) => {
+            if (!res.committed) bombPassFailed();
+        }).catch((error) => {
+            console.error('bomb pass transaction failed:', error);
+            if (attempt < 2) setTimeout(() => submitBombPass(attempt + 1), 400);
+            else bombPassFailed();
+        });
+    }
+
     function generateQuiz() {
+        bombPassPending = false;
         if (isPenaltyActive) return;
         const a1=Math.floor(Math.random()*8)+4, b1=Math.floor(Math.random()*7)+3, c1=Math.floor(Math.random()*25)+5;
         document.getElementById('quiz-question-text').innerText = `(${a1} × ${b1}) - ${c1} = ?`; currentAnswer = (a1*b1)-c1;
@@ -7420,16 +7470,12 @@
             b.onclick = () => {
                 if (isPenaltyActive) return; // 오답 페널티 중에는 아무 버튼도 선택되지 않도록 막음
                 if (o === currentAnswer) {
-                    runTransaction(ref(db, `rooms/${currentRoomCode}`), (roomData) => {
-                        if (!roomData || roomData.status !== 'playing' || roomData.selectedGame !== 'bomb' || roomData.bombExploded) return undefined;
-                        if (roomData.bombHolderId !== myId) return undefined; // 이미 소지자가 바뀐 상태(터짐 등) - 아무 것도 하지 않음
-                        const pIds = Object.keys(roomData.players || {});
-                        const myIdx = pIds.indexOf(myId);
-                        if (myIdx === -1) return undefined;
-                        roomData.bombHolderId = pIds[(myIdx + 1) % pIds.length];
-                        roomData.bombPassSeq = (roomData.bombPassSeq || 0) + 1;
-                        return roomData;
-                    }, { applyLocally: false }).catch((error) => console.error('bomb pass transaction failed:', error));
+                    if (bombPassPending) return;
+                    bombPassPending = true;
+                    Array.from(box.children).forEach((btn) => { btn.disabled = true; });
+                    const st = document.getElementById('bomb-status-text');
+                    if (st) st.textContent = '💣 넘기는 중...';
+                    submitBombPass(0);
                 } else {
                     isPenaltyActive = true; b.classList.add('wrong-animation');
                     Array.from(box.children).forEach((btn) => { btn.disabled = true; });
