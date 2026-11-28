@@ -116,3 +116,23 @@ All files     |   97.61 |    80.76 |     100 |   97.61
 - `5c2d0cc` `test: add RED reproducers for Phase 4 PWA and service worker`
 - `8bffc4e` `fix: harden service worker caching and add maskable PWA icons`
 - *(final commit)* `docs: add coverage hardening tests and TDD evidence report`
+
+---
+
+## 7. Follow-up Bugfix TDD Cycle: 방장 "새로운 방 만들기" 버튼 무반응 수정 (로컬 Mock 전용)
+- **Bug Report**: 방장이 새 방을 만들 때 버튼을 클릭해도 동작하지 않음.
+- **Validation Constraint**: 실제 Firebase DB에는 일절 접근하지 않고 로컬 Vitest + jsdom Mock 환경에서만 검증.
+- **Root Causes Identified**:
+  1. `createRoomSafely`의 `runRoomTransaction`에 타임아웃이 없어 지연/끊김 시 `createRoomInFlight`가 영구 잠금(`true`)되어 이후 클릭이 무반응 처리됨.
+  2. `runTransaction`이 환경/규칙 오류로 거부될 때 충돌 검증 기반 `get`+`set` 폴백 경로가 없음.
+  3. ES Module 지연 로딩 시 `DOMContentLoaded`가 이미 발생한 뒤 리스너가 등록되어 초기화가 누락될 수 있음.
+  4. `file://` 직접 열기 시 ES Module CORS 차단으로 버튼이 무반응 상태가 되며 안내 메시지가 없음.
+- **RED Checkpoint** (`a31b461`, `npx vitest run --testTimeout=1500 tests/unit/room-create-bug.test.js tests/integration/create-room-flow.test.js`):
+  - `tests/unit/room-create-bug.test.js`: 2/2 failed (`Test timed out in 1500ms` 영구 잠금 재현, `expected null to be '2222'` 폴백 부재 재현)
+  - `tests/integration/create-room-flow.test.js`: failed to resolve `src/core/login-controller.js`
+- **GREEN Fix & Verification**:
+  - `src/core/room.js`: `withTimeout` 기반 타임아웃 해제 + `checkRoomExists`/`writeRoom` 충돌 검증 폴백 추가
+  - `src/core/login-controller.js`: `onDomReady`, `bindLoginControls`(버튼 비활성/로딩 상태 및 `finally` 복구) 분리
+  - `index.html`, `sw.js`: `onDomReady`/`bindLoginControls` 연동, `window.__partyAppBooted` + `file://` CORS 경고 배너/클릭 안내 추가, `sw.js`에 `./src/core/login-controller.js` 프리캐시 등록
+  - Validation command: `npm run test:coverage` (14 test files / 59 tests PASS, 80%+ 전 항목 통과)
+

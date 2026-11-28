@@ -87,6 +87,37 @@ describe('host create-room UI flow and boot resilience (local mocks only)', () =
       nickname: '호스트유저',
       isHost: true
     });
+
+    // Switch back to join mode and verify join button validation & success flow
+    document.getElementById('link-to-join').click();
+    expect(document.getElementById('create-mode-box').style.display).toBe('none');
+    expect(document.getElementById('join-mode-box').style.display).toBe('block');
+
+    const joinBtn = document.getElementById('btn-join-room');
+    document.getElementById('room-code-input').value = '';
+    joinBtn.click();
+    expect(alertFn).toHaveBeenCalledWith('입력 값을 확인해주세요!');
+
+    const joinRoomMock = vi.fn(async () => ({ joined: true, isHost: false }));
+    setupLoginDom();
+    const onRoomEntered2 = vi.fn();
+    bindLoginControls({
+      doc: document,
+      createRoom: vi.fn(),
+      joinRoom: joinRoomMock,
+      onRoomEntered: onRoomEntered2,
+      alertFn
+    });
+    document.getElementById('nickname-input').value = '게스트';
+    document.getElementById('room-code-input').value = '4821';
+    document.getElementById('btn-join-room').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onRoomEntered2).toHaveBeenCalledWith({
+      roomCode: '4821',
+      nickname: '게스트',
+      isHost: false
+    });
   });
 
   it('index.html uses login-controller and includes a classic file:// CORS notice guard', () => {
