@@ -14,7 +14,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght=400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
@@ -1309,7 +1309,7 @@
             <div id="drink-timer-display" style="font-size: 48px; font-weight: bold; color: var(--danger-color);">00:00</div>
         </div>
         <div id="drink-status-text" style="font-size: 15px; color: #fff; font-weight: 700; margin-bottom: 14px;">불러오는 중...</div>
-        <button id="btn-drink-notify" class="secondary" style="display:none; margin-bottom: 14px; font-size:13px; padding:10px;" onclick="window.rpZEAWYtiB6bJ16NuLbGCc6CZ6jJdKfb63()">🔔 알림 받기 (타이머 종료 시)</button>
+        <button id="btn-drink-notify" class="secondary" style="display:none; margin-bottom: 14px; font-size:13px; padding:10px;" onclick="window.requestDrinkNotifyPermission()">🔔 알림 받기 (타이머 종료 시)</button>
 
         <div id="drink-next-round-box" style="display:none; background:#151518; border:1px solid #2D2D34; border-radius:10px; padding:14px; margin-bottom: 14px; text-align:left;">
             <div style="color:var(--accent-color); font-size:14px; font-weight:700; margin-bottom:10px;">⏱️ 다음 타이머 시간 정하기</div>
@@ -1575,6 +1575,7 @@
         createRoomSafely,
         joinRoomSafely
     } from './src/core/room.js';
+    import { playTierSound } from './src/utils/audio.js';
 
     initClickDelegate(document, window);
     const roomSubManager = new RoomSubscriptionManager();
@@ -1649,21 +1650,7 @@
         } catch (e) {}
     }
     function funPlaySound(tier) {
-        if (funState.muted) return;
-        try {
-            const AC = window.AudioContext || window.webkitAudioContext;
-            if (!AC) return;
-            if (!funState.audioCtx) funState.audioCtx = new AC();
-            const ctx = funState.audioCtx;
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.frequency.value = tier === 'perfect' ? 880 : (tier === 'good' ? 660 : 180);
-            osc.type = tier === 'miss' ? 'sawtooth' : 'sine';
-            gain.gain.value = 0.08;
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.15);
-        } catch (e) {}
+        playTierSound(funState, tier);
     }
     function funShowCallout(text, tier) {
         try {
@@ -2641,7 +2628,7 @@
 
     // 🔔 랜덤 마시기: 타이머가 끝났을 때 화면을 안 보고 있어도 알림이 오도록.
     // (별도 푸시 서버 없이, 브라우저 알림 권한 기반으로 동작 — 앱 탭이 열려있는 동안만 유효)
-    window.rpZEAWYtiB6bJ16NuLbGCc6CZ6jJdKfb63 = function() {
+    window.requestDrinkNotifyPermission = function() {
         if (!('Notification' in window)) { alert('이 브라우저는 알림 기능을 지원하지 않아요.\n(iOS는 홈 화면에 추가한 앱에서만 알림이 지원돼요)'); return; }
         if (Notification.permission === 'granted') { ensureDrinkServiceWorker(); updateDrinkNotifyButton(); return; }
         Notification.requestPermission().then((perm) => {
@@ -9533,8 +9520,15 @@
         }
     });
 
-    // 텍스트 드래그 선택 방지 (원하지 않으면 이 블록은 지워도 됩니다)
-    document.addEventListener('selectstart', (e) => e.preventDefault());
+    // 텍스트 드래그 선택 방지 (입력창 및 contenteditable 요소는 예외 허용)
+    document.addEventListener('selectstart', (e) => {
+        const target = e.target;
+        const el = target && target.nodeType === 3 ? target.parentElement : target;
+        if (el && typeof el.closest === 'function' && el.closest('input, textarea, select, [contenteditable="true"]')) {
+            return;
+        }
+        e.preventDefault();
+    });
 </script>
 </body>
 </html>
