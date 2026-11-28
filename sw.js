@@ -3,12 +3,27 @@
 // 오프라인 앱 셸 폴백(네트워크 우선 + 캐시 폴백)을 함께 제공합니다.
 
 const CACHE_PREFIX = 'party-games-shell-';
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
-const APP_SHELL_ASSETS = ['./', './index.html', './manifest.json'];
+const CACHE_NAME = `${CACHE_PREFIX}v3`;
+const APP_SHELL_ASSETS = [
+    './',
+    './index.html',
+    './manifest.json',
+    './src/utils/sanitize.js',
+    './src/utils/audio.js',
+    './src/utils/random.js',
+    './src/core/room.js',
+    './src/games/baseball.js',
+    './src/games/rummikub.js',
+    './src/games/bingo.js'
+];
 
 self.addEventListener('install', (event) => {
     const precache = self.caches
-        ? self.caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_ASSETS))
+        ? self.caches
+              .open(CACHE_NAME)
+              .then((cache) =>
+                  Promise.allSettled(APP_SHELL_ASSETS.map((asset) => cache.add(asset)))
+              )
         : Promise.resolve();
     event.waitUntil(precache.then(() => self.skipWaiting()));
 });
@@ -42,11 +57,12 @@ self.addEventListener('fetch', (event) => {
     if (self.location && url.origin !== self.location.origin) return;
     if (url.pathname.endsWith('/sw.js')) return;
 
+    const shouldCache = !url.search;
     const fetcher = typeof self.fetch === 'function' ? self.fetch.bind(self) : fetch;
     event.respondWith(
         fetcher(request)
             .then((response) => {
-                if (response && response.ok && self.caches) {
+                if (shouldCache && response && response.ok && self.caches) {
                     const responseClone = response.clone();
                     const cacheUpdate = self.caches
                         .open(CACHE_NAME)
