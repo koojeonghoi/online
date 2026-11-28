@@ -124,5 +124,18 @@ describe('rummikub game logic (Phase 3)', () => {
     st.winnerId = 'p1';
     expect(canActOnRummiTurn(st, 'p1')).toBe(false);
     expect(calcRummiHandPenalty([{ joker: true }, { num: 5, joker: false }])).toBe(35);
+
+    // Additional edge branches: duplicate num in run, non-turn pass abort, finished game check
+    expect(
+      evaluateRummiMeld([
+        { id: 1, color: 'blue', num: 4, joker: false },
+        { id: 2, color: 'blue', num: 4, joker: false },
+        { id: 3, color: 'blue', num: 5, joker: false }
+      ]).valid
+    ).toBe(false);
+    expect(applyRummiDrawPass({ rummikubState: { winnerId: 'p1', turnOrder: ['p1'] } }, 'p1')).toBeUndefined();
+    expect(applyRummiDrawPass({ rummikubState: { winnerId: null, turnOrder: ['p1', 'p2'], turnIdx: 0 } }, 'p2')).toBeUndefined();
+    expect(checkRummiLateMeldEnd({}, { winnerId: 'p1' }, ['p1', 'p2'], 'p1')).toBe(false);
+    expect(checkRummiLateMeldEnd({}, { winnerId: null, turnSeq: 5, melded: { p1: true, p2: true } }, ['p1', 'p2'], 'p1')).toBe(false);
   });
 });

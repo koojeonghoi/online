@@ -109,4 +109,36 @@ describe('sanitize utilities (Phase 1 security)', () => {
     protoEl.remove();
     badArgsEl.remove();
   });
+
+  it('covers nullish sanitizeHtml, allowDelegateAttrs=false, vbscript URLs, template tags, text-node clicks, and initClickDelegate', async () => {
+    const { initClickDelegate } = await import('../../src/utils/sanitize.js');
+    expect(sanitizeHtml(null)).toBe('');
+    const noDelegate = sanitizeHtml(
+      '<button data-ep-onclick-fn="changeDutchStatus" data-ep-onclick-args="[]">ok</button>',
+      { allowDelegateAttrs: false }
+    );
+    expect(noDelegate).not.toContain('data-ep-onclick-fn');
+
+    const tplAndVbs = sanitizeHtml('<template><script>bad()</script><a href="vbscript:msgbox(1)">x</a></template>');
+    expect(tplAndVbs).not.toMatch(/script|vbscript/i);
+
+    const spy = vi.fn();
+    const fakeDoc = {
+      listeners: [],
+      addEventListener(type, fn) { this.listeners.push({ type, fn }); }
+    };
+    initClickDelegate(fakeDoc, { openImageModal: spy }, ALLOWED_DELEGATE_FNS);
+    initClickDelegate(fakeDoc, { openImageModal: spy }, ALLOWED_DELEGATE_FNS); // idempotent
+    expect(fakeDoc.listeners).toHaveLength(1);
+
+    const btn = document.createElement('button');
+    btn.setAttribute('data-ep-onclick-fn', 'window.openImageModal');
+    btn.setAttribute('data-ep-onclick-args', JSON.stringify(['nick', 'data:image/png;base64,AA']));
+    const textNode = document.createTextNode('thumb');
+    btn.appendChild(textNode);
+    document.body.appendChild(btn);
+    fakeDoc.listeners[0].fn({ target: textNode });
+    expect(spy).toHaveBeenCalledWith('nick', 'data:image/png;base64,AA');
+    btn.remove();
+  });
 });

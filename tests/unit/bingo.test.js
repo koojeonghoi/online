@@ -31,5 +31,13 @@ describe('bingo atomic transaction updater (Phase 3)', () => {
     expect(applyBingoCall(room, 7, 'p1')).toBeUndefined();
     expect(applyBingoCall(room, 9, 'p2')).toBeUndefined();
     expect(applyBingoCall({ ...room, status: 'waiting' }, 9, 'p1')).toBeUndefined();
+    expect(applyBingoCall({ status: 'playing', selectedGame: 'bingo', players: {} }, 5, 'p1')).toBeUndefined();
+    const fallback = applyBingoCall(
+      { status: 'playing', selectedGame: 'bingo', players: { p1: {}, p2: {} } },
+      5,
+      'p1'
+    );
+    expect(fallback.bingoCalled[5]).toBe(true);
+    expect(fallback.bingoTurnIdx).toBe(1);
   });
 });

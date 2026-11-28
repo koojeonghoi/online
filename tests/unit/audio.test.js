@@ -61,5 +61,10 @@ describe('audio helper (Phase 2 AudioContext.resume)', () => {
     expect(osc.frequency.value).toBe(180);
     expect(osc.type).toBe('sawtooth');
     expect(osc.start).toHaveBeenCalledTimes(1);
+
+    // good tier & error resilience
+    playTierSound(state, 'good');
+    expect(osc.frequency.value).toBe(660);
+    expect(() => playTierSound({ muted: false, audioCtx: { createOscillator() { throw new Error('fail'); } } }, 'good')).not.toThrow();
   });
 });

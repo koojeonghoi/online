@@ -137,5 +137,29 @@ describe('createRoomSafely and joinRoomSafely', () => {
       onError
     });
     expect(missing).toEqual({ joined: false, reason: 'not_found' });
+
+    // Error branch and RoomSubscriptionManager.isActive / generateFourDigitCode
+    const { generateFourDigitCode } = await import('../../src/core/room.js');
+    expect(generateFourDigitCode(() => 0)).toBe('1000');
+    expect(generateFourDigitCode(() => 0.9999)).toBe('9999');
+
+    const mgr = new RoomSubscriptionManager();
+    expect(mgr.isActive()).toBe(false);
+    mgr.replace(() => { throw new Error('close error'); });
+    expect(mgr.isActive()).toBe(true);
+    expect(() => mgr.clear()).not.toThrow();
+    expect(mgr.isActive()).toBe(false);
+
+    const errRes = await joinRoomSafely({
+      roomCode: '1234',
+      nickname: '유저',
+      myId: 'p_3',
+      getRoom: async () => { throw new Error('offline'); },
+      writePlayer,
+      onError
+    });
+    expect(errRes.joined).toBe(false);
+    expect(errRes.reason).toBe('error');
+    expect(onError).toHaveBeenCalledTimes(1);
   });
 });
